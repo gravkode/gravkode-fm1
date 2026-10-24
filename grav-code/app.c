@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
-/* The template app: every control on the screen as it arrives, by the name the app knows it by (plat.h B_*, EN_*,
- * the keys), and a few of them doing something: the keys play a voice and go out over USB-MIDI (MIDI in plays it
- * too), OCT- / OCT+ set the octave, PRESET the wave, MASTER the volume, SAVE stores the settings; the keys are
- * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
- * gfx.c and announce.c are in scope. */
+/* GRAV CODE: one voice on Plaits' engines (dsp/), with an envelope and an LFO (synth/). The keys play it with
+ * velocity and go out over USB and Bluetooth MIDI (MIDI in plays it too); PRESET picks the engine, K1-K3 the page's
+ * parameters (HOME: OSC, LFO: MOD, ENV: ENV), OCT- / OCT+ the octave, MASTER the volume, SAVE stores it all, REC
+ * Bluetooth. Part of the unity build (device/unity.c, host/plat_host.c), after the platform: gfx.c and announce.c
+ * are in scope. */
 #include "fastmath.h"
 #include "dsp/grav_engine.h"
 #include "dsp/grav_plaits.h"

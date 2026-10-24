@@ -1,7 +1,11 @@
 #include "grav_engine.h"
 #include "grav_plaits.h"
-#include "fastmath.h"
-extern int grav_cpp_test(int x);
+
+/* a sample of 1.0 from an engine, at full MASTER: just under the 24-bit full scale (2^23), the rest the headroom
+ * left for an engine's peaks above 1.0 */
+#define GRAV_OUT_FULL 8300000.0f
+#define GRAV_VOICE_GAIN 0.25f            /* the voice at velocity 127, of that */
+
 void grav_engine_init(grav_engine_t *e)
 {
     grav_plaits_init();
@@ -31,8 +35,8 @@ void grav_engine_render(
         e->velocity = voice->velocity;
     }
 
-    float voice_gain = 0.25f * e->velocity;
-    float gain = (float)master_q12 / 4096.0f * (float)grav_cpp_test(4150000);
+    float voice_gain = GRAV_VOICE_GAIN * e->velocity;
+    float gain = (float)master_q12 / 4096.0f * GRAV_OUT_FULL;
 
     grav_plaits_params_t p;
     p.engine = engine;
@@ -56,24 +60,15 @@ void grav_engine_render(
 
         for (uint32_t j = 0; j < count; j++) {
             uint32_t i = base + j;
-        e->level = envelope_process(&voice->amp_env);
-        e->gain += (gain - e->gain) * 0.004f;
+            e->level = envelope_process(&voice->amp_env);
+            e->gain += (gain - e->gain) * 0.004f;   /* MASTER glides: no step in the sound */
 
-        float s = plaits_out[j];
+            float s = plaits_out[j] * (e->level * voice_gain * e->gain);
+            if (s > 8388607.0f) s = 8388607.0f;
+            if (s < -8388608.0f) s = -8388608.0f;
 
-        s *= e->level * voice_gain * e->gain;
-
-        if (s > 8388607.0f) s = 8388607.0f;
-        if (s < -8388608.0f) s = -8388608.0f;
-
-        lr[2 * i] = (int32_t)s;
-        lr[2 * i + 1] = (int32_t)s;
+            lr[2 * i] = (int32_t)s;
+            lr[2 * i + 1] = (int32_t)s;
         }
     }
-}
-
-/* Float math compatibility for Mutable Instruments Plaits */
-float fabsf(float x)
-{
-    return fm_fabsf(x);
 }

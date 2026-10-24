@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
-/* The template: the smallest complete fm1-base firmware. Copy this directory to start a firmware.
- * This header is the app's half of the contract with the platform (device/unity.c, host/plat_host.c). */
+/* GRAV CODE, a synthesizer for the M-VAVE FM-1 on Mutable Instruments Plaits' engines, grown from fm1-base's
+ * template. This header is the app's half of the contract with the platform (device/unity.c, host/plat_host.c). */
 #pragma once
 #include <stdint.h>
 #include "plat.h"
@@ -22,8 +22,8 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_NOBJ };
 /* the contract: the platform calls these */
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12);   /* audio interrupt: n stereo frames, 24-bit */
-void app_panic(void);
-void app_ota_mute(int active); /* block audio during OTA, restore on cancellation */                    /* silence now (before an update rewrites the flash) */
+void app_panic(void);                    /* silence now (before an update rewrites the flash) */
+void app_ota_mute(int active);           /* an update running (1): no sound until it ends or is given up (0) */
 void app_ui_init(void);                  /* the first screen, after the splash */
 void app_frame(void);                    /* the UI: input and a redraw, about 60 times a second */
 void app_input_only(void);               /* between frames: input only */

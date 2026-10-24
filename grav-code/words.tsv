@@ -1,6 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0
-# The template's words for a screen reader (fm1-reader): the text on the screen <TAB> what to say.
+# GRAV CODE's words for a screen reader (fm1-reader): the text on the screen <TAB> what to say.
 # url: https://charlesvestal.github.io/fm1-base/words/
-TEMPLATE	template
-K1 OCTAVE	knob 1, octave
-K2 WAVE	knob 2, wave
+GRAV CODE	grav code
+PLAITS WS	plaits waveshaping
+PLAITS FM	plaits F M
+PLAITS VA	plaits virtual analog
+PLAITS MDL	plaits modal
+OSC	oscillator
+MOD	modulation
+ENV	envelope
+LFO DEST	L F O destination

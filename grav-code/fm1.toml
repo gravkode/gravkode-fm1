@@ -1,17 +1,17 @@
-# The template's build settings (tools/build.py)
+# GRAV CODE's build settings (tools/build.py)
 name = "GRAV_CODE"              # APP_NAME is in app.h; this names the build's files
-id_prefix = "FM-1_11"          # package identity (each firmware its own): dev FM-1_1100, releases FM-1_11XXYYZZ
+id_prefix = "FM-1_73"          # package identity (each firmware its own; the template's is 11): dev FM-1_7300, releases FM-1_73XXYYZZ
 usb_manufacturer = "GRAV CODE"
 usb_product = "GRAV CODE FM-1"
 include = ["vendor"]
 
 o2 = [
     "dsp/grav_engine.c",
+    "dsp/grav_libm.c",
     "synth/synth.c",
     "synth/envelope.c",
     "synth/lfo.c",
     "synth/event_queue.c",
-    "dsp/grav_cpp.cpp",
     "dsp/grav_plaits.cpp",
     "vendor/stmlib/dsp/units.cc",
     "vendor/plaits/resources.cc",
@@ -35,6 +35,6 @@ ble_central = true             # and the FM-1 connects to Bluetooth MIDI devices
 tagline = "Hybrid DSP synthesizer for M-VAVE FM-1"
 repo = "https://github.com/gravkode/gravkode-fm1"
 licence = "MPL-2.0"
-credits = ""                   # a sentence for the installer's footer: what your firmware is built from
+credits = "Built on fm1-base. Sound engines: Mutable Instruments Plaits by Émilie Gillet (MIT)."
 
 vendored = ["vendor/"]
