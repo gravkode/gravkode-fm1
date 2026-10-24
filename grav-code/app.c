@@ -8,18 +8,30 @@
 #include "fastmath.h"
 #include "dsp/grav_engine.h"
 
-#define SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
+#define SET_MAGIC 0x54504C32u
+#define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t wave;                        /* 0 sine, 1 triangle */
+    uint8_t engine_id;                   /* 0 Plaits WS, 1 Plaits FM, 2 Virtual Analog */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const WAVE_NAME[] = {"SINE", "TRIANGLE"};
+static const char *const ENGINE_NAME[] = {"PLAITS WS", "PLAITS FM", "PLAITS VA"};
+
+/* Parameter pages: UI state only, independent of DSP. */
+enum {
+    PAGE_OSC = 0,
+    PAGE_MOD,
+    PAGE_ENV
+};
+
+static uint8_t active_page = PAGE_OSC;
+static const char *const PAGE_NAME[] = {"OSC", "MOD", "ENV"};
+
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -30,6 +42,30 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
 static volatile float voice_vel = 1.0f;      /* the note's velocity, 0..1 */
 static grav_engine_t grav_engine;
+
+/* Plaits parameters: 0..100% */
+static volatile int32_t plaits_timbre = 65;
+static volatile int32_t plaits_morph = 50;
+static volatile int32_t plaits_harmonics = 75;
+
+/* Parameters for future modulation and envelope DSP. */
+static int32_t mod_params[3] = {50, 0, 0};
+static int32_t env_params[3] = {10, 50, 30};
+
+static const char *const PARAM_NAME[3][3] = {
+    {"TIMBRE", "MORPH", "HARMONICS"},
+    {"LFO RATE", "LFO DEPTH", "LFO DEST"},
+    {"ATTACK", "DECAY", "RELEASE"}
+};
+
+
+static int32_t clamp_percent(int32_t value)
+{
+    if (value < 0) return 0;
+    if (value > 100) return 100;
+    return value;
+}
+
 
 static void note_on(int32_t note, uint32_t vel)
 {
@@ -63,10 +99,10 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+    midi_in();
+
     int32_t note = voice_note;
     float velocity = voice_vel;
-
-    midi_in();
 
     grav_engine_render(
         &grav_engine,
@@ -74,8 +110,11 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         n,
         note,
         velocity,
-        set.wave,
-        master_q12
+        set.engine_id,
+        master_q12,
+        (float)plaits_timbre / 100.0f,
+        (float)plaits_morph / 100.0f,
+        (float)plaits_harmonics / 100.0f
     );
 }
 
@@ -90,16 +129,32 @@ static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
     set.octave = 0;
-    set.wave = 0;
+    set.engine_id = 0;
     set.ble_off = 0;
 }
 
 void app_init(void)
 {
     grav_engine_init(&grav_engine);
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
-        || set.octave < -2 || set.octave > 2 || set.wave > 1u || set.ble_off > 1u)
+    int loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+
+    if (loaded != (int)sizeof set ||
+        set.octave < -2 || set.octave > 2 ||
+        set.ble_off > 1u) {
         settings_defaults();
+    } else if (set.magic == OLD_SET_MAGIC) {
+        /* Migrate v0.4.0: SINE=0, WS=1, FM=2 */
+        uint8_t old_wave = set.engine_id;
+        if (old_wave > 2u) {
+            settings_defaults();
+        } else {
+            set.engine_id = old_wave == 2u ? 1u : 0u;
+            set.magic = SET_MAGIC;
+            set_dirty = 1;
+        }
+    } else if (set.magic != SET_MAGIC || set.engine_id > 2u) {
+        settings_defaults();
+    }
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -180,7 +235,7 @@ static void speak(void)
         text_cat(t, APP_NAME ". OCTAVE ");
         text_cat(t, o);
         text_cat(t, ". WAVE ");
-        text_cat(t, WAVE_NAME[set.wave]);
+        text_cat(t, ENGINE_NAME[set.engine_id]);
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -289,7 +344,12 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
-        if (k == B_OCTDN)
+        if (k == B_HOME || k == B_LFO || k == B_ENV) {
+            active_page = k == B_HOME ? PAGE_OSC :
+                          k == B_LFO  ? PAGE_MOD : PAGE_ENV;
+            app_say("PAGE", PAGE_NAME[active_page]);
+            ui.redraw = 1;
+        } else if (k == B_OCTDN)
             octave_step(-1);
         else if (k == B_OCTUP)
             octave_step(1);
@@ -330,10 +390,30 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
+        } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
+            uint32_t index = (uint32_t)(k - EN_K1);
+            int32_t *value;
+
+            if (active_page == PAGE_OSC) {
+                if (index == 0u)
+                    value = (int32_t *)&plaits_timbre;
+                else if (index == 1u)
+                    value = (int32_t *)&plaits_morph;
+                else
+                    value = (int32_t *)&plaits_harmonics;
+            } else if (active_page == PAGE_MOD) {
+                value = &mod_params[index];
+            } else {
+                value = &env_params[index];
+            }
+
+            *value = clamp_percent(*value + e);
+            int_text(*value, t);
+            app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
-            set.wave ^= 1u;
+            set.engine_id = (uint8_t)((set.engine_id + 3 + e % 3) % 3);
             set_dirty = 1;
-            app_say("WAVE", WAVE_NAME[set.wave]);
+            app_say("WAVE", ENGINE_NAME[set.engine_id]);
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -409,10 +489,31 @@ static void draw(void)
     for (i = 0; i < NE; i++) {
         int32_t x = 4 + (int32_t)(i % 4u) * 58, y = 88 + (int32_t)(i / 4u) * 28;
         int lit = ui.turned_at[i] && now - ui.turned_at[i] < 300u;
-        cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
-        int_text(ui.turns[i], t);
-        cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
+        if (i >= EN_K1 && i <= EN_K3) {
+            uint32_t index = i - EN_K1;
+            int32_t value;
+
+            if (active_page == PAGE_OSC) {
+                value = index == 0u ? plaits_timbre :
+                        index == 1u ? plaits_morph : plaits_harmonics;
+            } else if (active_page == PAGE_MOD) {
+                value = mod_params[index];
+            } else {
+                value = env_params[index];
+            }
+
+            cv_text(x, y, &FONT_XS,
+                    PARAM_NAME[active_page][index],
+                    lit ? C_HI : C_GRAY);
+            int_text(value, t);
+            cv_text(x, y + 13, &FONT_XS, t, C_WHITE);
+        } else {
+            cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
+            int_text(ui.turns[i], t);
+            cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
+        }
     }
+    cv_text(178, 2, &FONT_XS, PAGE_NAME[active_page], C_HI);
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
     cv_begin(240, 60, C_BLACK);
@@ -426,7 +527,7 @@ static void draw(void)
     cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
     cv_text(30, 36, &FONT_XS, t, C_HI);
     cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
-    cv_text(112, 36, &FONT_XS, WAVE_NAME[set.wave], C_HI);
+    cv_text(112, 36, &FONT_XS, ENGINE_NAME[set.engine_id], C_HI);
     if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
         static const char HEX[] = "0123456789ABCDEF";
@@ -504,7 +605,7 @@ int app_expect(const char *what, int *got)
     if (!strcmp(what, "octave"))
         *got = set.octave;
     else if (!strcmp(what, "wave"))
-        *got = set.wave;
+        *got = set.engine_id;
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))
