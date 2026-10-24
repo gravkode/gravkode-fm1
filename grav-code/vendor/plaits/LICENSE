@@ -22,5 +22,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-GRAV CODE's changes: dsp/dsp.h sets the sample rate to the FM-1's 44.1 kHz (marked there), and resources.cc keeps
-only the tables these engines use.
+GRAV CODE's change: dsp/dsp.h sets the sample rate to the FM-1's 44.1 kHz (marked there). Everything else here is
+as published.
