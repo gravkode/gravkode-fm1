@@ -1,10 +1,13 @@
 #include "plaits/dsp/engine/waveshaping_engine.h"
+#include "plaits/dsp/engine/fm_engine.h"
 
 static plaits::WaveshapingEngine engine;
+static plaits::FMEngine fm_engine;
 static bool initialized = false;
 
 extern "C" void grav_plaits_init(void) {
     engine.Init(nullptr);
+    fm_engine.Init(nullptr);
     initialized = true;
 }
 
@@ -13,6 +16,7 @@ extern "C" void grav_plaits_render(
     float* out,
     float* aux,
     unsigned int size,
+    unsigned int algorithm,
     float timbre,
     float morph,
     float harmonics
@@ -30,5 +34,8 @@ extern "C" void grav_plaits_render(
     p.accent = 1.0f;
 
     bool already_enveloped = false;
-    engine.Render(p, out, aux, size, &already_enveloped);
+    if (algorithm == 2)
+        fm_engine.Render(p, out, aux, size, &already_enveloped);
+    else
+        engine.Render(p, out, aux, size, &already_enveloped);
 }

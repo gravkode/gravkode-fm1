@@ -19,7 +19,7 @@ typedef struct {
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const WAVE_NAME[] = {"SINE", "PLAITS WS"};
+static const char *const WAVE_NAME[] = {"SINE", "PLAITS WS", "PLAITS FM"};
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -114,7 +114,7 @@ void app_init(void)
 {
     grav_engine_init(&grav_engine);
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
-        || set.octave < -2 || set.octave > 2 || set.wave > 1u || set.ble_off > 1u)
+        || set.octave < -2 || set.octave > 2 || set.wave > 2u || set.ble_off > 1u)
         settings_defaults();
 }
 
@@ -365,7 +365,7 @@ static void input(void)
             int_text(*value, t);
             app_say(name, t);
         } else if (k == EN_PRESET) {
-            set.wave ^= 1u;
+            set.wave = (uint8_t)((set.wave + 3 + e % 3) % 3);
             set_dirty = 1;
             app_say("WAVE", WAVE_NAME[set.wave]);
         } else {

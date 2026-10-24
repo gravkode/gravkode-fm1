@@ -3,7 +3,7 @@
 extern int grav_cpp_test(int x);
 extern void grav_plaits_init(void);
 extern void grav_plaits_render(
-    float note, float *out, float *aux, unsigned int size,
+    float note, float *out, float *aux, unsigned int size, unsigned int algorithm,
     float timbre, float morph, float harmonics);
 void grav_engine_init(grav_engine_t *e)
 {
@@ -46,7 +46,7 @@ void grav_engine_render(
         if (wave)
             grav_plaits_render(
                 (float)last_note,
-                plaits_out, plaits_aux, count,
+                plaits_out, plaits_aux, count, (unsigned int)wave,
                 timbre, morph, harmonics);
 
         for (uint32_t j = 0; j < count; j++) {
