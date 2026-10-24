@@ -29,6 +29,13 @@ Slot<plaits::ModalEngine> modal_slot;
 
 plaits::Engine* engines[GRAV_ENGINE_COUNT];
 
+// Each engine's output level, so they sound about as loud as one another. Measured in the host simulator at the
+// defaults (TIMBRE 65, MORPH 50, HARMONICS 75, C4 at velocity 100), the RMS while held: Waveshaping -34.6 dB, FM
+// -31.2, Virtual Analog -36.2, Modal -17.2; Modal comes down 16 dB to the others. (Plaits balances its engines with
+// gains of its own and a limiter; GRAV CODE keeps the first three as they always sounded.) Modal's level follows
+// TIMBRE, its exciter's density, as on Plaits: quieter below the default, a sparse crackle at 0.
+const float engine_gain[GRAV_ENGINE_COUNT] = { 1.0f, 1.0f, 1.0f, 0.16f };
+
 // The engines' scratch RAM, shared as Plaits' Voice shares it: one engine renders at a time, and the one chosen is
 // Reset first. (Virtual Analog and Modal each take a block of floats here.)
 char engine_ram[1024] __attribute__((aligned(8)));
@@ -63,10 +70,12 @@ extern "C" void grav_plaits_render(const grav_plaits_params_t* in, float* out, f
     engines[current]->Reset();
   }
 
-  // The trigger is patched (Modal strikes rather than bows its resonator): its rising edge on a new note. The
-  // other engines leave it to Plaits' low-pass gate, which GRAV CODE does not use (its own envelope instead).
+  // Only Modal reads the trigger. A new note strikes its resonator (the rising edge); while the note is held it is
+  // excited on, as Plaits excites it with nothing in its trigger input (dust, as dense as TIMBRE is bright), so it
+  // sounds for as long as the others do and GRAV CODE's envelope and LFO shape it alike; let go, it rings out.
+  const plaits::TriggerState held = in->gate ? plaits::TRIGGER_UNPATCHED : plaits::TRIGGER_LOW;
   plaits::EngineParameters p = {};
-  p.trigger = in->strike ? plaits::TRIGGER_RISING_EDGE : plaits::TRIGGER_LOW;
+  p.trigger = in->strike ? plaits::TRIGGER_RISING_EDGE : held;
   p.note = in->note;
   p.timbre = in->timbre;
   p.morph = in->morph;
@@ -77,7 +86,14 @@ extern "C" void grav_plaits_render(const grav_plaits_params_t* in, float* out, f
   for (uint32_t done = 0; done < size; ) {
     uint32_t n = size - done < GRAV_PLAITS_BLOCK ? size - done : GRAV_PLAITS_BLOCK;
     engines[current]->Render(p, out + done, aux + done, n, &already_enveloped);
-    p.trigger = plaits::TRIGGER_LOW;
+    p.trigger = held;
     done += n;
+  }
+  const float gain = engine_gain[current];
+  if (gain != 1.0f) {
+    for (uint32_t i = 0; i < size; ++i) {
+      out[i] *= gain;
+      aux[i] *= gain;
+    }
   }
 }

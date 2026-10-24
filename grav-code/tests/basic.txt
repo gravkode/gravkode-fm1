@@ -121,7 +121,8 @@ master 4096
 wait 50
 wavstop
 midi 80 45 00
-# PRESET to Plaits' Modal: a note strikes its resonator (silent without the strike), which dies away after it ends
+# PRESET to Plaits' Modal: a note strikes its resonator and, held, sounds on as the other engines do (a strike
+# alone has died away by 1.4 s); let go, it ends with the envelope's release
 wait 800
 turn PRESET 2
 wait 30
@@ -131,9 +132,12 @@ midi 90 3C 64
 wait 10
 peakreset
 wait 400
-expect peak_db_min -50
+expect peak_db_min -40
+peakreset
+wait 1000
+expect peak_db_min -40
 midi 80 3C 00
-wait 800
+wait 1500
 peakreset
 wait 300
 expect peak_db_max -60

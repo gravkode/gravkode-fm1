@@ -45,6 +45,7 @@ void grav_engine_render(
     p.morph = morph;
     p.harmonics = harmonics;
     p.accent = e->velocity;
+    p.gate = note >= 0;
     p.strike = voice->strikes != e->strikes_seen;   /* a note began since the last block */
     e->strikes_seen = voice->strikes;
 

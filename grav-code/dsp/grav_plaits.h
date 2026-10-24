@@ -21,7 +21,8 @@ typedef struct {
     float note;                          /* a MIDI note; a fraction for the LFO's pitch */
     float timbre, morph, harmonics;      /* 0..1 */
     float accent;                        /* 0..1, the note's velocity: how hard Modal strikes */
-    uint8_t strike;                      /* a new note began: Modal strikes its resonator (Plaits' trigger in) */
+    uint8_t gate;                        /* a note is held: Modal keeps exciting its resonator, as the others sound */
+    uint8_t strike;                      /* a new note began: Modal strikes its resonator first */
 } grav_plaits_params_t;
 
 void grav_plaits_init(void);
