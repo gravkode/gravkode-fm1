@@ -294,6 +294,8 @@ static struct {
     uint32_t msg_until;
     uint32_t keys, btn;                  /* held at the last input */
     uint8_t vel[NKEYS], prs[NKEYS];      /* each key's last velocity, and its pressure while held */
+    uint8_t note[NKEYS];                 /* the note each held key plays: the octave it was pressed in, so OCTAVE
+                                          * while it is held changes the next notes, never this one's note-off */
     int32_t last_key;                    /* the key pressed last: its numbers in the header */
     uint8_t looking;                     /* Bluetooth MIDI devices: REC pressed, the scan's list up (lib/btdev) */
     uint32_t rec_t;                      /* REC went down (0: not held, or its hold already acted) */
@@ -404,8 +406,7 @@ static void octave_step(int32_t d)
     char t[4];
     if (o == set.octave)
         return;
-    queue_key_event(SYNTH_EVENT_PANIC, 0, 0); /* release held note before octave change */
-    set.octave = (int8_t)o;
+    set.octave = (int8_t)o;                  /* held keys keep their notes (ui.note) until they are let go */
     set_dirty = 1;
     octave_text(t);
     app_say("OCTAVE", t);
@@ -458,14 +459,17 @@ static void input(void)
             v = touch_vel(k);
             ui.vel[k] = (uint8_t)v;
             ui.prs[k] = 0;
+            ui.note[k] = (uint8_t)note;
             ui.last_key = (int32_t)k;
             queue_key_event(SYNTH_EVENT_NOTE_ON, note, v);
             plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
+            note = ui.note[k];
             ui.prs[k] = 0;
             queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0);
             plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB | TO_BLE);
         } else if ((keys & bit) && touch_pressure(k) != ui.prs[k]) {   /* pressure: poly aftertouch */
+            note = ui.note[k];
             ui.prs[k] = touch_pressure(k);
             ui.redraw = 1;
             plat_midi_send(0x0Au | 0xA0u << 8 | (uint32_t)note << 16 | (uint32_t)ui.prs[k] << 24, TO_USB | TO_BLE);

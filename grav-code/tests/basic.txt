@@ -51,6 +51,23 @@ wait 600
 expect env0 14
 expect osc1 45
 expect osc2 78
+# OCTAVE while a key is held: the held note plays on and ends as it began (no stuck note here or over MIDI)
+out
+key 7 down
+wait 50
+expect note 72
+tap OCT-
+wait 30
+expect octave 0
+expect note 72
+key 7 up
+wait 50
+expect note -1
+expect_out USB 80 48 00
+expect_no_out USB 80 3C 00
+tap OCT+
+wait 30
+expect octave 1
 midi 90 3C 64
 wait 30
 expect note 60
