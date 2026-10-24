@@ -11,6 +11,8 @@
 typedef struct {
     volatile int32_t note;               /* the note sounding, -1 none */
     volatile float velocity;             /* its velocity, 0..1 */
+    uint32_t strikes;                    /* notes begun so far (not counting a return to a held one): a change is a
+                                          * new attack, for an engine that strikes (Modal) */
     uint8_t held[SYNTH_HELD_MAX];        /* the notes held, oldest first: the last one sounds */
     uint8_t held_vel[SYNTH_HELD_MAX];    /* and the velocity each came with */
     uint32_t held_n;

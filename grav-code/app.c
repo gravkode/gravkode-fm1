@@ -7,6 +7,7 @@
  * gfx.c and announce.c are in scope. */
 #include "fastmath.h"
 #include "dsp/grav_engine.h"
+#include "dsp/grav_plaits.h"
 #include "synth/synth.h"
 #include "synth/event_queue.h"
 
@@ -16,7 +17,7 @@
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t engine_id;                   /* 0 Plaits WS, 1 Plaits FM, 2 Virtual Analog */
+    uint8_t engine_id;                   /* GRAV_ENGINE_*: Plaits' Waveshaping, FM, Virtual Analog, Modal */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
     uint8_t osc[3];
@@ -27,7 +28,7 @@ typedef struct {
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const ENGINE_NAME[] = {"PLAITS WS", "PLAITS FM", "PLAITS VA"};
+static const char *const ENGINE_NAME[GRAV_ENGINE_COUNT] = {"PLAITS WS", "PLAITS FM", "PLAITS VA", "PLAITS MDL"};
 
 /* Parameter pages: UI state only, independent of DSP. */
 enum {
@@ -153,11 +154,6 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 
     midi_in();
 
-
-
-    int32_t note = synth.note;
-    float velocity = synth.velocity;
-
     float timbre = (float)plaits_timbre * 0.01f;
     float morph = (float)plaits_morph * 0.01f;
     float lfo_value = lfo_process(&synth.mod_lfo);
@@ -178,15 +174,13 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         &grav_engine,
         lr,
         n,
-        note,
-        velocity,
+        &synth,
         set.engine_id,
         master_q12,
         timbre,
         morph,
         (float)plaits_harmonics / 100.0f,
-        pitch_offset,
-        &synth.amp_env
+        pitch_offset
     );
 
     lfo_advance(&synth.mod_lfo, n);
@@ -251,7 +245,7 @@ void app_init(void)
 
         if (loaded == (int)sizeof loaded_settings &&
             loaded_settings.magic == SET_MAGIC &&
-            loaded_settings.engine_id <= 2u) {
+            loaded_settings.engine_id < GRAV_ENGINE_COUNT) {
             int valid = 1;
             for (int i = 0; i < 3; ++i) {
                 if (loaded_settings.osc[i] > 100u ||
@@ -550,7 +544,7 @@ static void input(void)
             int_text(*value, t);
             app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
-            set.engine_id = (uint8_t)((set.engine_id + 3 + e % 3) % 3);
+            set.engine_id = (uint8_t)((set.engine_id + GRAV_ENGINE_COUNT + e % GRAV_ENGINE_COUNT) % GRAV_ENGINE_COUNT);
             set_dirty = 1;
             app_say("WAVE", ENGINE_NAME[set.engine_id]);
         } else {

@@ -12,14 +12,21 @@ enum {                                   /* the engines, by the settings' engine
     GRAV_ENGINE_WAVESHAPING = 0,
     GRAV_ENGINE_FM,
     GRAV_ENGINE_VIRTUAL_ANALOG,
+    GRAV_ENGINE_MODAL,
     GRAV_ENGINE_COUNT
 };
 
+typedef struct {
+    uint32_t engine;                     /* GRAV_ENGINE_* */
+    float note;                          /* a MIDI note; a fraction for the LFO's pitch */
+    float timbre, morph, harmonics;      /* 0..1 */
+    float accent;                        /* 0..1, the note's velocity: how hard Modal strikes */
+    uint8_t strike;                      /* a new note began: Modal strikes its resonator (Plaits' trigger in) */
+} grav_plaits_params_t;
+
 void grav_plaits_init(void);
-/* size samples (any number: longer runs are rendered GRAV_PLAITS_BLOCK at a time) of engine at a MIDI note (a
- * fraction for the LFO's pitch), the parameters 0..1 */
-void grav_plaits_render(float note, float *out, float *aux, uint32_t size, uint32_t engine,
-                        float timbre, float morph, float harmonics);
+/* size samples (any number: longer runs are rendered GRAV_PLAITS_BLOCK at a time, a strike in the first) */
+void grav_plaits_render(const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
 
 #ifdef __cplusplus
 }

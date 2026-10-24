@@ -4,6 +4,7 @@ void synth_init(synth_t *s)
 {
     s->note = -1;
     s->velocity = 1.0f;
+    s->strikes = 0;
     s->held_n = 0;
     envelope_init(&s->amp_env);
     lfo_init(&s->mod_lfo, 44100.0f);
@@ -40,6 +41,7 @@ void synth_note_on(synth_t *s, int32_t note, uint32_t velocity)
 
     s->velocity = (float)velocity / 127.0f;
     s->note = note;
+    s->strikes++;
     envelope_note_on(&s->amp_env);
 }
 

@@ -9,31 +9,40 @@ void grav_engine_init(grav_engine_t *e)
     e->level = 0.0f;
     e->gain = 0.0f;
     e->velocity = 1.0f;
+    e->strikes_seen = 0;
 }
 
 void grav_engine_render(
     grav_engine_t *e,
     int32_t *lr,
     uint32_t n,
-    int32_t note,
-    float velocity,
-    uint8_t wave,
+    synth_t *voice,
+    uint32_t engine,
     uint32_t master_q12,
     float timbre,
     float morph,
     float harmonics,
-    float pitch_offset,
-    envelope_t *amp_env
+    float pitch_offset
 ) {
+    int32_t note = voice->note;
 
-    if (note >= 0)
-        e->velocity = velocity;
+    if (note >= 0) {
+        e->last_note = note;
+        e->velocity = voice->velocity;
+    }
 
     float voice_gain = 0.25f * e->velocity;
     float gain = (float)master_q12 / 4096.0f * (float)grav_cpp_test(4150000);
 
-    if (note >= 0)
-        e->last_note = note;
+    grav_plaits_params_t p;
+    p.engine = engine;
+    p.note = (float)e->last_note + pitch_offset;
+    p.timbre = timbre;
+    p.morph = morph;
+    p.harmonics = harmonics;
+    p.accent = e->velocity;
+    p.strike = voice->strikes != e->strikes_seen;   /* a note began since the last block */
+    e->strikes_seen = voice->strikes;
 
     float plaits_out[GRAV_PLAITS_BLOCK];
     float plaits_aux[GRAV_PLAITS_BLOCK];
@@ -42,14 +51,12 @@ void grav_engine_render(
         uint32_t count = n - base;
         if (count > GRAV_PLAITS_BLOCK) count = GRAV_PLAITS_BLOCK;
 
-        grav_plaits_render(
-            (float)e->last_note + pitch_offset,
-            plaits_out, plaits_aux, count, wave,
-            timbre, morph, harmonics);
+        grav_plaits_render(&p, plaits_out, plaits_aux, count);
+        p.strike = 0;
 
         for (uint32_t j = 0; j < count; j++) {
             uint32_t i = base + j;
-        e->level = envelope_process(amp_env);
+        e->level = envelope_process(&voice->amp_env);
         e->gain += (gain - e->gain) * 0.004f;
 
         float s = plaits_out[j];

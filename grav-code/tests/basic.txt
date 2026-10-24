@@ -121,6 +121,25 @@ master 4096
 wait 50
 wavstop
 midi 80 45 00
+# PRESET to Plaits' Modal: a note strikes its resonator (silent without the strike), which dies away after it ends
+wait 800
+turn PRESET 2
+wait 30
+expect wave 3
+said PLAITS MDL
+midi 90 3C 64
+wait 10
+peakreset
+wait 400
+expect peak_db_min -50
+midi 80 3C 00
+wait 800
+peakreset
+wait 300
+expect peak_db_max -60
+turn PRESET -2
+wait 30
+expect wave 1
 # velocity and pressure (lib/touch.c): a key landing at 40 plays at about 40; pressed 80 % more, it has pressure
 key 7 down 40
 wait 60
@@ -169,10 +188,10 @@ said BLE DISCONNECTED
 wait 100
 expect ble_dev 0
 unsaid LOST
-# each port's messages counted (plat_midi_count): this is the 11th from USB in this script
+# each port's messages counted (plat_midi_count): this is the 13th from USB in this script
 midi USB 90 40 50
 wait 20
-expect midi_in_usb 11
+expect midi_in_usb 13
 midi USB 80 40 00
 # Bluetooth's two links, the computer's and the device's: TO_BLE goes to both, each with its own room; their MIDI
 # comes in on PORT_BLE, and plat_midi_in_from says which link (MIDI thru sends it to every other)

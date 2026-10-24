@@ -18,6 +18,10 @@ o2 = [
     "vendor/plaits/dsp/engine/waveshaping_engine.cc",
     "vendor/plaits/dsp/engine/fm_engine.cc",
     "vendor/plaits/dsp/engine/virtual_analog_engine.cc",
+    "vendor/plaits/dsp/engine/modal_engine.cc",
+    "vendor/plaits/dsp/physical_modelling/modal_voice.cc",
+    "vendor/plaits/dsp/physical_modelling/resonator.cc",
+    "vendor/stmlib/utils/random.cc",
 ]
 
 # TEST: stmlib's portable code instead of its ARM assembly; M_PI: newlib leaves it out in strict C++

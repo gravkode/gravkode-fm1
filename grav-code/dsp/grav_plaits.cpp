@@ -5,6 +5,7 @@
 
 #include "plaits/dsp/dsp.h"
 #include "plaits/dsp/engine/fm_engine.h"
+#include "plaits/dsp/engine/modal_engine.h"
 #include "plaits/dsp/engine/virtual_analog_engine.h"
 #include "plaits/dsp/engine/waveshaping_engine.h"
 #include "stmlib/utils/buffer_allocator.h"
@@ -24,11 +25,12 @@ struct Slot {
 Slot<plaits::WaveshapingEngine> waveshaping_slot;
 Slot<plaits::FMEngine> fm_slot;
 Slot<plaits::VirtualAnalogEngine> virtual_analog_slot;
+Slot<plaits::ModalEngine> modal_slot;
 
 plaits::Engine* engines[GRAV_ENGINE_COUNT];
 
 // The engines' scratch RAM, shared as Plaits' Voice shares it: one engine renders at a time, and the one chosen is
-// Reset first. (Virtual Analog takes a block of floats here.)
+// Reset first. (Virtual Analog and Modal each take a block of floats here.)
 char engine_ram[1024] __attribute__((aligned(8)));
 
 uint32_t current;
@@ -40,6 +42,7 @@ extern "C" void grav_plaits_init(void) {
   engines[GRAV_ENGINE_WAVESHAPING] = new (waveshaping_slot.bytes) plaits::WaveshapingEngine();
   engines[GRAV_ENGINE_FM] = new (fm_slot.bytes) plaits::FMEngine();
   engines[GRAV_ENGINE_VIRTUAL_ANALOG] = new (virtual_analog_slot.bytes) plaits::VirtualAnalogEngine();
+  engines[GRAV_ENGINE_MODAL] = new (modal_slot.bytes) plaits::ModalEngine();
 
   stmlib::BufferAllocator allocator(engine_ram, sizeof(engine_ram));
   for (uint32_t i = 0; i < GRAV_ENGINE_COUNT; ++i) {
@@ -50,38 +53,31 @@ extern "C" void grav_plaits_init(void) {
   initialized = true;
 }
 
-extern "C" void grav_plaits_render(
-    float note,
-    float* out,
-    float* aux,
-    uint32_t size,
-    uint32_t engine,
-    float timbre,
-    float morph,
-    float harmonics) {
+extern "C" void grav_plaits_render(const grav_plaits_params_t* in, float* out, float* aux, uint32_t size) {
   if (!initialized) {
     grav_plaits_init();
   }
-  if (engine >= GRAV_ENGINE_COUNT) {
-    engine = GRAV_ENGINE_WAVESHAPING;
-  }
+  uint32_t engine = in->engine < GRAV_ENGINE_COUNT ? in->engine : GRAV_ENGINE_WAVESHAPING;
   if (engine != current) {
     current = engine;
     engines[current]->Reset();
   }
 
+  // The trigger is patched (Modal strikes rather than bows its resonator): its rising edge on a new note. The
+  // other engines leave it to Plaits' low-pass gate, which GRAV CODE does not use (its own envelope instead).
   plaits::EngineParameters p = {};
-  p.trigger = plaits::TRIGGER_UNPATCHED;
-  p.note = note;
-  p.timbre = timbre;
-  p.morph = morph;
-  p.harmonics = harmonics;
-  p.accent = 1.0f;
+  p.trigger = in->strike ? plaits::TRIGGER_RISING_EDGE : plaits::TRIGGER_LOW;
+  p.note = in->note;
+  p.timbre = in->timbre;
+  p.morph = in->morph;
+  p.harmonics = in->harmonics;
+  p.accent = in->accent;
 
   bool already_enveloped = false;
   for (uint32_t done = 0; done < size; ) {
     uint32_t n = size - done < GRAV_PLAITS_BLOCK ? size - done : GRAV_PLAITS_BLOCK;
     engines[current]->Render(p, out + done, aux + done, n, &already_enveloped);
+    p.trigger = plaits::TRIGGER_LOW;
     done += n;
   }
 }
