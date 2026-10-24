@@ -6,6 +6,7 @@
  * played with velocity and pressure (lib/touch.h), shown on them. One of each thing the platform offers, kept short. Part of the unity build (device/unity.c, host/plat_host.c), after the platform:
  * gfx.c and announce.c are in scope. */
 #include "fastmath.h"
+#include "dsp/grav_engine.h"
 
 #define SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -28,7 +29,7 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
 static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
 static volatile float voice_vel = 1.0f;      /* the note's velocity, 0..1 */
-static float voice_phase, voice_level, gain_now;   /* gain_now glides to MASTER: no step at a block's edge */
+static grav_engine_t grav_engine;
 
 static void note_on(int32_t note, uint32_t vel)
 {
@@ -62,30 +63,26 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
-    uint32_t i;
     int32_t note = voice_note;
-    float target = note >= 0 ? 0.25f * voice_vel : 0.0f;
-    float inc = note >= 0 ? 440.0f * fm_exp2f((float)(note - 69) / 12.0f) / 44100.0f : 0.0f;
-    float gain = (float)master_q12 / 4096.0f * 8300000.0f;   /* MASTER, read once a block */
+    float velocity = voice_vel;
+
     midi_in();
-    for (i = 0; i < n; i++) {
-        float s;
-        voice_level += (target - voice_level) * 0.002f;          /* ~10 ms attack and release */
-        gain_now += (gain - gain_now) * 0.004f;                  /* ~5 ms: turning MASTER does not click */
-        voice_phase += inc;
-        if (voice_phase >= 1.0f)
-            voice_phase -= 1.0f;
-        s = set.wave ? 4.0f * fm_fabsf(voice_phase - 0.5f) - 1.0f : fm_sinf(voice_phase * 6.2831853f);
-        s *= voice_level * gain_now;
-        lr[2 * i] = (int32_t)s;
-        lr[2 * i + 1] = (int32_t)s;
-    }
+
+    grav_engine_render(
+        &grav_engine,
+        lr,
+        n,
+        note,
+        velocity,
+        set.wave,
+        master_q12
+    );
 }
 
 void app_panic(void)
 {
     voice_note = -1;
-    voice_level = 0.0f;
+    grav_engine.level = 0.0f;
 }
 
 /* --------------------------------------------------------------- settings --- */
@@ -99,6 +96,7 @@ static void settings_defaults(void)
 
 void app_init(void)
 {
+    grav_engine_init(&grav_engine);
     if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
         || set.octave < -2 || set.octave > 2 || set.wave > 1u || set.ble_off > 1u)
         settings_defaults();
