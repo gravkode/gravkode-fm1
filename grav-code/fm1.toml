@@ -9,6 +9,6 @@ ble = true                     # Bluetooth MIDI (--no-ble builds without it)
 ble_central = true             # and the FM-1 connects to Bluetooth MIDI devices too
 # the site (tools/make_site.py, tools/publish_site.sh)
 tagline = "Hybrid DSP synthesizer for M-VAVE FM-1"
-repo = "https://github.com/charlesvestal/fm1-base"
+repo = "https://github.com/gravkode/gravkode-fm1"
 licence = "MPL-2.0"
 credits = ""                   # a sentence for the installer's footer: what your firmware is built from
