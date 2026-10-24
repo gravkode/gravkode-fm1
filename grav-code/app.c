@@ -21,6 +21,17 @@ static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
 static const char *const ENGINE_NAME[] = {"PLAITS WS", "PLAITS FM", "PLAITS VA"};
+
+/* Parameter pages: UI state only, independent of DSP. */
+enum {
+    PAGE_OSC = 0,
+    PAGE_MOD,
+    PAGE_ENV
+};
+
+static uint8_t active_page = PAGE_OSC;
+static const char *const PAGE_NAME[] = {"OSC", "MOD", "ENV"};
+
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -36,6 +47,17 @@ static grav_engine_t grav_engine;
 static volatile int32_t plaits_timbre = 65;
 static volatile int32_t plaits_morph = 50;
 static volatile int32_t plaits_harmonics = 75;
+
+/* Parameters for future modulation and envelope DSP. */
+static int32_t mod_params[3] = {50, 0, 0};
+static int32_t env_params[3] = {10, 50, 30};
+
+static const char *const PARAM_NAME[3][3] = {
+    {"TIMBRE", "MORPH", "HARMONICS"},
+    {"LFO RATE", "LFO DEPTH", "LFO DEST"},
+    {"ATTACK", "DECAY", "RELEASE"}
+};
+
 
 static int32_t clamp_percent(int32_t value)
 {
@@ -322,7 +344,12 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
-        if (k == B_OCTDN)
+        if (k == B_HOME || k == B_LFO || k == B_ENV) {
+            active_page = k == B_HOME ? PAGE_OSC :
+                          k == B_LFO  ? PAGE_MOD : PAGE_ENV;
+            app_say("PAGE", PAGE_NAME[active_page]);
+            ui.redraw = 1;
+        } else if (k == B_OCTDN)
             octave_step(-1);
         else if (k == B_OCTUP)
             octave_step(1);
@@ -364,23 +391,25 @@ static void input(void)
             btdev_choose(btdev_pick() + e);
             ble_device_say();
         } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
-            volatile int32_t *value;
-            const char *name;
+            uint32_t index = (uint32_t)(k - EN_K1);
+            int32_t *value;
 
-            if (k == EN_K1) {
-                value = &plaits_timbre;
-                name = "TIMBRE";
-            } else if (k == EN_K2) {
-                value = &plaits_morph;
-                name = "MORPH";
+            if (active_page == PAGE_OSC) {
+                if (index == 0u)
+                    value = (int32_t *)&plaits_timbre;
+                else if (index == 1u)
+                    value = (int32_t *)&plaits_morph;
+                else
+                    value = (int32_t *)&plaits_harmonics;
+            } else if (active_page == PAGE_MOD) {
+                value = &mod_params[index];
             } else {
-                value = &plaits_harmonics;
-                name = "HARMONICS";
+                value = &env_params[index];
             }
 
             *value = clamp_percent(*value + e);
             int_text(*value, t);
-            app_say(name, t);
+            app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
             set.engine_id = (uint8_t)((set.engine_id + 3 + e % 3) % 3);
             set_dirty = 1;
@@ -460,10 +489,31 @@ static void draw(void)
     for (i = 0; i < NE; i++) {
         int32_t x = 4 + (int32_t)(i % 4u) * 58, y = 88 + (int32_t)(i / 4u) * 28;
         int lit = ui.turned_at[i] && now - ui.turned_at[i] < 300u;
-        cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
-        int_text(ui.turns[i], t);
-        cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
+        if (i >= EN_K1 && i <= EN_K3) {
+            uint32_t index = i - EN_K1;
+            int32_t value;
+
+            if (active_page == PAGE_OSC) {
+                value = index == 0u ? plaits_timbre :
+                        index == 1u ? plaits_morph : plaits_harmonics;
+            } else if (active_page == PAGE_MOD) {
+                value = mod_params[index];
+            } else {
+                value = env_params[index];
+            }
+
+            cv_text(x, y, &FONT_XS,
+                    PARAM_NAME[active_page][index],
+                    lit ? C_HI : C_GRAY);
+            int_text(value, t);
+            cv_text(x, y + 13, &FONT_XS, t, C_WHITE);
+        } else {
+            cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
+            int_text(ui.turns[i], t);
+            cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
+        }
     }
+    cv_text(178, 2, &FONT_XS, PAGE_NAME[active_page], C_HI);
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
     cv_begin(240, 60, C_BLACK);
