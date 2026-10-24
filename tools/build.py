@@ -206,6 +206,8 @@ def tc(tool, *args):
     rel = [str(Path(a).resolve().relative_to(ROOT)) if isinstance(a, Path) else a for a in args]
     if tool == "cc":                # the toolchain's cc wrapper needs python3; call clang directly
         tool, rel = "pi32v2/bin/clang", ["-target", "pi32v2", *rel]
+    if tool == "cxx":
+        tool, rel = "pi32v2/bin/clang++", ["-target", "pi32v2", *rel]
     if use_docker():
         cmd = ["docker", "exec", "-w", "/work", builder(), f"/opt/jieli/{tool}", *rel]
     else:
@@ -480,7 +482,11 @@ def build_app():
     for u in CONF.get("o2", []):
         for f in (sorted(APP.glob(u)) if any(ch in u for ch in "*?[") else [APP / u]):
             o = OUT / "o2" / ("_".join(f.relative_to(APP).with_suffix("").parts) + ".o")
-            units.append(("cc", *o2, *o2_more, *inc(f.parent), *ir_out, "-c", f, "-o", o.with_suffix(".ll") if ir else o))
+            compiler = "cxx" if f.suffix in (".cpp", ".cc", ".cxx") else "cc"
+            units.append((compiler, *o2, *o2_more,
+              *(["-std=c++11", "-fno-exceptions", "-fno-rtti"] if compiler == "cxx" else []),
+              *inc(f.parent), *ir_out, "-c", f,
+              "-o", o.with_suffix(".ll") if ir else o))
             objs.append(o)
             o2_units.append((f, o))
     b_units, b_objs, b_libs = radio_units() if BLE or WIFI else ([], [], [])

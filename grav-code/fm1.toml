@@ -3,7 +3,21 @@ name = "GRAV_CODE"              # APP_NAME is in app.h; this names the build's f
 id_prefix = "FM-1_11"          # package identity (each firmware its own): dev FM-1_1100, releases FM-1_11XXYYZZ
 usb_manufacturer = "GRAV CODE"
 usb_product = "GRAV CODE FM-1"
-o2 = ["dsp/grav_engine.c"]                        # separate units compiled at -O2 (an app's DSP)
+include = ["vendor"]
+
+o2 = [
+    "dsp/grav_engine.c",
+    "dsp/grav_cpp.cpp",
+    "dsp/grav_plaits.cpp",
+    "vendor/stmlib/dsp/units.cc",
+    "vendor/plaits/resources.cc",
+    "vendor/plaits/dsp/engine/waveshaping_engine.cc",
+]
+
+o2_cflags = ["-DM_PI=3.14159265358979323846", "-DTEST", 
+    "-Igrav-code/vendor/newlib",
+    "-Igrav-code/vendor/cxx",
+]
 words = "words.tsv"
 ble = true                     # Bluetooth MIDI (--no-ble builds without it)
 ble_central = true             # and the FM-1 connects to Bluetooth MIDI devices too
@@ -12,3 +26,5 @@ tagline = "Hybrid DSP synthesizer for M-VAVE FM-1"
 repo = "https://github.com/gravkode/gravkode-fm1"
 licence = "MPL-2.0"
 credits = ""                   # a sentence for the installer's footer: what your firmware is built from
+
+vendored = ["vendor/"]

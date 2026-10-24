@@ -12,14 +12,14 @@
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t wave;                        /* 0 sine, 1 triangle */
+    uint8_t wave;                        /* 0 sine, 1 Plaits Waveshaping */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const WAVE_NAME[] = {"SINE", "TRIANGLE"};
+static const char *const WAVE_NAME[] = {"SINE", "PLAITS WS"};
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -63,10 +63,10 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+    midi_in();
+
     int32_t note = voice_note;
     float velocity = voice_vel;
-
-    midi_in();
 
     grav_engine_render(
         &grav_engine,
