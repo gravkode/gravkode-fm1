@@ -18,6 +18,10 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
   o2 = ["dsp/engine.c"]      separate units compiled at -O2 (the app's DSP), relative to APP_DIR (globs too); each with
                              its own directory on the include path
   o2_cflags = ["-DX=1"]      more flags for those; o2_include = ["lib/prefix.h"]: a header included first in each
+                             (a .cc/.cpp/.cxx unit is C++: C++11, no exceptions, no RTTI, and no static constructors
+                             on the FM-1: the app constructs its C++ objects itself)
+  o2_device_include = ["vendor/cxx"]   include directories for the o2 units on the FM-1 only (a C or C++ library's
+                             headers the toolchain lacks), relative to APP_DIR; the host and the web use their own
   include = ["dsp/lib"]      more include directories, relative to APP_DIR
   device_include = ["inc"]   include directories for the firmware only (headers the toolchain lacks)
   mmio_skip = ["dsp/lib/"]   paths whose numbers are not addresses (a library's tables): the register check skips
@@ -105,6 +109,8 @@ CFLAGS = ["-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-fu
 # build (-ffp-contract=off) computes the same samples
 CPU = "r3"                          # the core: the compiler, the LTO plugin and objdump (to decode its FPU instructions)
 FPU = [f"-mcpu={CPU}", "-mfprev1", "-ffp-contract=off"]
+CXX_FLAGS = ["-std=c++11", "-fno-exceptions", "-fno-rtti"]   # an o2 unit in C++ (.cc, .cpp, .cxx), everywhere
+CXX_SUFFIXES = (".cc", ".cpp", ".cxx")
 LINE = re.compile(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2} )+)\s*\t(.*)$")
 
 # SDK files of AC79NN_SDK_V1.2.1_2023-12-13 (the tested version)
@@ -476,15 +482,14 @@ def build_app():
         units.append(("cc", "-c", APP / a, "-o", o))
         objs.append(o)
     (OUT / "o2").mkdir(parents=True, exist_ok=True)
-    o2_more = [*CONF.get("o2_cflags", []),
+    o2_more = [*inc(*(APP / d for d in CONF.get("o2_device_include", []))), *CONF.get("o2_cflags", []),
                *[a for h in CONF.get("o2_include", []) for a in ("-include", str((APP / h).resolve().relative_to(ROOT)))]]
     o2_units = []
     for u in CONF.get("o2", []):
         for f in (sorted(APP.glob(u)) if any(ch in u for ch in "*?[") else [APP / u]):
             o = OUT / "o2" / ("_".join(f.relative_to(APP).with_suffix("").parts) + ".o")
-            compiler = "cxx" if f.suffix in (".cpp", ".cc", ".cxx") else "cc"
-            units.append((compiler, *o2, *o2_more,
-              *(["-std=c++11", "-fno-exceptions", "-fno-rtti"] if compiler == "cxx" else []),
+            compiler = "cxx" if f.suffix in CXX_SUFFIXES else "cc"
+            units.append((compiler, *o2, *o2_more, *(CXX_FLAGS if compiler == "cxx" else []),
               *inc(f.parent), *ir_out, "-c", f,
               "-o", o.with_suffix(".ll") if ir else o))
             objs.append(o)
@@ -708,16 +713,20 @@ def o2_files():
     return [f for u in CONF.get("o2", []) for f in (sorted(APP.glob(u)) if any(ch in u for ch in "*?[") else [APP / u])]
 
 
-def o2_objects(cc, base_flags, out):
+def o2_objects(cc, cxx, base_flags, out):
     """the o2 units compiled apart (each with its own flags: o2_cflags, o2_include, its directory) for the host or the
-    browser; their objects"""
+    browser, a C++ unit by cxx with the C++ flags in place of the C standard; their objects"""
     extra = [*CONF.get("o2_cflags", []), *[a for h in CONF.get("o2_include", []) for a in ("-include", str(APP / h))]]
     out.mkdir(parents=True, exist_ok=True)
     jobs = [(f, out / ("_".join(f.relative_to(APP).with_suffix("").parts) + ".o")) for f in o2_files()]
 
     def one(job):
         f, o = job
-        r = subprocess.run([cc, *base_flags, *extra, f"-I{f.parent}", "-c", str(f), "-o", str(o)],
+        if f.suffix in CXX_SUFFIXES:
+            tool, flags = cxx, [*(a for a in base_flags if not a.startswith("-std=")), *CXX_FLAGS]
+        else:
+            tool, flags = cc, base_flags
+        r = subprocess.run([tool, *flags, *extra, f"-I{f.parent}", "-c", str(f), "-o", str(o)],
                            capture_output=True, text=True)
         return r.stderr if r.returncode else ""
     with ThreadPoolExecutor(8) as ex:
@@ -753,8 +762,8 @@ def build_host():
     out.mkdir(parents=True, exist_ok=True)
     exe = out / (STEM + "_host")                  # NAME_host; NAME-usb_host with --no-ble
     inc_dirs = [f"-I{d}" for d in (SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))]
-    o2_objs = o2_objects(os.environ.get("CC", "cc"), ["-O2", "-ffp-contract=off", "-std=c99", "-w", "-DPLAT_HOST", *inc_dirs],
-                         out / "o2")
+    o2_objs = o2_objects(os.environ.get("CC", "cc"), os.environ.get("CXX", "c++"),
+                         ["-O2", "-ffp-contract=off", "-std=c99", "-w", "-DPLAT_HOST", *inc_dirs], out / "o2")
     cmd = [os.environ.get("CC", "cc"), "-O2", "-ffp-contract=off", "-std=c99", "-Wall", "-Wextra",
            "-Wno-unused-function", "-Wno-unused-parameter", "-DPLAT_HOST", *opt_flags(), *["-DFM1B_BLE=1"] * BLE, *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_WIFI=1"] * WIFI,
            *(f"-I{d}" for d in (SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))),
@@ -774,8 +783,8 @@ def build_web():
     emu = OUT / "emu"
     emu.mkdir(parents=True, exist_ok=True)
     web_inc = [f"-I{d}" for d in (SRC / "host", SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))]
-    o2_objs = o2_objects("emcc", ["-O2", "-ffp-contract=off", "-std=gnu99", "-w", "-DPLAT_HOST", "-DPLAT_WEB", *web_inc],
-                         emu / "o2")
+    o2_objs = o2_objects("emcc", "em++", ["-O2", "-ffp-contract=off", "-std=gnu99", "-w", "-DPLAT_HOST", "-DPLAT_WEB",
+                                          *web_inc], emu / "o2")
     cmd = ["emcc", "-O2", "-ffp-contract=off", "-std=gnu99", "-Wall", "-Wno-unused-function", "-Wno-unused-parameter",
            "-Wno-unused-variable", "-DPLAT_HOST", "-DPLAT_WEB", *opt_flags(), *["-DFM1B_BLE=1"] * BLE, *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_WIFI=1"] * WIFI, *(f'-DAPP_VERSION="{VERSION}"',) * bool(VERSION),
            *(f"-I{d}" for d in (SRC / "host", SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))),
