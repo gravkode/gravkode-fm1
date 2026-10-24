@@ -34,7 +34,7 @@ extern "C" void grav_plaits_render(
     p.accent = 1.0f;
 
     bool already_enveloped = false;
-    if (algorithm == 2)
+    if (algorithm == 1)
         fm_engine.Render(p, out, aux, size, &already_enveloped);
     else
         engine.Render(p, out, aux, size, &already_enveloped);

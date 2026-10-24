@@ -8,18 +8,19 @@
 #include "fastmath.h"
 #include "dsp/grav_engine.h"
 
-#define SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
+#define SET_MAGIC 0x54504C32u
+#define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t wave;                        /* 0 sine, 1 Plaits Waveshaping */
+    uint8_t engine_id;                   /* 0 Plaits WS, 1 Plaits FM */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const WAVE_NAME[] = {"SINE", "PLAITS WS", "PLAITS FM"};
+static const char *const ENGINE_NAME[] = {"PLAITS WS", "PLAITS FM"};
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -87,7 +88,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         n,
         note,
         velocity,
-        set.wave,
+        set.engine_id,
         master_q12,
         (float)plaits_timbre / 100.0f,
         (float)plaits_morph / 100.0f,
@@ -106,16 +107,32 @@ static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
     set.octave = 0;
-    set.wave = 0;
+    set.engine_id = 0;
     set.ble_off = 0;
 }
 
 void app_init(void)
 {
     grav_engine_init(&grav_engine);
-    if (plat_store_load(OBJ_SETTINGS, &set, sizeof set) != (int)sizeof set || set.magic != SET_MAGIC
-        || set.octave < -2 || set.octave > 2 || set.wave > 2u || set.ble_off > 1u)
+    int loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+
+    if (loaded != (int)sizeof set ||
+        set.octave < -2 || set.octave > 2 ||
+        set.ble_off > 1u) {
         settings_defaults();
+    } else if (set.magic == OLD_SET_MAGIC) {
+        /* Migrate v0.4.0: SINE=0, WS=1, FM=2 */
+        uint8_t old_wave = set.engine_id;
+        if (old_wave > 2u) {
+            settings_defaults();
+        } else {
+            set.engine_id = old_wave == 2u ? 1u : 0u;
+            set.magic = SET_MAGIC;
+            set_dirty = 1;
+        }
+    } else if (set.magic != SET_MAGIC || set.engine_id > 1u) {
+        settings_defaults();
+    }
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -196,7 +213,7 @@ static void speak(void)
         text_cat(t, APP_NAME ". OCTAVE ");
         text_cat(t, o);
         text_cat(t, ". WAVE ");
-        text_cat(t, WAVE_NAME[set.wave]);
+        text_cat(t, ENGINE_NAME[set.engine_id]);
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -365,9 +382,9 @@ static void input(void)
             int_text(*value, t);
             app_say(name, t);
         } else if (k == EN_PRESET) {
-            set.wave = (uint8_t)((set.wave + 3 + e % 3) % 3);
+            set.engine_id = (uint8_t)((set.engine_id + (e & 1)) & 1u);
             set_dirty = 1;
-            app_say("WAVE", WAVE_NAME[set.wave]);
+            app_say("WAVE", ENGINE_NAME[set.engine_id]);
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -460,7 +477,7 @@ static void draw(void)
     cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
     cv_text(30, 36, &FONT_XS, t, C_HI);
     cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
-    cv_text(112, 36, &FONT_XS, WAVE_NAME[set.wave], C_HI);
+    cv_text(112, 36, &FONT_XS, ENGINE_NAME[set.engine_id], C_HI);
     if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
         static const char HEX[] = "0123456789ABCDEF";
@@ -538,7 +555,7 @@ int app_expect(const char *what, int *got)
     if (!strcmp(what, "octave"))
         *got = set.octave;
     else if (!strcmp(what, "wave"))
-        *got = set.wave;
+        *got = set.engine_id;
     else if (!strcmp(what, "note"))
         *got = voice_note;
     else if (!strcmp(what, "dirty"))

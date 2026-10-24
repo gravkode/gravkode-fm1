@@ -26,9 +26,6 @@ void grav_engine_render(
     float harmonics
 ) {
     float target = note >= 0 ? 0.25f * velocity : 0.0f;
-    float inc = note >= 0
-        ? 440.0f * fm_exp2f((float)(note - 69) / 12.0f) / 44100.0f
-        : 0.0f;
     float gain = (float)master_q12 / 4096.0f * (float)grav_cpp_test(4150000);
 
     static int32_t last_note = 69;
@@ -43,24 +40,17 @@ void grav_engine_render(
         uint32_t count = n - base;
         if (count > 32) count = 32;
 
-        if (wave)
-            grav_plaits_render(
-                (float)last_note,
-                plaits_out, plaits_aux, count, (unsigned int)wave,
-                timbre, morph, harmonics);
+        grav_plaits_render(
+            (float)last_note,
+            plaits_out, plaits_aux, count, (unsigned int)wave,
+            timbre, morph, harmonics);
 
         for (uint32_t j = 0; j < count; j++) {
             uint32_t i = base + j;
         e->level += (target - e->level) * 0.002f;
         e->gain += (gain - e->gain) * 0.004f;
 
-        e->phase += inc;
-        if (e->phase >= 1.0f)
-            e->phase -= 1.0f;
-
-        float s = wave
-            ? plaits_out[j]
-            : fm_sinf(e->phase * 6.2831853f);
+        float s = plaits_out[j];
 
         s *= e->level * e->gain;
 
