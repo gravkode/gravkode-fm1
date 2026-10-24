@@ -156,15 +156,15 @@ def render(ttf, px, scale, pixel, first, last):
                                     for n, a in zip(names, font.get_variation_axes())])
     feats = None if pixel else ["tnum"]
     asc, desc = font.getmetrics()
-    top = max(0, font.getbbox("A8|(", features=feats)[1] - 1)
+    top = max(0, font.getbbox("A8|(")[1] - 1)
     h = asc + desc - top
     glyphs = []
     for c in range(first, last + 1):
         ch = chr(c)
-        adv = int(round(font.getlength(ch, features=feats)))
+        adv = int(round(font.getlength(ch)))
         bw = adv + 2 * PAD
         img = Image.new("L", (bw, asc + desc), 0)
-        ImageDraw.Draw(img).text((PAD, 0), ch, font=font, fill=255, features=feats)
+        ImageDraw.Draw(img).text((PAD, 0), ch, font=font, fill=255)
         img = img.crop((0, top, bw, top + h))
         px_ = [(15 if v >= 128 else 0) if pixel else min(15, (v + 8) // 17) for v in img.tobytes()]
         glyphs.append((adv * scale, bw * scale, upscale(px_, bw, h, scale)))
