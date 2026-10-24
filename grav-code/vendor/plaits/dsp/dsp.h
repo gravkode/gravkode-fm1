@@ -32,7 +32,9 @@
 #include "stmlib/stmlib.h"
 
 namespace plaits {
-  
+
+// GRAV CODE: the FM-1 plays at 44.1 kHz, exactly (device/main_fm1.c FS); Plaits'
+// own were 48000 here and 47872.34 below, its STM32's real frame clock.
 static const float kSampleRate = 44100.0f;
 
 // There is no proper PLL for I2S, only a divider on the system clock to derive

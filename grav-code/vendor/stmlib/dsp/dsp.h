@@ -31,6 +31,7 @@
 
 #include "stmlib/stmlib.h"
 
+#include <cmath>
 #include <math.h>
 
 namespace stmlib {

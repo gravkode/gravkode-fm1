@@ -33,6 +33,7 @@
 #include "stmlib/dsp/parameter_interpolator.h"
 #include "stmlib/dsp/polyblep.h"
 
+#include <algorithm>
 
 #include "plaits/dsp/oscillator/oscillator.h"
 

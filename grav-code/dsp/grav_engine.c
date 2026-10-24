@@ -1,10 +1,7 @@
 #include "grav_engine.h"
+#include "grav_plaits.h"
 #include "fastmath.h"
 extern int grav_cpp_test(int x);
-extern void grav_plaits_init(void);
-extern void grav_plaits_render(
-    float note, float *out, float *aux, unsigned int size, unsigned int algorithm,
-    float timbre, float morph, float harmonics);
 void grav_engine_init(grav_engine_t *e)
 {
     grav_plaits_init();
@@ -38,16 +35,16 @@ void grav_engine_render(
     if (note >= 0)
         e->last_note = note;
 
-    float plaits_out[32];
-    float plaits_aux[32];
+    float plaits_out[GRAV_PLAITS_BLOCK];
+    float plaits_aux[GRAV_PLAITS_BLOCK];
 
-    for (uint32_t base = 0; base < n; base += 32) {
+    for (uint32_t base = 0; base < n; base += GRAV_PLAITS_BLOCK) {
         uint32_t count = n - base;
-        if (count > 32) count = 32;
+        if (count > GRAV_PLAITS_BLOCK) count = GRAV_PLAITS_BLOCK;
 
         grav_plaits_render(
             (float)e->last_note + pitch_offset,
-            plaits_out, plaits_aux, count, (unsigned int)wave,
+            plaits_out, plaits_aux, count, wave,
             timbre, morph, harmonics);
 
         for (uint32_t j = 0; j < count; j++) {

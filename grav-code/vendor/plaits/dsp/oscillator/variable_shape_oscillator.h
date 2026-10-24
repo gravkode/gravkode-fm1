@@ -40,6 +40,7 @@
 
 #include "plaits/dsp/oscillator/oscillator.h"
 
+#include <algorithm>
 
 namespace plaits {
 
@@ -133,8 +134,8 @@ class VariableShapeOscillator {
       const float pw = pwm.Next();
       const float waveshape = waveshape_modulation.Next();
       
-      const float square_amount = (waveshape > 0.5f ? waveshape - 0.5f : 0.0f) * 2.0f;
-      const float triangle_amount = (waveshape < 0.5f ? 1.0f - waveshape * 2.0f : 0.0f);
+      const float square_amount = std::max(waveshape - 0.5f, 0.0f) * 2.0f;
+      const float triangle_amount = std::max(1.0f - waveshape * 2.0f, 0.0f);
       
       const float slope_up = 1.0f / (pw);
       const float slope_down = 1.0f / (1.0f - pw);

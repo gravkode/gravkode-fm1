@@ -28,6 +28,7 @@
 
 #include "plaits/dsp/engine/waveshaping_engine.h"
 
+#include <algorithm>
 
 #include "stmlib/dsp/parameter_interpolator.h"
 #include "stmlib/utils/dsp.h"

@@ -17,11 +17,13 @@
 /* #undef _LIBCPP_HAS_NO_GLOBAL_FILESYSTEM_NAMESPACE */
 #define _LIBCPP_HAS_NO_STDIN
 #define _LIBCPP_HAS_NO_STDOUT
-/* #undef _LIBCPP_HAS_NO_THREADS */
+/* GRAV CODE: the app's C++ runs in the FM-1's audio interrupt, with no threads and no pthread.h in the SDK; the
+ * SDK's settings were the next two lines' opposites (_LIBCPP_HAS_THREAD_API_PTHREAD) */
+#define _LIBCPP_HAS_NO_THREADS
 /* #undef _LIBCPP_HAS_NO_MONOTONIC_CLOCK */
 /* #undef _LIBCPP_HAS_NO_THREAD_UNSAFE_C_FUNCTIONS */
 /* #undef _LIBCPP_HAS_MUSL_LIBC */
-#define _LIBCPP_HAS_THREAD_API_PTHREAD
+/* #undef _LIBCPP_HAS_THREAD_API_PTHREAD */
 /* #undef _LIBCPP_HAS_THREAD_API_EXTERNAL */
 /* #undef _LIBCPP_HAS_THREAD_API_WIN32 */
 /* #undef _LIBCPP_HAS_THREAD_LIBRARY_EXTERNAL */

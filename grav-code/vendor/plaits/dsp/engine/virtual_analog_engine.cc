@@ -28,6 +28,7 @@
 
 #include "plaits/dsp/engine/virtual_analog_engine.h"
 
+#include <algorithm>
 
 #include "stmlib/dsp/parameter_interpolator.h"
 
@@ -46,7 +47,7 @@ void VirtualAnalogEngine::Init(BufferAllocator* allocator) {
   auxiliary_amount_ = 0.0f;
   xmod_amount_ = 0.0f;
   
-  // Scratch buffer is owned by the engine; no allocator required.
+  temp_buffer_ = allocator->Allocate<float>(kMaxBlockSize);
 }
 
 void VirtualAnalogEngine::Reset() {
@@ -199,7 +200,7 @@ void VirtualAnalogEngine::Render(
       ? 0.0f
       : (parameters.timbre - 0.5f) * (parameters.timbre - 0.5f) * 4.0f * 48.0f;
   
-  const float square_gain = (parameters.timbre * 8.0f < 1.0f ? parameters.timbre * 8.0f : 1.0f);
+  const float square_gain = min(parameters.timbre * 8.0f, 1.0f);
   
   float saw_pw = parameters.morph < 0.5f
       ? parameters.morph + 0.5f
@@ -220,7 +221,7 @@ void VirtualAnalogEngine::Render(
       primary_f, square_sync_f, square_pw, 1.0f, temp_buffer_, size);
   variable_saw_.Render(auxiliary_f, saw_pw, saw_shape, out, size);
   
-  float norm = 1.0f / ((square_gain > saw_gain ? square_gain : saw_gain));
+  float norm = 1.0f / (std::max(square_gain, saw_gain));
   
   ParameterInterpolator square_gain_modulation(
       &auxiliary_amount_,
