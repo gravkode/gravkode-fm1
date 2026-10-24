@@ -295,6 +295,7 @@ static struct {
     uint32_t rec_t;                      /* REC went down (0: not held, or its hold already acted) */
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
+    uint32_t cpu, xruns, cpu_at;         /* the render's load (% of its time) and late renders, as last shown */
     uint8_t redraw;
 } ui;
 
@@ -691,6 +692,10 @@ static void draw(void)
     int_text((int32_t)pct, t);
     text_cat(t, "%");
     cv_text(204, 36, &FONT_XS, t, C_HI);
+    cv_text(178, 48, &FONT_XS, "CPU", C_GRAY);   /* the render's load; red once a render ran late (heard: a crackle) */
+    int_text((int32_t)ui.cpu, t);
+    text_cat(t, "%");
+    cv_text(204, 48, &FONT_XS, t, ui.xruns ? RGB(240, 55, 45) : C_HI);
     cv_blit(0, 180);
 }
 
@@ -731,6 +736,14 @@ void app_frame(void)
         while ((ev = btdev_event()) != BTDEV_NONE)   /* a device connected, given up or lost */
             if (ev == BTDEV_CONNECTED || ev == BTDEV_NO_ANSWER || ev == BTDEV_LOST)
                 app_say("DEVICE", btdev_word(ev));
+    }
+    if (now - ui.cpu_at >= 500u) {           /* the load, twice a second */
+        ui.cpu_at = now;
+        if (plat_cpu_pct() != ui.cpu || plat_xruns() != ui.xruns) {
+            ui.cpu = plat_cpu_pct();
+            ui.xruns = plat_xruns();
+            ui.redraw = 1;
+        }
     }
     if (midi_count != last_midi) {
         last_midi = midi_count;
