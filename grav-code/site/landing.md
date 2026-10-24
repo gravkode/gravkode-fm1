@@ -1,11 +1,8 @@
-# TEMPLATE
+# GRAV CODE
 
-TEMPLATE is the smallest complete firmware for the M-VAVE FM-1, made to be copied: every control on the screen by
-its name, a simple voice on the keys with velocity and pressure, settings that save, MIDI over USB, Bluetooth and
-TRS, and a screen reader. Copy it to
-start your own firmware on fm1-base.
-
-![TEMPLATE while a key is held: C4 in the header with V 90 P 64, FX lit among the buttons, K3 at 3, the key filled](manual/img/screen-playing.png "TEMPLATE on the FM-1's screen")
+GRAV CODE turns the M-VAVE FM-1 into a synthesizer on Mutable Instruments Plaits' sound engines: Waveshaping, FM,
+Virtual Analog and Modal, a struck resonator. The keys play it with velocity; an envelope shapes it and an LFO moves
+its timbre, morph or pitch; the settings save; MIDI goes out and comes in over USB and TRS.
 
 Version {{VERSION}}. Installing is at your own risk; the installer can put M-VAVE's own firmware back.
 
@@ -13,7 +10,34 @@ Version {{VERSION}}. Installing is at your own risk; the installer can put M-VAV
 - [Install](install/): from Chrome or Edge, with the FM-1 connected by USB.
 - [Manual](manual/): the screen, the controls, saving, MIDI.
 - [Download {{PKG}}](firmware/{{PKG}}): for the command-line installer, `python3 tools/fm1_install.py {{PKG}}`.
-- [Source](https://github.com/charlesvestal/fm1-base): MPL-2.0. Built on fm1-base and felucca-bsp, from Felucca by
-  Leo Kuroshita, Hügelton Instruments.
+- [Source](https://github.com/gravkode/gravkode-fm1): MPL-2.0. Built on fm1-base by Charles Vestal and felucca-bsp,
+  from Felucca by Leo Kuroshita, Hügelton Instruments.
 
-M-VAVE and FM-1 are trademarks of their owners. TEMPLATE is not affiliated with M-VAVE.
+## Credits and licences
+
+The sound engines are Mutable Instruments Plaits' and its library stmlib, by Emilie Gillet
+([source](https://github.com/pichenettes/eurorack)), used under the MIT License:
+
+```
+Copyright 2012-2021 Emilie Gillet.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+M-VAVE and FM-1 are trademarks of their owners. GRAV CODE is not affiliated with M-VAVE or Mutable Instruments.
