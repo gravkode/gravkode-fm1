@@ -16,7 +16,8 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
   usb_manufacturer = "..."   the USB names (felucca-bsp FELUCCA_USB_MANUFACTURER / FELUCCA_USB_PRODUCT)
   usb_product = "..."
   o2 = ["dsp/engine.c"]      separate units compiled at -O2 (the app's DSP), relative to APP_DIR (globs too); each with
-                             its own directory on the include path
+                             its own directory for its quoted includes (-iquote: a header there named like the C
+                             library's, Plaits' physical_modelling/string.h, does not hide <string.h>)
   o2_cflags = ["-DX=1"]      more flags for those; o2_include = ["lib/prefix.h"]: a header included first in each
                              (a .cc/.cpp/.cxx unit is C++: C++11, no exceptions, no RTTI, and no static constructors
                              on the FM-1: the app constructs its C++ objects itself)
@@ -490,7 +491,7 @@ def build_app():
             o = OUT / "o2" / ("_".join(f.relative_to(APP).with_suffix("").parts) + ".o")
             compiler = "cxx" if f.suffix in CXX_SUFFIXES else "cc"
             units.append((compiler, *o2, *o2_more, *(CXX_FLAGS if compiler == "cxx" else []),
-              *inc(f.parent), *ir_out, "-c", f,
+              "-iquote", str(f.parent.resolve().relative_to(ROOT)), *ir_out, "-c", f,
               "-o", o.with_suffix(".ll") if ir else o))
             objs.append(o)
             o2_units.append((f, o))
@@ -726,7 +727,7 @@ def o2_objects(cc, cxx, base_flags, out):
             tool, flags = cxx, [*(a for a in base_flags if not a.startswith("-std=")), *CXX_FLAGS]
         else:
             tool, flags = cc, base_flags
-        r = subprocess.run([tool, *flags, *extra, f"-I{f.parent}", "-c", str(f), "-o", str(o)],
+        r = subprocess.run([tool, *flags, *extra, "-iquote", str(f.parent), "-c", str(f), "-o", str(o)],
                            capture_output=True, text=True)
         return r.stderr if r.returncode else ""
     with ThreadPoolExecutor(8) as ex:
