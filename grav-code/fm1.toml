@@ -13,6 +13,7 @@ o2 = [
     "vendor/plaits/resources.cc",
     "vendor/plaits/dsp/engine/waveshaping_engine.cc",
     "vendor/plaits/dsp/engine/fm_engine.cc",
+    "vendor/plaits/dsp/engine/virtual_analog_engine.cc",
 ]
 
 o2_cflags = ["-DM_PI=3.14159265358979323846", "-DTEST", 

@@ -13,14 +13,14 @@
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t engine_id;                   /* 0 Plaits WS, 1 Plaits FM */
+    uint8_t engine_id;                   /* 0 Plaits WS, 1 Plaits FM, 2 Virtual Analog */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const ENGINE_NAME[] = {"PLAITS WS", "PLAITS FM"};
+static const char *const ENGINE_NAME[] = {"PLAITS WS", "PLAITS FM", "PLAITS VA"};
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
@@ -130,7 +130,7 @@ void app_init(void)
             set.magic = SET_MAGIC;
             set_dirty = 1;
         }
-    } else if (set.magic != SET_MAGIC || set.engine_id > 1u) {
+    } else if (set.magic != SET_MAGIC || set.engine_id > 2u) {
         settings_defaults();
     }
 }
@@ -382,7 +382,7 @@ static void input(void)
             int_text(*value, t);
             app_say(name, t);
         } else if (k == EN_PRESET) {
-            set.engine_id = (uint8_t)((set.engine_id + (e & 1)) & 1u);
+            set.engine_id = (uint8_t)((set.engine_id + 3 + e % 3) % 3);
             set_dirty = 1;
             app_say("WAVE", ENGINE_NAME[set.engine_id]);
         } else {
