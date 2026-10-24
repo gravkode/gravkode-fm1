@@ -31,6 +31,19 @@ static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
 static volatile float voice_vel = 1.0f;      /* the note's velocity, 0..1 */
 static grav_engine_t grav_engine;
 
+/* Plaits parameters: 0..100% */
+static volatile int32_t plaits_timbre = 65;
+static volatile int32_t plaits_morph = 50;
+static volatile int32_t plaits_harmonics = 75;
+
+static int32_t clamp_percent(int32_t value)
+{
+    if (value < 0) return 0;
+    if (value > 100) return 100;
+    return value;
+}
+
+
 static void note_on(int32_t note, uint32_t vel)
 {
     voice_vel = (float)vel / 127.0f;
@@ -75,7 +88,10 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         note,
         velocity,
         set.wave,
-        master_q12
+        master_q12,
+        (float)plaits_timbre / 100.0f,
+        (float)plaits_morph / 100.0f,
+        (float)plaits_harmonics / 100.0f
     );
 }
 
@@ -330,6 +346,24 @@ static void input(void)
         if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
             btdev_choose(btdev_pick() + e);
             ble_device_say();
+        } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
+            volatile int32_t *value;
+            const char *name;
+
+            if (k == EN_K1) {
+                value = &plaits_timbre;
+                name = "TIMBRE";
+            } else if (k == EN_K2) {
+                value = &plaits_morph;
+                name = "MORPH";
+            } else {
+                value = &plaits_harmonics;
+                name = "HARMONICS";
+            }
+
+            *value = clamp_percent(*value + e);
+            int_text(*value, t);
+            app_say(name, t);
         } else if (k == EN_PRESET) {
             set.wave ^= 1u;
             set_dirty = 1;

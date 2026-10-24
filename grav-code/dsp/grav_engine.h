@@ -15,5 +15,8 @@ void grav_engine_render(
     int32_t note,
     float velocity,
     uint8_t wave,
-    uint32_t master_q12
+    uint32_t master_q12,
+    float timbre,
+    float morph,
+    float harmonics
 );

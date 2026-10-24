@@ -2,7 +2,9 @@
 #include "fastmath.h"
 extern int grav_cpp_test(int x);
 extern void grav_plaits_init(void);
-extern void grav_plaits_render(float note, float *out, float *aux, unsigned int size);
+extern void grav_plaits_render(
+    float note, float *out, float *aux, unsigned int size,
+    float timbre, float morph, float harmonics);
 void grav_engine_init(grav_engine_t *e)
 {
     grav_plaits_init();
@@ -18,7 +20,10 @@ void grav_engine_render(
     int32_t note,
     float velocity,
     uint8_t wave,
-    uint32_t master_q12
+    uint32_t master_q12,
+    float timbre,
+    float morph,
+    float harmonics
 ) {
     float target = note >= 0 ? 0.25f * velocity : 0.0f;
     float inc = note >= 0
@@ -41,7 +46,8 @@ void grav_engine_render(
         if (wave)
             grav_plaits_render(
                 (float)last_note,
-                plaits_out, plaits_aux, count);
+                plaits_out, plaits_aux, count,
+                timbre, morph, harmonics);
 
         for (uint32_t j = 0; j < count; j++) {
             uint32_t i = base + j;

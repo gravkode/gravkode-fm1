@@ -12,7 +12,10 @@ extern "C" void grav_plaits_render(
     float note,
     float* out,
     float* aux,
-    unsigned int size
+    unsigned int size,
+    float timbre,
+    float morph,
+    float harmonics
 ) {
     if (!initialized) {
         grav_plaits_init();
@@ -21,9 +24,9 @@ extern "C" void grav_plaits_render(
     plaits::EngineParameters p = {};
     p.trigger = plaits::TRIGGER_UNPATCHED;
     p.note = note;
-    p.timbre = 0.65f;
-    p.morph = 0.5f;
-    p.harmonics = 0.75f;
+    p.timbre = timbre;
+    p.morph = morph;
+    p.harmonics = harmonics;
     p.accent = 1.0f;
 
     bool already_enveloped = false;
