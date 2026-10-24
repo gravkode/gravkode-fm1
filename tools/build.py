@@ -756,6 +756,16 @@ def opt_flags():
             if (CONF.get(key) and os.environ.get(flag) != "0") or os.environ.get(flag) == "1"]   # (FM1B_MIRROR=1: a build with it, fm1.toml as it is; FM1B_BACKUP=0: without)
 
 
+def host_cxx_runtime(web=False):
+    """the host's C++ library, when an o2 unit is C++ (a template libc++ keeps in it: std::sort's); the host and the
+    web link with the C compiler, and the FM-1 has none (its units make every template they use)"""
+    if not any(f.suffix in CXX_SUFFIXES for f in o2_files()):
+        return []
+    if web:
+        return ["-lc++", "-lc++abi"]
+    return ["-lc++"] if sys.platform == "darwin" else ["-lstdc++"]
+
+
 def build_host():
     """the app against a simulated FM-1 (host/plat_host.c), with this machine's compiler; -ffp-contract=off like the
     device (no fused multiply-add), so the samples match"""
@@ -768,7 +778,7 @@ def build_host():
     cmd = [os.environ.get("CC", "cc"), "-O2", "-ffp-contract=off", "-std=c99", "-Wall", "-Wextra",
            "-Wno-unused-function", "-Wno-unused-parameter", "-DPLAT_HOST", *opt_flags(), *["-DFM1B_BLE=1"] * BLE, *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_WIFI=1"] * WIFI,
            *(f"-I{d}" for d in (SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))),
-           "-o", str(exe), str(SRC / "host" / "plat_host.c"), *o2_objs, "-lm"]
+           "-o", str(exe), str(SRC / "host" / "plat_host.c"), *o2_objs, "-lm", *host_cxx_runtime()]
     r = subprocess.run(cmd, capture_output=True, text=True)
     sys.stderr.write(r.stderr)
     if r.returncode:
@@ -790,7 +800,7 @@ def build_web():
            "-Wno-unused-variable", "-DPLAT_HOST", "-DPLAT_WEB", *opt_flags(), *["-DFM1B_BLE=1"] * BLE, *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_WIFI=1"] * WIFI, *(f'-DAPP_VERSION="{VERSION}"',) * bool(VERSION),
            *(f"-I{d}" for d in (SRC / "host", SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))),
            "--no-entry", "-sSTANDALONE_WASM", "-sSTACK_SIZE=1048576", "-sINITIAL_MEMORY=33554432", "-sFILESYSTEM=0",
-           "-o", str(emu / "app.wasm"), str(SRC / "web" / "emu" / "emu_web.c"), *o2_objs]
+           "-o", str(emu / "app.wasm"), str(SRC / "web" / "emu" / "emu_web.c"), *o2_objs, *host_cxx_runtime(web=True)]
     r = subprocess.run(cmd, capture_output=True, text=True)
     sys.stderr.write(r.stderr)
     if r.returncode:
