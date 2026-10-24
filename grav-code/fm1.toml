@@ -7,6 +7,10 @@ include = ["vendor"]
 
 o2 = [
     "dsp/grav_engine.c",
+    "synth/synth.c",
+    "synth/envelope.c",
+  "synth/lfo.c",
+    "synth/event_queue.c",
     "dsp/grav_cpp.cpp",
     "dsp/grav_plaits.cpp",
     "vendor/stmlib/dsp/units.cc",

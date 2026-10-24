@@ -7,8 +7,11 @@
  * gfx.c and announce.c are in scope. */
 #include "fastmath.h"
 #include "dsp/grav_engine.h"
+#include "synth/synth.h"
+#include "synth/event_queue.h"
 
-#define SET_MAGIC 0x54504C32u
+#define SET_MAGIC 0x47525639u
+#define PREV_SET_MAGIC 0x54504C32u
 #define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
     uint32_t magic;
@@ -16,6 +19,10 @@ typedef struct {
     uint8_t engine_id;                   /* 0 Plaits WS, 1 Plaits FM, 2 Virtual Analog */
     uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
     uint8_t rsv[1];
+    uint8_t osc[3];
+    uint8_t mod[3];
+    uint8_t env[3];
+    uint8_t reserved[3];
 } settings_t;
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
@@ -39,8 +46,22 @@ static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2",
 
 /* ------------------------------------------------------------------ voice --- */
 /* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
-static volatile int32_t voice_note = -1;     /* MIDI note, -1 = released */
-static volatile float voice_vel = 1.0f;      /* the note's velocity, 0..1 */
+static synth_t synth;
+static synth_event_queue_t synth_queue;
+static volatile uint32_t synth_queue_overflows;
+static volatile uint32_t synth_emergency_panic;
+static uint32_t synth_emergency_panic_seen;
+static volatile uint32_t synth_audio_mute;
+static volatile uint32_t synth_ota_mute;
+
+static void queue_key_event(synth_event_type_t type, int32_t note, uint32_t velocity)
+{
+    synth_event_t event = {type, note, velocity};
+    if (!synth_event_queue_push(&synth_queue, &event)) {
+        synth_queue_overflows++;
+        synth_emergency_panic++;
+    }
+}
 static grav_engine_t grav_engine;
 
 /* Plaits parameters: 0..100% */
@@ -49,8 +70,8 @@ static volatile int32_t plaits_morph = 50;
 static volatile int32_t plaits_harmonics = 75;
 
 /* Parameters for future modulation and envelope DSP. */
-static int32_t mod_params[3] = {50, 0, 0};
-static int32_t env_params[3] = {10, 50, 30};
+static volatile int32_t mod_params[3] = {50, 0, 0};
+static volatile int32_t env_params[3] = {10, 50, 30};
 
 static const char *const PARAM_NAME[3][3] = {
     {"TIMBRE", "MORPH", "HARMONICS"},
@@ -67,17 +88,6 @@ static int32_t clamp_percent(int32_t value)
 }
 
 
-static void note_on(int32_t note, uint32_t vel)
-{
-    voice_vel = (float)vel / 127.0f;
-    voice_note = note;
-}
-static void note_off(int32_t note)
-{
-    if (voice_note == note)
-        voice_note = -1;
-}
-
 static volatile uint32_t midi_last, midi_last_port, midi_count;   /* the last message in (shown), and how many */
 static void midi_in(void)                    /* audio interrupt: the packets that came in */
 {
@@ -90,19 +100,79 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             midi_last_port = (uint32_t)port;
             midi_count++;
         }
-        if ((st & 0xF0u) == 0x90u && d2)
-            note_on((int32_t)d1, d2);
+        if ((st & 0xF0u) == 0x90u && d2) {
+            synth_audio_mute = 0u;
+            synth_note_on(&synth, (int32_t)d1, d2);
+        }
         else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u)
-            note_off((int32_t)d1);
+            synth_note_off(&synth, (int32_t)d1);
     }
 }
 
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
+    synth_event_t event;
+
+    float lfo_rate = 0.05f + (float)mod_params[0] * 0.1995f;
+    float lfo_depth = (float)mod_params[1] * 0.01f;
+    lfo_set(&synth.mod_lfo, lfo_rate, lfo_depth);
+
+    envelope_set(
+        &synth.amp_env,
+        (float)env_params[0] * 0.02f,
+        (float)env_params[1] * 0.02f,
+        0.7f,
+        (float)env_params[2] * 0.04f,
+        44100.0f
+    );
+
+    while (synth_event_queue_pop(&synth_queue, &event)) {
+        switch (event.type) {
+        case SYNTH_EVENT_NOTE_ON:
+            synth_audio_mute = 0u;
+            synth_note_on(&synth, event.note, event.velocity);
+            break;
+        case SYNTH_EVENT_NOTE_OFF:
+            synth_note_off(&synth, event.note);
+            break;
+        case SYNTH_EVENT_PANIC:
+            synth_audio_mute = 1u;
+            synth_panic(&synth);
+            break;
+        default:
+            break;
+        }
+    }
+
+    uint32_t emergency = synth_emergency_panic;
+    if (emergency != synth_emergency_panic_seen) {
+        synth_emergency_panic_seen = emergency;
+        synth_audio_mute = 1u;
+        synth_panic(&synth);
+    }
+
     midi_in();
 
-    int32_t note = voice_note;
-    float velocity = voice_vel;
+
+
+    int32_t note = synth.note;
+    float velocity = synth.velocity;
+
+    float timbre = (float)plaits_timbre * 0.01f;
+    float morph = (float)plaits_morph * 0.01f;
+    float lfo_value = lfo_process(&synth.mod_lfo);
+    int32_t lfo_dest = mod_params[2] / 34;
+    float pitch_offset = (lfo_dest == 2) ? lfo_value * 2.0f : 0.0f;
+
+    if (lfo_dest == 0)
+        timbre += lfo_value * 0.5f;
+    else if (lfo_dest == 1)
+        morph += lfo_value * 0.5f;
+
+    if (timbre < 0.0f) timbre = 0.0f;
+    if (timbre > 1.0f) timbre = 1.0f;
+    if (morph < 0.0f) morph = 0.0f;
+    if (morph > 1.0f) morph = 1.0f;
 
     grav_engine_render(
         &grav_engine,
@@ -112,16 +182,30 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         velocity,
         set.engine_id,
         master_q12,
-        (float)plaits_timbre / 100.0f,
-        (float)plaits_morph / 100.0f,
-        (float)plaits_harmonics / 100.0f
+        timbre,
+        morph,
+        (float)plaits_harmonics / 100.0f,
+        pitch_offset,
+        &synth.amp_env
     );
+
+    lfo_advance(&synth.mod_lfo, n);
+
+    if (synth_audio_mute || synth_ota_mute) {
+        for (uint32_t i = 0; i < 2u * n; ++i)
+            lr[i] = 0;
+    }
+}
+
+void app_ota_mute(int active)
+{
+    synth_ota_mute = active ? 1u : 0u;
 }
 
 void app_panic(void)
 {
-    voice_note = -1;
-    grav_engine.level = 0.0f;
+    synth_audio_mute = 1u;
+    queue_key_event(SYNTH_EVENT_PANIC, 0, 0);
 }
 
 /* --------------------------------------------------------------- settings --- */
@@ -131,29 +215,64 @@ static void settings_defaults(void)
     set.octave = 0;
     set.engine_id = 0;
     set.ble_off = 0;
+    set.rsv[0] = 0;
+    set.osc[0] = 65; set.osc[1] = 50; set.osc[2] = 75;
+    set.mod[0] = 50; set.mod[1] = 0; set.mod[2] = 0;
+    set.env[0] = 10; set.env[1] = 50; set.env[2] = 30;
+    for (int i = 0; i < 3; ++i) set.reserved[i] = 0;
 }
 
 void app_init(void)
 {
+    synth_init(&synth);
+    synth_event_queue_init(&synth_queue);
     grav_engine_init(&grav_engine);
-    int loaded = plat_store_load(OBJ_SETTINGS, &set, sizeof set);
+    settings_t loaded_settings = {0};
+    int loaded = plat_store_load(OBJ_SETTINGS, &loaded_settings, sizeof loaded_settings);
 
-    if (loaded != (int)sizeof set ||
-        set.octave < -2 || set.octave > 2 ||
-        set.ble_off > 1u) {
-        settings_defaults();
-    } else if (set.magic == OLD_SET_MAGIC) {
-        /* Migrate v0.4.0: SINE=0, WS=1, FM=2 */
-        uint8_t old_wave = set.engine_id;
-        if (old_wave > 2u) {
-            settings_defaults();
-        } else {
-            set.engine_id = old_wave == 2u ? 1u : 0u;
-            set.magic = SET_MAGIC;
+    settings_defaults();
+    set_dirty = 0;
+
+    if ((loaded == 8 || loaded == (int)sizeof loaded_settings) &&
+        loaded_settings.octave >= -2 && loaded_settings.octave <= 2 &&
+        loaded_settings.ble_off <= 1u) {
+
+        if (loaded == (int)sizeof loaded_settings &&
+            loaded_settings.magic == SET_MAGIC &&
+            loaded_settings.engine_id <= 2u) {
+            int valid = 1;
+            for (int i = 0; i < 3; ++i) {
+                if (loaded_settings.osc[i] > 100u ||
+                    loaded_settings.mod[i] > 100u ||
+                    loaded_settings.env[i] > 100u)
+                    valid = 0;
+            }
+            if (valid)
+                set = loaded_settings;
+        } else if (loaded == 8 &&
+                   loaded_settings.magic == PREV_SET_MAGIC &&
+                   loaded_settings.engine_id <= 2u) {
+            set.octave = loaded_settings.octave;
+            set.engine_id = loaded_settings.engine_id;
+            set.ble_off = loaded_settings.ble_off;
+            set_dirty = 1;
+        } else if (loaded == 8 &&
+                   loaded_settings.magic == OLD_SET_MAGIC &&
+                   loaded_settings.engine_id <= 2u) {
+            set.octave = loaded_settings.octave;
+            set.engine_id = loaded_settings.engine_id == 2u ? 1u : 0u;
+            set.ble_off = loaded_settings.ble_off;
             set_dirty = 1;
         }
-    } else if (set.magic != SET_MAGIC || set.engine_id > 2u) {
-        settings_defaults();
+    }
+
+    plaits_timbre = set.osc[0];
+    plaits_morph = set.osc[1];
+    plaits_harmonics = set.osc[2];
+
+    for (int i = 0; i < 3; ++i) {
+        mod_params[i] = set.mod[i];
+        env_params[i] = set.env[i];
     }
 }
 
@@ -273,7 +392,7 @@ static void octave_step(int32_t d)
     char t[4];
     if (o == set.octave)
         return;
-    voice_note = -1;                         /* a key held across the change would not find its note off */
+    queue_key_event(SYNTH_EVENT_PANIC, 0, 0); /* release held note before octave change */
     set.octave = (int8_t)o;
     set_dirty = 1;
     octave_text(t);
@@ -328,11 +447,11 @@ static void input(void)
             ui.vel[k] = (uint8_t)v;
             ui.prs[k] = 0;
             ui.last_key = (int32_t)k;
-            note_on(note, v);
+            queue_key_event(SYNTH_EVENT_NOTE_ON, note, v);
             plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
         } else if (!(keys & bit) && (ui.keys & bit)) {
             ui.prs[k] = 0;
-            note_off(note);
+            queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0);
             plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB | TO_BLE);
         } else if ((keys & bit) && touch_pressure(k) != ui.prs[k]) {   /* pressure: poly aftertouch */
             ui.prs[k] = touch_pressure(k);
@@ -392,7 +511,7 @@ static void input(void)
             ble_device_say();
         } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
             uint32_t index = (uint32_t)(k - EN_K1);
-            int32_t *value;
+            volatile int32_t *value;
 
             if (active_page == PAGE_OSC) {
                 if (index == 0u)
@@ -407,7 +526,10 @@ static void input(void)
                 value = &env_params[index];
             }
 
-            *value = clamp_percent(*value + e);
+            int32_t previous = *value;
+            *value = clamp_percent(previous + e);
+            if (*value != previous)
+                set_dirty = 1;
             int_text(*value, t);
             app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
@@ -625,7 +747,7 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "wave"))
         *got = set.engine_id;
     else if (!strcmp(what, "note"))
-        *got = voice_note;
+        *got = synth.note;
     else if (!strcmp(what, "dirty"))
         *got = set_dirty;
     else if (!strcmp(what, "vel"))           /* the last key's velocity and pressure */

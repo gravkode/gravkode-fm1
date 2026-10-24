@@ -8,9 +8,10 @@ extern void grav_plaits_render(
 void grav_engine_init(grav_engine_t *e)
 {
     grav_plaits_init();
-    e->phase = 0.0f;
+    e->last_note = 69;
     e->level = 0.0f;
     e->gain = 0.0f;
+    e->velocity = 1.0f;
 }
 
 void grav_engine_render(
@@ -23,15 +24,19 @@ void grav_engine_render(
     uint32_t master_q12,
     float timbre,
     float morph,
-    float harmonics
+    float harmonics,
+    float pitch_offset,
+    envelope_t *amp_env
 ) {
-    float target = note >= 0 ? 0.25f * velocity : 0.0f;
-    float gain = (float)master_q12 / 4096.0f * (float)grav_cpp_test(4150000);
-
-    static int32_t last_note = 69;
 
     if (note >= 0)
-        last_note = note;
+        e->velocity = velocity;
+
+    float voice_gain = 0.25f * e->velocity;
+    float gain = (float)master_q12 / 4096.0f * (float)grav_cpp_test(4150000);
+
+    if (note >= 0)
+        e->last_note = note;
 
     float plaits_out[32];
     float plaits_aux[32];
@@ -41,18 +46,18 @@ void grav_engine_render(
         if (count > 32) count = 32;
 
         grav_plaits_render(
-            (float)last_note,
+            (float)e->last_note + pitch_offset,
             plaits_out, plaits_aux, count, (unsigned int)wave,
             timbre, morph, harmonics);
 
         for (uint32_t j = 0; j < count; j++) {
             uint32_t i = base + j;
-        e->level += (target - e->level) * 0.002f;
+        e->level = envelope_process(amp_env);
         e->gain += (gain - e->gain) * 0.004f;
 
         float s = plaits_out[j];
 
-        s *= e->level * e->gain;
+        s *= e->level * voice_gain * e->gain;
 
         if (s > 8388607.0f) s = 8388607.0f;
         if (s < -8388608.0f) s = -8388608.0f;

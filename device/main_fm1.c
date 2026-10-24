@@ -909,9 +909,11 @@ static void fm1_main(void)
 #endif
         if (usb.ota_req) {
             usb.ota_req = 0;
+            app_ota_mute(1);
             app_panic();                            /* silence: the update rewrites the flash */
             if (flash_ok)
                 ota_session();                      /* returns only if nothing was committed */
+            app_ota_mute(0);
             app_ui_init();
         }
         if (usb.uboot_req)

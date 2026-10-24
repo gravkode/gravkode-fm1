@@ -22,7 +22,8 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_NOBJ };
 /* the contract: the platform calls these */
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12);   /* audio interrupt: n stereo frames, 24-bit */
-void app_panic(void);                    /* silence now (before an update rewrites the flash) */
+void app_panic(void);
+void app_ota_mute(int active); /* block audio during OTA, restore on cancellation */                    /* silence now (before an update rewrites the flash) */
 void app_ui_init(void);                  /* the first screen, after the splash */
 void app_frame(void);                    /* the UI: input and a redraw, about 60 times a second */
 void app_input_only(void);               /* between frames: input only */
