@@ -68,6 +68,33 @@ expect_no_out USB 80 3C 00
 tap OCT+
 wait 30
 expect octave 1
+# two notes held: letting go of the one sounding goes back to the other, still held; letting go of both ends it
+key 7 down
+wait 50
+key 9 down
+wait 50
+expect note 74
+key 9 up
+wait 50
+expect note 72
+key 7 up
+wait 50
+expect note -1
+# the same over MIDI, and a note let go under the one sounding changes nothing
+midi 90 3C 64
+midi 90 3E 64
+midi 90 40 64
+wait 30
+expect note 64
+midi 80 3E 00
+wait 30
+expect note 64
+midi 80 40 00
+wait 30
+expect note 60
+midi 80 3C 00
+wait 30
+expect note -1
 midi 90 3C 64
 wait 30
 expect note 60
@@ -142,10 +169,10 @@ said BLE DISCONNECTED
 wait 100
 expect ble_dev 0
 unsaid LOST
-# each port's messages counted (plat_midi_count): this is the fifth from USB in this script
+# each port's messages counted (plat_midi_count): this is the 11th from USB in this script
 midi USB 90 40 50
 wait 20
-expect midi_in_usb 5
+expect midi_in_usb 11
 midi USB 80 40 00
 # Bluetooth's two links, the computer's and the device's: TO_BLE goes to both, each with its own room; their MIDI
 # comes in on PORT_BLE, and plat_midi_in_from says which link (MIDI thru sends it to every other)
