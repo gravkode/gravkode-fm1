@@ -32,6 +32,25 @@ reboot
 wait 600
 expect octave 1
 expect wave 1
+expect osc2 78
+# SAVE keeps the knobs of every page across a restart (ENV's ATTACK, OSC's MORPH)
+tap ENV
+wait 30
+turn K1 4
+wait 30
+tap HOME
+wait 30
+turn K2 -5
+wait 30
+expect dirty 1
+tap SAVE
+wait 30
+expect dirty 0
+reboot
+wait 600
+expect env0 14
+expect osc1 45
+expect osc2 78
 midi 90 3C 64
 wait 30
 expect note 60

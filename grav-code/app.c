@@ -222,6 +222,18 @@ static void settings_defaults(void)
     for (int i = 0; i < 3; ++i) set.reserved[i] = 0;
 }
 
+/* the knobs' parameters as they are now, into the settings record (SAVE writes the record) */
+static void settings_capture(void)
+{
+    set.osc[0] = (uint8_t)plaits_timbre;
+    set.osc[1] = (uint8_t)plaits_morph;
+    set.osc[2] = (uint8_t)plaits_harmonics;
+    for (int i = 0; i < 3; ++i) {
+        set.mod[i] = (uint8_t)mod_params[i];
+        set.env[i] = (uint8_t)env_params[i];
+    }
+}
+
 void app_init(void)
 {
     synth_init(&synth);
@@ -475,6 +487,7 @@ static void input(void)
         else if (k == B_REC && FM1B_BLE)
             ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
         else if (k == B_SAVE) {
+            settings_capture();
             if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
                 set_dirty = 0;
                 app_say("SAVED", "");
@@ -756,6 +769,13 @@ int app_expect(const char *what, int *got)
         *got = ui.prs[ui.last_key];
     else if (!strncmp(what, "turns", 5))    /* turnsN: encoder N's count (plat.h EN_*) */
         *got = ui.turns[atoi(what + 5) % NE];
+    else if (!strncmp(what, "osc", 3)) {     /* oscN, modN, envN: parameter N (0..2) of a page, as the knobs left it */
+        int i = atoi(what + 3) % 3;
+        *got = i == 0 ? plaits_timbre : i == 1 ? plaits_morph : plaits_harmonics;
+    } else if (!strncmp(what, "mod", 3))
+        *got = mod_params[atoi(what + 3) % 3];
+    else if (!strncmp(what, "env", 3))
+        *got = env_params[atoi(what + 3) % 3];
     else
         return 0;
     return 1;
