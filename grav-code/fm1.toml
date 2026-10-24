@@ -7,25 +7,29 @@ include = ["vendor"]
 
 o2 = [
     "dsp/grav_engine.c",
-    "dsp/grav_libm.c",
+    "dsp/grav_libc.c",
     "synth/synth.c",
     "synth/envelope.c",
     "synth/lfo.c",
     "synth/event_queue.c",
     "dsp/grav_plaits.cpp",
     "vendor/stmlib/dsp/units.cc",
-    "vendor/plaits/resources.cc",
-    "vendor/plaits/dsp/engine/waveshaping_engine.cc",
-    "vendor/plaits/dsp/engine/fm_engine.cc",
-    "vendor/plaits/dsp/engine/virtual_analog_engine.cc",
-    "vendor/plaits/dsp/engine/modal_engine.cc",
-    "vendor/plaits/dsp/physical_modelling/modal_voice.cc",
-    "vendor/plaits/dsp/physical_modelling/resonator.cc",
     "vendor/stmlib/utils/random.cc",
+    "vendor/plaits/resources.cc",
+    "vendor/plaits/dsp/engine/*.cc",            # all of Plaits' engines (not its voice.cc: GRAV CODE's own voice)
+    "vendor/plaits/dsp/engine2/*.cc",
+    "vendor/plaits/dsp/chords/*.cc",
+    "vendor/plaits/dsp/fm/*.cc",
+    "vendor/plaits/dsp/physical_modelling/*.cc",
+    "vendor/plaits/dsp/speech/*.cc",
 ]
 
-# TEST: stmlib's portable code instead of its ARM assembly; M_PI: newlib leaves it out in strict C++
-o2_cflags = ["-DM_PI=3.14159265358979323846", "-DTEST"]
+# TEST: stmlib's portable code instead of its ARM assembly; M_PI: newlib leaves it out in strict C++;
+# _LIBCPP_DISABLE_EXTERN_TEMPLATE: no libc++ library is linked (none on the FM-1, and the host links C), so the
+# templates the engines use (std::sort) are made in their units, not taken from it; stmlib's STATIC_ASSERT is a
+# typedef nothing uses, by design
+o2_cflags = ["-DM_PI=3.14159265358979323846", "-DTEST", "-D_LIBCPP_DISABLE_EXTERN_TEMPLATE",
+             "-Wno-unused-local-typedef"]
 # the C library's and libc++'s headers from the AC79 SDK, which the toolchain's C++ compiler lacks (the FM-1 only)
 o2_device_include = ["vendor/cxx", "vendor/newlib"]
 words = "words.tsv"

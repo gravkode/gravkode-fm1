@@ -17,7 +17,7 @@
 typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
-    uint8_t engine_id;                   /* GRAV_ENGINE_*: Plaits' Waveshaping, FM, Virtual Analog, Modal */
+    uint8_t engine_id;                   /* GRAV_ENGINE_* (dsp/grav_plaits.h): one of Plaits' 24 */
     uint8_t rsv_ble;                     /* was Bluetooth switched off (REC held), when there was Bluetooth: kept,
                                           * unread, for the record's layout (saved settings still load) */
     uint8_t rsv[1];
@@ -29,7 +29,6 @@ typedef struct {
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
-static const char *const ENGINE_NAME[GRAV_ENGINE_COUNT] = {"PLAITS WS", "PLAITS FM", "PLAITS VA", "PLAITS MDL"};
 
 /* Parameter pages: UI state only, independent of DSP. */
 enum {
@@ -359,7 +358,7 @@ static void speak(void)
         text_cat(t, APP_NAME ". OCTAVE ");
         text_cat(t, o);
         text_cat(t, ". WAVE ");
-        text_cat(t, ENGINE_NAME[set.engine_id]);
+        text_cat(t, grav_engine_name(set.engine_id));
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -488,9 +487,9 @@ static void input(void)
             int_text(*value, t);
             app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
-            set.engine_id = (uint8_t)((set.engine_id + GRAV_ENGINE_COUNT + e % GRAV_ENGINE_COUNT) % GRAV_ENGINE_COUNT);
+            set.engine_id = (uint8_t)grav_engine_step(set.engine_id, e);   /* in Plaits' order */
             set_dirty = 1;
-            app_say("WAVE", ENGINE_NAME[set.engine_id]);
+            app_say("WAVE", grav_engine_name(set.engine_id));
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -578,7 +577,7 @@ static void draw(void)
     /* Synth engine and parameter page */
     cv_begin(240, 144, C_BLACK);
 
-    cv_text(8, 4, &FONT_S, ENGINE_NAME[set.engine_id], C_HI);
+    cv_text(8, 4, &FONT_S, grav_engine_name(set.engine_id), C_HI);
 
     for (i = 0; i < 3u; i++) {
         int32_t value;
@@ -615,7 +614,7 @@ static void draw(void)
     cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
     cv_text(30, 36, &FONT_XS, t, C_HI);
     cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
-    cv_text(112, 36, &FONT_XS, ENGINE_NAME[set.engine_id], C_HI);
+    cv_text(112, 36, &FONT_XS, grav_engine_name(set.engine_id), C_HI);
     if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
         static const char HEX[] = "0123456789ABCDEF";
@@ -700,6 +699,8 @@ int app_expect(const char *what, int *got)
         *got = set.octave;
     else if (!strcmp(what, "wave"))
         *got = set.engine_id;
+    else if (!strcmp(what, "engine_ram"))    /* bytes of the pool the engines' Init took */
+        *got = (int)grav_plaits_ram_used();
     else if (!strcmp(what, "note"))
         *got = synth.note;
     else if (!strcmp(what, "dirty"))

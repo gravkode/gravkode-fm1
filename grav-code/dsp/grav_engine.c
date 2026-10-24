@@ -56,7 +56,9 @@ void grav_engine_render(
         uint32_t count = n - base;
         if (count > GRAV_PLAITS_BLOCK) count = GRAV_PLAITS_BLOCK;
 
-        grav_plaits_render(&p, plaits_out, plaits_aux, count);
+        /* an engine with an envelope of its own (a drum, the 6-op FM, a word) plays through, as Plaits' low-pass
+         * gate lets it; the envelope runs on all the same, ready for the next engine */
+        int own_envelope = grav_plaits_render(&p, plaits_out, plaits_aux, count);
         p.strike = 0;
 
         for (uint32_t j = 0; j < count; j++) {
@@ -64,7 +66,8 @@ void grav_engine_render(
             e->level = envelope_process(&voice->amp_env);
             e->gain += (gain - e->gain) * 0.004f;   /* MASTER glides: no step in the sound */
 
-            float s = plaits_out[j] * (e->level * voice_gain * e->gain);
+            float level = own_envelope ? 1.0f : e->level;
+            float s = plaits_out[j] * (level * voice_gain * e->gain);
             if (s > 8388607.0f) s = 8388607.0f;
             if (s < -8388608.0f) s = -8388608.0f;
 

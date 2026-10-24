@@ -1,9 +1,10 @@
 # GRAV CODE
 
-GRAV CODE turns the M-VAVE FM-1 into a synthesizer on Mutable Instruments Plaits' sound engines: Waveshaping, FM,
-Virtual Analog and Modal, a resonator struck and sounding on while held. The keys play it with velocity; an
-envelope shapes it and an LFO moves its timbre, morph or pitch; the settings save; MIDI goes out and comes in over
-USB and TRS.
+GRAV CODE turns the M-VAVE FM-1 into a synthesizer on all of Mutable Instruments Plaits' 24 sound engines: virtual
+analog, waveshaping, FM and 6-operator FM, grains, additive, wavetables, chords, speech, swarms, noise, particles,
+strings and modal resonators, drums, wave terrains, a string machine and chiptune. The keys play it with velocity;
+an envelope shapes it and an LFO moves its timbre, morph or pitch; the settings save; MIDI goes out and comes in
+over USB and TRS.
 
 Version {{VERSION}}. Installing is at your own risk; the installer can put M-VAVE's own firmware back.
 

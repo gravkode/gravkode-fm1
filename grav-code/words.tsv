@@ -2,10 +2,17 @@
 # GRAV CODE's words for a screen reader (fm1-reader): the text on the screen <TAB> what to say.
 # url: https://charlesvestal.github.io/fm1-base/words/
 GRAV CODE	grav code
-PLAITS WS	plaits waveshaping
-PLAITS FM	plaits F M
-PLAITS VA	plaits virtual analog
-PLAITS MDL	plaits modal
+WAVESHAPE	waveshaping
+FM 2-OP	two operator F M
+ANALOG	virtual analog
+VA VCF	virtual analog with filter
+PHASE DIST	phase distortion
+6-OP FM 1	six operator F M, bank 1
+6-OP FM 2	six operator F M, bank 2
+6-OP FM 3	six operator F M, bank 3
+TERRAIN	wave terrain
+STRING MCH	string machine
+HI-HAT	hi hat
 OSC	oscillator
 MOD	modulation
 ENV	envelope

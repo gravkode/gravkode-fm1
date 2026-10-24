@@ -105,7 +105,7 @@ expect peak_db_min -30
 midi 80 3C 00
 listen
 wait 100
-said GRAV CODE. OCTAVE +1. WAVE PLAITS FM
+said GRAV CODE. OCTAVE +1. WAVE FM 2-OP
 tap ARP
 wait 30
 said BUTTON ARP
@@ -121,13 +121,13 @@ master 4096
 wait 50
 wavstop
 midi 80 45 00
-# PRESET to Plaits' Modal: a note strikes its resonator and, held, sounds on as the other engines do (a strike
-# alone has died away by 1.4 s); let go, it ends with the envelope's release
+# PRESET to Modal (ten on from FM, in Plaits' order): a note strikes its resonator and, held, sounds on as the
+# other engines do (a strike alone has died away by 1.4 s); let go, it ends with the envelope's release
 wait 800
-turn PRESET 2
+turn PRESET 10
 wait 30
 expect wave 3
-said PLAITS MDL
+said WAVE MODAL
 midi 90 3C 64
 wait 10
 peakreset
@@ -141,7 +141,7 @@ wait 1500
 peakreset
 wait 300
 expect peak_db_max -60
-turn PRESET -2
+turn PRESET -10
 wait 30
 expect wave 1
 # velocity and pressure (lib/touch.c): a key landing at 40 plays at about 40; pressed 80 % more, it has pressure
