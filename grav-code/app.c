@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
 /* GRAV CODE: one voice on Plaits' engines (dsp/), with an envelope and an LFO (synth/). The keys play it with
- * velocity and go out over USB and Bluetooth MIDI (MIDI in plays it too); PRESET picks the engine, K1-K3 the page's
- * parameters (HOME: OSC, LFO: MOD, ENV: ENV), OCT- / OCT+ the octave, MASTER the volume, SAVE stores it all, REC
- * Bluetooth. Part of the unity build (device/unity.c, host/plat_host.c), after the platform: gfx.c and announce.c
- * are in scope. */
+ * velocity and go out over USB MIDI (MIDI in, USB or TRS, plays it too); PRESET picks the engine, K1-K3 the page's
+ * parameters (HOME: OSC, LFO: MOD, ENV: ENV), OCT- / OCT+ the octave, MASTER the volume, SAVE stores it all. No
+ * radio: Bluetooth and WiFi are left out of the build. Part of the unity build (device/unity.c, host/plat_host.c),
+ * after the platform: gfx.c and announce.c are in scope. */
 #include "fastmath.h"
 #include "dsp/grav_engine.h"
 #include "dsp/grav_plaits.h"
@@ -18,7 +18,8 @@ typedef struct {
     uint32_t magic;
     int8_t octave;                       /* -2 .. +2 */
     uint8_t engine_id;                   /* GRAV_ENGINE_*: Plaits' Waveshaping, FM, Virtual Analog, Modal */
-    uint8_t ble_off;                     /* Bluetooth switched off (REC held); 0, the default: on */
+    uint8_t rsv_ble;                     /* was Bluetooth switched off (REC held), when there was Bluetooth: kept,
+                                          * unread, for the record's layout (saved settings still load) */
     uint8_t rsv[1];
     uint8_t osc[3];
     uint8_t mod[3];
@@ -208,7 +209,7 @@ static void settings_defaults(void)
     set.magic = SET_MAGIC;
     set.octave = 0;
     set.engine_id = 0;
-    set.ble_off = 0;
+    set.rsv_ble = 0;
     set.rsv[0] = 0;
     set.osc[0] = 65; set.osc[1] = 50; set.osc[2] = 75;
     set.mod[0] = 50; set.mod[1] = 0; set.mod[2] = 0;
@@ -240,8 +241,7 @@ void app_init(void)
     set_dirty = 0;
 
     if ((loaded == 8 || loaded == (int)sizeof loaded_settings) &&
-        loaded_settings.octave >= -2 && loaded_settings.octave <= 2 &&
-        loaded_settings.ble_off <= 1u) {
+        loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
         if (loaded == (int)sizeof loaded_settings &&
             loaded_settings.magic == SET_MAGIC &&
@@ -260,14 +260,12 @@ void app_init(void)
                    loaded_settings.engine_id <= 2u) {
             set.octave = loaded_settings.octave;
             set.engine_id = loaded_settings.engine_id;
-            set.ble_off = loaded_settings.ble_off;
             set_dirty = 1;
         } else if (loaded == 8 &&
                    loaded_settings.magic == OLD_SET_MAGIC &&
                    loaded_settings.engine_id <= 2u) {
             set.octave = loaded_settings.octave;
             set.engine_id = loaded_settings.engine_id == 2u ? 1u : 0u;
-            set.ble_off = loaded_settings.ble_off;
             set_dirty = 1;
         }
     }
@@ -291,8 +289,6 @@ static struct {
     uint8_t note[NKEYS];                 /* the note each held key plays: the octave it was pressed in, so OCTAVE
                                           * while it is held changes the next notes, never this one's note-off */
     int32_t last_key;                    /* the key pressed last: its numbers in the header */
-    uint8_t looking;                     /* Bluetooth MIDI devices: REC pressed, the scan's list up (lib/btdev) */
-    uint32_t rec_t;                      /* REC went down (0: not held, or its hold already acted) */
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint32_t cpu, xruns, cpu_at;         /* the render's load (% of its time) and late renders, as last shown */
@@ -407,40 +403,6 @@ static void octave_step(int32_t d)
     app_say("OCTAVE", t);
 }
 
-int template_ble_off(void) { return set.ble_off; }
-
-/* REC held a second: Bluetooth off or on (kept with the settings, so it stays so at the next power-on) */
-static void ble_toggle(void)
-{
-    set.ble_off = (uint8_t)!set.ble_off;
-    set_dirty = 1;
-    plat_ble_enable(!set.ble_off);
-    app_say("BLUETOOTH", set.ble_off ? "OFF" : "ON");
-}
-
-/* REC: a Bluetooth MIDI device (FM1B_BLE_CENTRAL, lib/btdev): look for devices, then connect to the one ALGORITHM
- * picks, then let it go */
-static void ble_device_say(void)
-{
-    char name[21];
-    if (btdev_found(btdev_pick(), name, 0))
-        app_say("DEVICE", name);
-    else
-        app_say("BLE", "SCANNING");
-}
-static void ble_device_button(void)
-{
-    int ev;
-    if (!btdev_busy() && !ui.looking) {
-        ui.looking = 1;
-        app_say("BLE", "SCANNING");
-        return;
-    }
-    ev = btdev_save();
-    ui.looking = 0;
-    app_say(ev == BTDEV_CONNECTING ? btdev_word(ev) : "BLE", ev == BTDEV_CONNECTING ? btdev_name() : btdev_word(ev));
-}
-
 static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k;
@@ -457,17 +419,17 @@ static void input(void)
             ui.note[k] = (uint8_t)note;
             ui.last_key = (int32_t)k;
             queue_key_event(SYNTH_EVENT_NOTE_ON, note, v);
-            plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB | TO_BLE);   /* BLE: if built with it */
+            plat_midi_send(0x09u | 0x90u << 8 | (uint32_t)note << 16 | v << 24, TO_USB);
         } else if (!(keys & bit) && (ui.keys & bit)) {
             note = ui.note[k];
             ui.prs[k] = 0;
             queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0);
-            plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB | TO_BLE);
+            plat_midi_send(0x08u | 0x80u << 8 | (uint32_t)note << 16, TO_USB);
         } else if ((keys & bit) && touch_pressure(k) != ui.prs[k]) {   /* pressure: poly aftertouch */
             note = ui.note[k];
             ui.prs[k] = touch_pressure(k);
             ui.redraw = 1;
-            plat_midi_send(0x0Au | 0xA0u << 8 | (uint32_t)note << 16 | (uint32_t)ui.prs[k] << 24, TO_USB | TO_BLE);
+            plat_midi_send(0x0Au | 0xA0u << 8 | (uint32_t)note << 16 | (uint32_t)ui.prs[k] << 24, TO_USB);
         }
     }
     for (k = 0; k < NB; k++) {               /* a button pressed: its name, and what it does here */
@@ -483,8 +445,6 @@ static void input(void)
             octave_step(-1);
         else if (k == B_OCTUP)
             octave_step(1);
-        else if (k == B_REC && FM1B_BLE)
-            ui.rec_t = plat_ms();                /* a press: on release (a hold switches Bluetooth) */
         else if (k == B_SAVE) {
             settings_capture();
             if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0) {
@@ -497,20 +457,6 @@ static void input(void)
             app_say("BUTTON", BTN_NAME[k]);
         }
     }
-    if (FM1B_BLE && ui.rec_t) {             /* REC: held a second, Bluetooth on / off; a press, a device */
-        if (btn >> B_REC & 1u) {
-            if (plat_ms() - ui.rec_t >= 1000u) {
-                ui.rec_t = 0;
-                ble_toggle();
-            }
-        } else {
-            ui.rec_t = 0;
-            if (FM1B_BLE_CENTRAL && !set.ble_off)
-                ble_device_button();
-            else
-                app_say("BUTTON", "REC");
-        }
-    }
     for (k = 0; k < NE; k++) {               /* an encoder turned: its count; PRESET also changes the wave */
         char t[12];
         if ((e = plat_enc((int)k)) == 0)
@@ -518,10 +464,7 @@ static void input(void)
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
         ui.redraw = 1;
-        if (k == EN_ALGO && FM1B_BLE_CENTRAL && ui.looking) {
-            btdev_choose(btdev_pick() + e);
-            ble_device_say();
-        } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
+        if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
             uint32_t index = (uint32_t)(k - EN_K1);
             volatile int32_t *value;
 
@@ -708,7 +651,7 @@ void app_ui_init(void)
 
 void app_frame(void)
 {
-    static uint32_t last_pct, lit_until, last_ble, last_midi;
+    static uint32_t last_pct, lit_until, last_midi;
     static int last_batt = -2;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
     int batt = plat_battery();
@@ -726,17 +669,6 @@ void app_frame(void)
         lit_until = 0;
         ui.redraw = 1;
     }
-    if (FM1B_BLE_CENTRAL) {                  /* looking: a device found is named at once (REC connects to it) */
-        static int found;
-        int n = ui.looking ? btdev_count() : 0, ev;
-        btdev_page(ui.looking && !set.ble_off);
-        if (n > found && btdev_pick() < n)
-            ble_device_say();
-        found = n;
-        while ((ev = btdev_event()) != BTDEV_NONE)   /* a device connected, given up or lost */
-            if (ev == BTDEV_CONNECTED || ev == BTDEV_NO_ANSWER || ev == BTDEV_LOST)
-                app_say("DEVICE", btdev_word(ev));
-    }
     if (now - ui.cpu_at >= 500u) {           /* the load, twice a second */
         ui.cpu_at = now;
         if (plat_cpu_pct() != ui.cpu || plat_xruns() != ui.xruns) {
@@ -749,10 +681,8 @@ void app_frame(void)
         last_midi = midi_count;
         ui.redraw = 1;
     }
-    if (pct != last_pct || (uint32_t)(plat_ble_connected() | plat_ble_device() << 1) != last_ble ||
-        (ui.msg_until && now >= ui.msg_until)) {
+    if (pct != last_pct || (ui.msg_until && now >= ui.msg_until)) {
         last_pct = pct;
-        last_ble = (uint32_t)(plat_ble_connected() | plat_ble_device() << 1);
         if (now >= ui.msg_until)
             ui.msg_until = 0;
         ui.redraw = 1;

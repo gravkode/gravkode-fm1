@@ -29,8 +29,7 @@ o2_cflags = ["-DM_PI=3.14159265358979323846", "-DTEST"]
 # the C library's and libc++'s headers from the AC79 SDK, which the toolchain's C++ compiler lacks (the FM-1 only)
 o2_device_include = ["vendor/cxx", "vendor/newlib"]
 words = "words.tsv"
-ble = true                     # Bluetooth MIDI (--no-ble builds without it)
-ble_central = true             # and the FM-1 connects to Bluetooth MIDI devices too
+# no radio: Bluetooth (ble) and WiFi (wifi) are left out, so nothing of JieLi's radio libraries is linked
 # the site (tools/make_site.py, tools/publish_site.sh)
 tagline = "Hybrid DSP synthesizer for M-VAVE FM-1"
 repo = "https://github.com/gravkode/gravkode-fm1"
