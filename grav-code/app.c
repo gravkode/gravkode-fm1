@@ -451,69 +451,80 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
 static void draw(void)
 {
     char t[24];
-    int32_t note = voice_note;
-    uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
-    static const uint8_t WK[16] = PLAT_WHITE_KEYS, BK[11] = PLAT_BLACK_KEYS;
-    /* the header: the name and the note, or a message for a moment */
+    uint32_t i;
+    uint32_t pct = plat_master() * 100u / 4096u;
+    int batt = plat_battery();
+    static const uint8_t WK[16] = PLAT_WHITE_KEYS;
+    static const uint8_t BK[11] = PLAT_BLACK_KEYS;
+
+    /* Header */
     cv_begin(240, 32, C_BLACK);
-    if (now < ui.msg_until) {
-        int32_t x = cv_text(10, 6, &FONT_B, ui.msg[0], C_WHITE);
-        cv_text(x + 8, 6, &FONT_B, ui.msg[1], C_HI);
-    } else {
-        int32_t x = cv_text(10, 6, &FONT_B, APP_NAME, C_WHITE);
-        if (FM1B_BLE)                        /* Bluetooth: grey while it waits, lit while a computer is connected */
-            x = cv_text(x + 8, 10, &FONT_XS, "BLE", plat_ble_connected() ? C_HI : C_DIM);
-        if (FM1B_BLE_CENTRAL)                /* a Bluetooth MIDI device: lit while connected */
-            cv_text(x + 6, 10, &FONT_XS, "DEV", plat_ble_device() == BLE_DEV_READY ? C_HI : C_DIM);
-        if (note >= 0) {                     /* the note, and the last key's velocity and pressure */
-            int32_t x;
-            note_name(note, t);
-            x = 230 - text_w(&FONT_B, t);
-            cv_text(x, 6, &FONT_B, t, C_HI);
-            if (ui.keys >> ui.last_key & 1u) {
-                char n[24] = "V ";
-                int_text(ui.vel[ui.last_key], t);
-                text_cat(n, t);
-                text_cat(n, "  P ");
-                int_text(ui.prs[ui.last_key], t);
-                text_cat(n, t);
-                cv_text(x - 12 - text_w(&FONT_XS, n), 10, &FONT_XS, n, C_GRAY);
-            }
+    cv_text(6, 6, &FONT_B, "GRAV CODE", C_WHITE);
+    cv_text(136, 10, &FONT_XS, PAGE_NAME[active_page], C_HI);
+
+
+
+
+    /* Battery: rounded 26x14 body, terminal and level/USB symbol. */
+    {
+        const int32_t bx = 202, by = 9;
+        uint16_t color = batt >= 3 ? RGB(0, 255, 0) :
+                         batt == 2 ? RGB(255, 200, 0) :
+                                     RGB(240, 55, 45);
+
+        /* Rounded outline (pixel corners). */
+        cv_rect(bx + 2, by, 22, 1, C_GRAY);
+        cv_rect(bx + 2, by + 13, 22, 1, C_GRAY);
+        cv_rect(bx, by + 2, 1, 10, C_GRAY);
+        cv_rect(bx + 25, by + 2, 1, 10, C_GRAY);
+        cv_rect(bx + 1, by + 1, 1, 1, C_GRAY);
+        cv_rect(bx + 24, by + 1, 1, 1, C_GRAY);
+        cv_rect(bx + 1, by + 12, 1, 1, C_GRAY);
+        cv_rect(bx + 24, by + 12, 1, 1, C_GRAY);
+        cv_rect(bx + 26, by + 5, 3, 4, C_GRAY);
+
+        if (batt == 4) {
+            /* Lightning bolt: USB power. */
+            cv_line(bx + 14, by + 2, bx + 10, by + 7, RGB(0, 255, 0));
+            cv_line(bx + 10, by + 7, bx + 15, by + 7, RGB(0, 255, 0));
+            cv_line(bx + 15, by + 7, bx + 11, by + 12, RGB(0, 255, 0));
+        } else if (batt >= 0 && batt <= 3) {
+            /* Three discrete charge levels; no invented percentages. */
+            if (batt > 0)
+                cv_rect(bx + 3, by + 3, batt * 7, 8, color);
+        } else {
+            /* Battery level unavailable: show empty outline. */
         }
     }
     cv_blit(0, 0);
-    /* the buttons, 4 to a row, lit while held; the encoders and their counts, lit for a moment after a turn */
+
+    /* Synth engine and parameter page */
     cv_begin(240, 144, C_BLACK);
-    for (i = 0; i < NB; i++)
-        cell(4 + (int32_t)(i % 4u) * 58, (int32_t)(i / 4u) * 21, 56, BTN_NAME[i], (ui.btn >> i) & 1u);
-    for (i = 0; i < NE; i++) {
-        int32_t x = 4 + (int32_t)(i % 4u) * 58, y = 88 + (int32_t)(i / 4u) * 28;
-        int lit = ui.turned_at[i] && now - ui.turned_at[i] < 300u;
-        if (i >= EN_K1 && i <= EN_K3) {
-            uint32_t index = i - EN_K1;
-            int32_t value;
 
-            if (active_page == PAGE_OSC) {
-                value = index == 0u ? plaits_timbre :
-                        index == 1u ? plaits_morph : plaits_harmonics;
-            } else if (active_page == PAGE_MOD) {
-                value = mod_params[index];
-            } else {
-                value = env_params[index];
-            }
+    cv_text(8, 4, &FONT_S, ENGINE_NAME[set.engine_id], C_HI);
 
-            cv_text(x, y, &FONT_XS,
-                    PARAM_NAME[active_page][index],
-                    lit ? C_HI : C_GRAY);
-            int_text(value, t);
-            cv_text(x, y + 13, &FONT_XS, t, C_WHITE);
+    for (i = 0; i < 3u; i++) {
+        int32_t value;
+        int32_t x = 8 + (int32_t)i * 78;
+
+        if (active_page == PAGE_OSC) {
+            value = i == 0u ? plaits_timbre :
+                    i == 1u ? plaits_morph : plaits_harmonics;
+        } else if (active_page == PAGE_MOD) {
+            value = mod_params[i];
         } else {
-            cv_text(x, y, &FONT_XS, ENC_NAME[i], lit ? C_HI : C_GRAY);
-            int_text(ui.turns[i], t);
-            cv_text(x, y + 13, &FONT_XS, t, lit ? C_WHITE : C_DIM);
+            value = env_params[i];
         }
+
+        cv_text(x, 42, &FONT_XS, PARAM_NAME[active_page][i], C_GRAY);
+        int_text(value, t);
+        cv_text(x, 62, &FONT_M, t, C_WHITE);
+
+        cv_rect(x, 100, 68, 3, C_LINE);
+        if (value > 0)
+            cv_rect(x, 100, value * 68 / 100, 3, C_HI);
     }
-    cv_text(178, 2, &FONT_XS, PAGE_NAME[active_page], C_HI);
+
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
     cv_begin(240, 60, C_BLACK);
@@ -560,7 +571,14 @@ void app_ui_init(void)
 void app_frame(void)
 {
     static uint32_t last_pct, lit_until, last_ble, last_midi;
+    static int last_batt = -2;
     uint32_t i, now = plat_ms(), pct = plat_master() * 100u / 4096u;
+    int batt = plat_battery();
+
+    if (batt != last_batt) {
+        last_batt = batt;
+        ui.redraw = 1;
+    }
     input();
     speak();
     for (i = 0; i < NE; i++)                 /* an encoder's light goes out */

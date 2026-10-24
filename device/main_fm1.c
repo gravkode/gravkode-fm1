@@ -868,8 +868,10 @@ static void fm1_main(void)
                 master_pos = mirror_in_master(remote.master >= 0 ? (uint32_t)remote.master : (uint32_t)(knob / 4));
             }
         }
-        if (!fm1_an.con && !fm1_an.pend && fm1_ms - batt_t >= 100u) {   /* the battery, ten times a second (plat_battery) */
-            int32_t b = fm1_adc_read(FM1_ADC_BATT);
+        if (fm1_ms - batt_t >= 100u) {   /* battery: scan ADC when active, direct ADC otherwise */
+            int32_t b = fm1_an.con
+                ? (int32_t)fm1_an.battery
+                : (!fm1_an.pend ? fm1_adc_read(FM1_ADC_BATT) : -1);
             batt_t = fm1_ms;
             if (b > 0)
                 batt_raw = batt_raw ? batt_raw + (b - batt_raw) / 16 : b;
