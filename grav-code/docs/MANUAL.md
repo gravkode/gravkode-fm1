@@ -50,7 +50,7 @@ your own risk.
 
 From the top:
 
-- **The header:** GRAV CODE, the page you are on (OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE or FX MIX), and the
+- **The header:** GRAV CODE, the page you are on (OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE, FX MIX or DEBUG), and the
   battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
 - **The engine** that plays, by its name; beside it FREEZE, lit, while the effect is frozen.
 - **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
@@ -77,10 +77,11 @@ From the top:
 | FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
 | SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
+| REC | DEBUG: K1 selects one/two-core processing; K2 resets peaks and counters |
 | MASTER | The volume, glided: no step in the sound |
 | SAVE | Stores the settings; lit while there are changes not stored |
 
-The other buttons (ARP, SEQ, PLAY, REC) and knobs (SELECT, ALGO, K4) only say their name or count for now: they are
+The other buttons (ARP, SEQ, PLAY) and knobs (SELECT, ALGO, K4) only say their name or count for now: they are
 free for what comes next.
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
@@ -129,7 +130,7 @@ It starts at ATTACK 10 (0.2 s), DECAY 50 (1 s) and RELEASE 30 (1.2 s).
 
 ### GLO (GLO)
 
-![The GLO page: VOICES 4, VELOCITY ON, version 0.13.0, ID FM-1_73001300, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: VOICES 4, VELOCITY ON, version 0.14.0, ID FM-1_73001400, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -326,13 +327,22 @@ GRAV CODE has no Bluetooth or WiFi.
 
 ## 10. CPU and its limits
 
-CPU (bottom right) is the share of its time the sound takes. Four voices of the heaviest engines cost the most:
-FM 2-OP, PARTICLE, then the drums, STRING and MODAL. The effect, when on, costs about as much as one more voice;
-off (DRY/WET and REVERB at 0, not frozen), nothing. Should the sound ever take over 90 % of its time, GRAV CODE
-silences the oldest voice sounding rather than letting the sound break up (MONO keeps its one voice). A voice let go
-and silent costs nothing.
+CPU (bottom right) is the smoothed share of each audio block's time used by rendering. Version 0.14.0
+splits active Plaits voices across both cores by default; CPU0 then mixes them and processes Beads. REC opens
+DEBUG, where K1 selects one/two-core processing and K2 resets peaks and counters. These debug choices are temporary.
 
-If CPU turns red (a block came late): fewer VOICES, a lighter engine, or the effect off.
+Beads, when on, can take a substantial share of the block by itself; off (DRY/WET and REVERB at 0, not frozen),
+it is bypassed. If any individual block exceeds 90% of its time, GRAV CODE silences an active voice
+(MONO keeps its one voice). This immediate cut can click. The average CPU display can stay below 90% even
+when short peaks trigger protection. A released voice that is silent costs nothing.
+
+DEBUG's PEAK, OVER, SHED and XRUN distinguish peaks, protection cuts and missed audio deadlines. The footer
+CPU turns red once a block is late and remains red until power-on. Fewer VOICES, a lighter engine, or the effect
+off can reduce load. Two cores increase capacity but do not guarantee four voices at every FX setting.
+
+See [DEBUG controls and fields](DUAL_CORE_DEBUG.md) and [measured hardware results](DUAL_CORE_RESULTS.md).
+
+![The DEBUG page: core status, average and peak load, synthesis and effect times, audio errors and voice cuts](img/screen-debug.png "The DEBUG page")
 
 ---
 

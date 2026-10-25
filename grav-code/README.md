@@ -21,7 +21,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Build, test, install
 
-This branch enables a second-core audio worker and a temporary DEBUG page (REC).
+Version 0.14.0 enables a second-core audio worker and the DEBUG page (REC).
 K1 switches one/two-core processing; K2 clears peaks and counters. See
 [the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
 
@@ -42,13 +42,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.13.0    # grav-code/build/grav_code-0.13.0.fwsc, identity FM-1_73001300
+    python3 tools/build.py grav-code --release 0.14.0    # grav-code/build/grav_code-0.14.0.fwsc, identity FM-1_73001400
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.13.0.fwsc 0.13.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.0.fwsc 0.14.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.13.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.14.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 
@@ -59,6 +59,6 @@ Python with Pillow (the fonts).
 - Plaits' engines run 12 samples at a time, always (the 6-op FM depends on it), through a FIFO per voice.
 - The engines' RAM and each voice's slot are in the pool (`.pool`, PLAT_POOL): about 98 KB for four voices. Beads'
   delay (96 KiB) and reverb (64 KiB) are there too, its processor (25 KB) in `.bss`: the pool is 333 KB of 336,
-  the RAM 55 KB of 96.
+  the RAM about 67 KiB of 96 (including the 8 KiB CPU1 stack and per-voice block buffers).
 - `-fdata-sections` (`fm1.toml`): each table its own section, so the link leaves out those nothing reads (Beads'
   synth mode's 100 KB of wavetables).

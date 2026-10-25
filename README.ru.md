@@ -13,6 +13,8 @@
 
 ---
 
+Текущая версия: **0.14.0** — расчёт голосов на двух ядрах и страница DEBUG с нагрузкой и диагностикой звука.
+
 ## Возможности
 
 - **24 движка Plaits:** виртуальный аналог, вейвшейпинг, двухоператорный FM, гранулярные форманты, аддитивный синтез,
@@ -27,7 +29,7 @@
 - **Огибающая** (атака, спад, затухание) и **LFO** на TIMBRE, MORPH или высоту тона.
 - **Настройки сохраняются** после выключения и обновления прошивки.
 - **MIDI:** вход по USB и TRS, выход по USB; FM-1 работает и как **USB-звуковая карта**.
-- **Индикатор CPU** и защита от перегрузки: при нехватке процессора гаснет самый старый голос, а не трещит звук.
+- **Расчёт голосов на двух ядрах** и **страница DEBUG**: средняя и пиковая нагрузка, время обработки, пропуски аудио и отключения голосов.
 - **Установка из браузера** (Chrome или Edge), с той же страницы можно вернуть заводскую прошивку.
 
 ## Экран и страницы
@@ -43,10 +45,16 @@
 | FX | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
 | FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
 | FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
+| REC | DEBUG | одно/два ядра | сброс пиков и счётчиков | — |
 
 Ручка PRESET выбирает движок, OCT- и OCT+ — октаву (от -2 до +2), MASTER — громкость, SAVE сохраняет всё. EDIT
 замораживает запись эффекта (FREEZE); SEL запускает гранулу вручную, а если держать его 2 с — гранулы снова идут
 сами (SEED). При DRY/WET и REVERB на 0 эффект выключен и не тратит процессор.
+
+По умолчанию работают два ядра. Переключение режима в DEBUG временное, через SAVE оно не сохраняется.
+При тяжёлых настройках FX защита всё ещё может отключать голоса на пиках выше 90% времени аудиоблока,
+даже когда средний CPU ниже. См. [результаты замеров](grav-code/docs/DUAL_CORE_RESULTS.md) и
+[описание DEBUG](grav-code/docs/DUAL_CORE_DEBUG.md).
 
 ## Движки
 
@@ -89,7 +97,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.13.0.fwsc 0.13.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.0.fwsc 0.14.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -104,7 +112,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.13.0      # grav-code/build/grav_code-0.13.0.fwsc
+python3 tools/build.py grav-code --release 0.14.0      # grav-code/build/grav_code-0.14.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

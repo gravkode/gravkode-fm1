@@ -13,6 +13,8 @@ screen.
 
 ---
 
+Current version: **0.14.0** — voice rendering on two cores, with a DEBUG page for load and audio diagnostics.
+
 ## What it does
 
 - **24 engines from Plaits:** virtual analog, waveshaping, 2-operator FM, granular formants, additive, wavetables,
@@ -26,7 +28,7 @@ screen.
 - **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
 - **Settings that stay** across a power cycle and a firmware update.
 - **MIDI** in over USB and TRS, out over USB; the FM-1 is also a **USB sound card**.
-- **A CPU meter**, and voices that give way before the sound would break up.
+- **Two-core voice rendering** and a **DEBUG page** showing average/peak load, worker timing, audio xruns and voice cuts.
 - **A web installer** (Chrome or Edge), and the stock firmware back from the same page.
 
 ## The screen and its pages
@@ -42,10 +44,15 @@ screen.
 | FX | FX GRAIN | DENSITY (none at the middle: clocked left, random right) | TIME (how far back) | SIZE (backwards, forwards, at the end the delay) |
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
 | FX again | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
+| REC | DEBUG | one/two cores | reset peaks/counters | — |
 
 PRESET picks the engine, OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE stores it all. EDIT freezes
 the effect's recording (FREEZE); SEL seeds a grain by hand, and held 2 s lets the grains come on their own again
 (SEED). The effect is off with DRY/WET and REVERB at 0, and costs nothing then.
+
+DEBUG keeps two-core mode on by default. Its controls are temporary and are not saved. Heavy FX settings can
+still trigger voice cuts above 90% of an audio block; the smoothed CPU meter can hide short peaks. See
+[the measured results](grav-code/docs/DUAL_CORE_RESULTS.md) and [the debug guide](grav-code/docs/DUAL_CORE_DEBUG.md).
 
 ## The engines
 
@@ -88,7 +95,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.13.0.fwsc 0.13.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.0.fwsc 0.14.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -103,7 +110,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.13.0      # grav-code/build/grav_code-0.13.0.fwsc
+python3 tools/build.py grav-code --release 0.14.0      # grav-code/build/grav_code-0.14.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -111,7 +118,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`screens.txt` (the screenshots). More in
+`dual_core.txt` (DEBUG and worker scheduling), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 
 ## The repository

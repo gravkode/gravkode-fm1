@@ -1,6 +1,7 @@
-# Two-core debug firmware
+# Two-core processing and DEBUG
 
-Branch: `codex/dual-core-debug`, based on `feature/grav-code-v0.13.0` (the version with Beads).
+Included in `main` since **0.14.0**. Developed in `codex/dual-core-debug`, based on
+`feature/grav-code-v0.13.0` (the version with Beads).
 At creation, local `main` and `origin/main` were still at `7b5fbd3`, without the effect.
 See [the measured hardware results](DUAL_CORE_RESULTS.md) for the installed build's first A/B test.
 
@@ -63,10 +64,10 @@ scheduling switch after a successful boot; it does not bypass a failure to boot 
 From the repository root, with Python/Pillow and the usual device toolchain configured:
 
 ```sh
-.venv/bin/python tools/build.py grav-code --host --release 0.13.0-dual
+.venv/bin/python tools/build.py grav-code --host --release 0.14.0
 .venv/bin/python grav-code/tests/run_dual_core_test.py
 grav-code/build/host/grav_code_host grav-code/tests/dual_core.txt grav-code/build/host
-.venv/bin/python tools/build.py grav-code --release 0.13.0-dual
+.venv/bin/python tools/build.py grav-code --release 0.14.0
 ```
 
 The concurrent test runs actual host threads against the DSP objects, rather than the stock host
@@ -85,8 +86,8 @@ Run it only while the player leaves the panel untouched: it temporarily selects 
 FREEZE, uses DIGITAL with DRY/WET 0 and REVERB 0/60, and selects 2/3/4 voices. It never presses SAVE.
 `--reverb 0` or `--reverb 60` runs just one condition, and `--out PATH` selects the JSON report.
 
-Device output: `grav-code/build/grav_code-0.13.0-dual.fwsc`. This is a diagnostic build of 0.13.0,
-not a new release. Keep `grav_code-0.13.0.fwsc` for comparison/reinstallation.
+Device output: `grav-code/build/grav_code-0.14.0.fwsc`. The original hardware comparison used
+`grav_code-0.13.0-dual.fwsc`; its results are retained in the hardware report.
 
 ## Check on the FM-1
 

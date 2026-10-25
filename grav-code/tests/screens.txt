@@ -53,3 +53,8 @@ tap EDIT
 wait 30
 tap HOME
 wait 30
+
+# DEBUG: its fields and controls, with the effect still on
+tap REC
+wait 400
+shot screen-debug.png
