@@ -13,6 +13,7 @@ o2 = [
     "synth/lfo.c",
     "synth/event_queue.c",
     "dsp/grav_plaits.cpp",
+    "dsp/grav_beads.cpp",
     "vendor/stmlib/dsp/units.cc",
     "vendor/stmlib/utils/random.cc",
     "vendor/plaits/resources.cc",
@@ -22,14 +23,17 @@ o2 = [
     "vendor/plaits/dsp/fm/*.cc",
     "vendor/plaits/dsp/physical_modelling/*.cc",
     "vendor/plaits/dsp/speech/*.cc",
+    "vendor/beads/resources.cc",
+    "vendor/beads/dsp/*.cc",                    # Beads' processor (its synth mode is left out of vendor/)
 ]
 
 # TEST: stmlib's portable code instead of its ARM assembly; M_PI: newlib leaves it out in strict C++;
 # _LIBCPP_DISABLE_EXTERN_TEMPLATE: no libc++ library is linked (none on the FM-1, and the host links C), so the
 # templates the engines use (std::sort) are made in their units, not taken from it; stmlib's STATIC_ASSERT is a
-# typedef nothing uses, by design
+# typedef nothing uses, by design; -fdata-sections: each table its own section, so the link drops those nothing reads
+# (Beads' resources.cc carries its synth mode's 100 KB of wavetables)
 o2_cflags = ["-DM_PI=3.14159265358979323846", "-DTEST", "-D_LIBCPP_DISABLE_EXTERN_TEMPLATE",
-             "-Wno-unused-local-typedef"]
+             "-Wno-unused-local-typedef", "-fdata-sections"]
 # the C library's and libc++'s headers from the AC79 SDK, which the toolchain's C++ compiler lacks (the FM-1 only)
 o2_device_include = ["vendor/cxx", "vendor/newlib"]
 words = "words.tsv"
@@ -38,6 +42,6 @@ words = "words.tsv"
 tagline = "Hybrid DSP synthesizer for M-VAVE FM-1"
 repo = "https://github.com/gravkode/gravkode-fm1"
 licence = "MPL-2.0"
-credits = "Built on fm1-base. Sound engines: Mutable Instruments Plaits by Émilie Gillet (MIT)."
+credits = "Built on fm1-base. Sound engines: Mutable Instruments Plaits; effect: Mutable Instruments Beads; both by Émilie Gillet (MIT)."
 
 vendored = ["vendor/"]

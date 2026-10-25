@@ -16,6 +16,11 @@ float sqrtf(float x)                     /* stmlib's Sqrt (its portable code, -D
     return fm_sqrtf(x);                  /* (relative error 2e-7: include/fastmath.h) */
 }
 
+int abs(int x)                           /* Beads' grains (std::abs on an int: the head's distance) */
+{
+    return x < 0 ? -x : x;
+}
+
 void *memmove(void *d, const void *s, size_t n)   /* Plaits' chords (its string synth oscillator) */
 {
     unsigned char *p = d;

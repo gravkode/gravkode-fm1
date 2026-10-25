@@ -15,6 +15,7 @@ _Static_assert(SYNTH_VOICES_MAX == GRAV_VOICES, "a Plaits engine for each of the
 void grav_engine_init(grav_engine_t *e)
 {
     grav_plaits_init();
+    grav_beads_init();
     e->gain = 0.0f;
     for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++) {
         e->strikes_seen[v] = 0;
@@ -45,7 +46,8 @@ void grav_engine_render(
     float timbre,
     float morph,
     float harmonics,
-    float pitch_offset
+    float pitch_offset,
+    const grav_beads_params_t *fx
 ) {
     const float gain = (float)master_q12 / 4096.0f * GRAV_OUT_FULL;
     grav_plaits_params_t p[SYNTH_VOICES_MAX];
@@ -75,6 +77,7 @@ void grav_engine_render(
     float plaits_out[GRAV_PLAITS_BLOCK];
     float plaits_aux[GRAV_PLAITS_BLOCK];
     float mix[GRAV_PLAITS_BLOCK];
+    float fx_l[GRAV_PLAITS_BLOCK], fx_r[GRAV_PLAITS_BLOCK];
 
     for (uint32_t base = 0; base < n; base += GRAV_PLAITS_BLOCK) {
         uint32_t count = n - base;
@@ -100,12 +103,13 @@ void grav_engine_render(
             }
         }
 
+        /* the effect (off: the mix in both), then MASTER and the limiter on each side */
+        grav_beads_process(fx, mix, fx_l, fx_r, count);
         for (uint32_t j = 0; j < count; j++) {
             uint32_t i = base + j;
             e->gain += (gain - e->gain) * 0.004f;   /* MASTER glides: no step in the sound */
-            float s = soft_limit(mix[j] * e->gain / GRAV_FULL_SCALE) * GRAV_FULL_SCALE;
-            lr[2 * i] = (int32_t)s;
-            lr[2 * i + 1] = (int32_t)s;
+            lr[2 * i] = (int32_t)(soft_limit(fx_l[j] * e->gain / GRAV_FULL_SCALE) * GRAV_FULL_SCALE);
+            lr[2 * i + 1] = (int32_t)(soft_limit(fx_r[j] * e->gain / GRAV_FULL_SCALE) * GRAV_FULL_SCALE);
         }
     }
 

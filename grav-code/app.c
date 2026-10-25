@@ -69,6 +69,7 @@ static void queue_key_event(synth_event_type_t type, int32_t note, uint32_t velo
     }
 }
 static grav_engine_t grav_engine;
+static grav_beads_params_t fx;           /* the effect: off */
 
 /* Plaits parameters: 0..100% */
 static volatile int32_t plaits_timbre = 65;
@@ -188,7 +189,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         timbre,
         morph,
         (float)plaits_harmonics / 100.0f,
-        pitch_offset
+        pitch_offset,
+        &fx
     );
 
     lfo_advance(&synth.mod_lfo, n);
