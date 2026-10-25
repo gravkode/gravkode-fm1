@@ -13,8 +13,8 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.15.0** — the sequencer: 64 steps in 4 pages of 16 on the white keys, a length of 1 to 64,
-chords, swing, step recording, MIDI clock in and out; SEQ is the main page.
+Current version: **0.16.0** — four synth tracks, each its own engine, sound, voices and steps (polymeters), picked
+with SELECT; each track's notes on its own MIDI channel.
 
 ## What it does
 
@@ -24,8 +24,10 @@ chords, swing, step recording, MIDI clock in and out; SEQ is the main page.
   patches), wave terrains, a string machine and chiptune. Each with Plaits' own TIMBRE, MORPH and HARMONICS.
 - **An effect from Beads:** its granular processor (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), its delay, its four
   recording qualities (digital to dirty tape) and its reverb, with FREEZE and SEED on the panel's buttons.
-- **A sequencer:** 64 steps in four pages of 16, played on the white keys like a TR, a length of 1 to 64, notes and
-  chords with their velocity and length, tempo and swing, step recording, MIDI clock out and in (it follows one).
+- **A sequencer of four tracks** (S1–S4), each its own engine and sound, voices (the four shared out: MONO, POLY or
+  none) and steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
+  (polymeters), notes and chords with their velocity and length; tempo and swing, step recording, MIDI clock out
+  and in (it follows one); each track's notes on its MIDI channel (1–4).
 - **Polyphony:** up to four voices (POLY), or one with legato (MONO).
 - **Velocity** from the FM-1's keys (or a fixed one), pressure sent as polyphonic aftertouch.
 - **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
@@ -44,13 +46,14 @@ chords, swing, step recording, MIDI clock in and out; SEQ is the main page.
 | HOME again | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
-| GLO | GLO | VOICES (MONO, 2, 3, 4) | VELOCITY (ON, OFF) | the version |
+| GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | the version |
 | FX | FX GRAIN | DENSITY (none at the middle: clocked left, random right) | TIME (how far back) | SIZE (backwards, forwards, at the end the delay) |
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
 | FX again | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO again | DEBUG | one/two cores | reset peaks/counters | — |
 
-PRESET picks the engine, OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE stores it all. SEQ turns step
+SELECT picks the track (S1–S4) the keys, PRESET, OSC, VOICES and the steps are for; PRESET picks its engine, OCT-
+and OCT+ the octave (-2 to +2), MASTER the volume, SAVE stores it all. SEQ turns step
 mode on (the white keys are the steps; hold one and turn K1..K3 for its note, velocity, length; OCT- / OCT+ the
 pages; SEQ held and a step: the length), PLAY starts and stops, REC (stopped) records notes and chords step by
 step. The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
@@ -102,7 +105,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.15.0.fwsc 0.15.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.16.0.fwsc 0.16.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -117,7 +120,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.15.0      # grav-code/build/grav_code-0.15.0.fwsc
+python3 tools/build.py grav-code --release 0.16.0      # grav-code/build/grav_code-0.16.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -125,7 +128,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `seq_test.c` (its timing, to the sample:
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the four tracks), `seq_test.c` (its timing, to the sample:
 `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

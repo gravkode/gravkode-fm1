@@ -13,8 +13,8 @@
 
 ---
 
-Текущая версия: **0.15.0** — секвенсор: 64 шага, 4 страницы по 16 на белых клавишах, длина от 1 до 64, аккорды,
-свинг, пошаговая запись, MIDI clock на вход и выход; SEQ теперь главная страница.
+Текущая версия: **0.16.0** — четыре синтовые дорожки: у каждой свой движок, звук, голоса и шаги (полиметрия),
+выбор ручкой SELECT; ноты каждой дорожки идут по своему MIDI-каналу.
 
 ## Возможности
 
@@ -25,8 +25,10 @@
   MORPH и HARMONICS, как на Plaits.
 - **Эффект Beads:** гранулярный процессор (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), задержка, четыре качества
   записи (от чистого цифрового до «грязной» ленты) и реверб; FREEZE и SEED на кнопках панели.
-- **Секвенсор:** 64 шага, четыре страницы по 16 на белых клавишах, как у TR; длина от 1 до 64; ноты и аккорды со своей
-  силой нажатия и длиной; темп и свинг; пошаговая запись; MIDI clock на выход и вход (подстраивается под внешний).
+- **Секвенсор на четыре дорожки** (S1–S4): у каждой свой движок и звук, голоса (четыре на всех: MONO, POLY или
+  ни одного) и шаги — 64, четыре страницы по 16 на белых клавишах, как у TR; своя длина от 1 до 64 (полиметрия); ноты и
+  аккорды со своей силой и длиной; темп и свинг; пошаговая запись; MIDI clock на выход и вход; ноты каждой дорожки
+  на своём MIDI-канале (1–4).
 - **Полифония:** до четырёх голосов (POLY) или один с легато (MONO).
 - **Velocity** с клавиш FM-1 (или фиксированная), давление клавиш уходит по MIDI как полифоническое послекасание.
 - **Огибающая** (атака, спад, затухание) и **LFO** на TIMBRE, MORPH или высоту тона.
@@ -45,13 +47,13 @@
 | HOME ещё раз | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0,05–20 Гц) | LFO DEPTH (глубина) | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
-| GLO | GLO | VOICES (MONO, 2, 3, 4) | VELOCITY (ON, OFF) | версия прошивки |
+| GLO | GLO | VOICES дорожки (OFF, MONO, 2, 3, 4; всего четыре) | VELOCITY (ON, OFF) | версия прошивки |
 | FX | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
 | FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
 | FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO ещё раз | DEBUG | одно/два ядра | сброс пиков и счётчиков | — |
 
-Ручка PRESET выбирает движок, OCT- и OCT+ — октаву (от -2 до +2), MASTER — громкость, SAVE сохраняет всё. SEQ включает режим шагов (белые клавиши — шаги;
+SELECT выбирает дорожку (S1–S4), для неё работают клавиши, PRESET, OSC, VOICES и шаги. Ручка PRESET выбирает её движок, OCT- и OCT+ — октаву (от -2 до +2), MASTER — громкость, SAVE сохраняет всё. SEQ включает режим шагов (белые клавиши — шаги;
 зажал шаг и крутишь K1..K3 — его нота, сила, длина; OCT- / OCT+ — страницы; SEQ зажат + шаг — длина), PLAY запускает и
 останавливает, REC (на стопе) записывает ноты и аккорды по шагу. Кнопка открытой страницы мигает, на следующей её
 странице быстрее; PLAY мигает зелёным в долю. EDIT
@@ -104,7 +106,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.15.0.fwsc 0.15.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.16.0.fwsc 0.16.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -119,7 +121,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.15.0      # grav-code/build/grav_code-0.15.0.fwsc
+python3 tools/build.py grav-code --release 0.16.0      # grav-code/build/grav_code-0.16.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
@@ -127,7 +129,7 @@ python3 tools/build.py grav-code --web                 # эмулятор в б�
 
 Тесты (`grav-code/tests/`): `basic.txt` (клавиши, октава, сохранение, MIDI), `engines.txt` (все движки звучат),
 `voices.txt` (полифония, MONO, velocity), `fx.txt` (эффект: страницы, FREEZE, SEED, QUALITY, сохранение),
-`seq.txt` (секвенсор), `seq_test.c` (его тайминг до сэмпла: `run_seq_test.py`), `screens.txt` (скриншоты). Подробнее — в
+`seq.txt` (секвенсор), `tracks.txt` (четыре дорожки), `seq_test.c` (его тайминг до сэмпла: `run_seq_test.py`), `screens.txt` (скриншоты). Подробнее — в
 [grav-code/README.md](grav-code/README.md).
 
 ## Что где лежит

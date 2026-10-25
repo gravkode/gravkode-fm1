@@ -102,9 +102,44 @@ key 11 up
 wait 30
 tap REC
 wait 30
+# S2 (the black key 6 in step mode): steps 2, 4, 7, 10, 14; then S1 again (the black key 5)
+tap SEQ
+wait 30
+key 13 down 100 0
+wait 30
+key 13 up
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+key 6 down 100 0
+wait 30
+key 6 up
+key 11 down 100 0
+wait 30
+key 11 up
+key 16 down 100 0
+wait 30
+key 16 up
+key 23 down 100 0
+wait 30
+key 23 up
+wait 30
+key 10 down 100 0
+wait 30
+key 10 up
+wait 30
+tap SEQ
+wait 1600
 turn K2 8
 tap PLAY
 wait 640
 shot screen-seq.png
 tap PLAY
 wait 30
+# SELECT: the tracks' list
+turn SELECT 1
+wait 300
+shot screen-tracks.png
+turn SELECT -1
+wait 1600
