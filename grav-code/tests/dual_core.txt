@@ -52,10 +52,13 @@ turn K1 -1
 wait 200
 expect fx_on 1
 expect worker_mask 0
+expect fx_core 0
 turn K1 1
 wait 200
 expect fx_on 1
-expect worker_mask >0
+# two cores, the effect on: Beads on CPU1, the voices where there is room (all on CPU0 when Beads is heavy)
+expect fx_core 1
+expect worker_jobs >0
 shot debug-fx.png
 midi 80 3C 00
 midi 80 40 00

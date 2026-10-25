@@ -6,6 +6,7 @@
 typedef struct {
     uint32_t voice_us[2], fx_us, wait_us, jobs;
     uint32_t masks[2], active, steals, shed;
+    uint32_t fx_core;                    /* the core the effect ran on (1: CPU1, a chunk behind the voices) */
 } grav_debug_t;
 extern grav_debug_t grav_debug;         /* audio-owned; UI copies with plat_lock */
 extern volatile uint32_t grav_dual_core; /* UI request, sampled once at a block boundary */
@@ -15,6 +16,9 @@ typedef struct {
     float gain;                          /* MASTER, glided */
     uint32_t strikes_seen[SYNTH_VOICES_MAX];   /* each voice's strikes count at the last render */
     uint8_t asleep[SYNTH_VOICES_MAX];    /* quiet and let go: not rendered until its next note (the CPU, the battery) */
+    uint32_t fade_left[SYNTH_VOICES_MAX];   /* taken by the overload protection: samples of its fade-out left */
+    int32_t voice_cost, fx_cost;         /* a voice's block and the effect's, in plat_ticks24 ticks (smoothed): the
+                                          * cores' split */
 } grav_engine_t;
 
 void grav_engine_init(grav_engine_t *e);

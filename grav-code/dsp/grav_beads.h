@@ -26,6 +26,7 @@ void grav_beads_init(void);
  * is off: l and r are the mix, and Beads takes no time; it fades in and out (and through a change of QUALITY) */
 void grav_beads_process(const grav_beads_params_t *p, const float *in, float *l, float *r, uint32_t n);
 int grav_beads_on(void);                 /* running (not off) */
+int grav_beads_busy(const grav_beads_params_t *p);   /* running, or to start with p: the render's choice of core */
 float grav_beads_pitch(float knob);      /* PITCH's knob (0..1) in semitones, as Beads' panel reads it */
 
 #ifdef __cplusplus

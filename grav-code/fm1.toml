@@ -5,8 +5,10 @@ usb_manufacturer = "GRAV CODE"
 usb_product = "GRAV CODE FM-1"
 include = ["vendor"]
 cpu2 = true
-# DSP jobs change engine state: a failed job must restart, never be replayed partly twice.
-cpu2_fallback = false
+# A failure of the second core (some FM-1s' CPU1 misreads shared RAM now and then) gives it up: that block is
+# silent (dsp/grav_engine.c: the dropped job is never replayed), the render goes on on one core until power-off.
+# Without it, the FM-1 would restart mid-play, and two failed starts would be safe mode.
+cpu2_fallback = true
 cpu2_stack = 8192              # nested Plaits engine calls; DEBUG shows the measured high water mark
 
 o2 = [

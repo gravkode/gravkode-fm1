@@ -4,6 +4,7 @@
 #include "grav_beads.h"
 
 #include "beads/dsp/processor.h"
+#include "stmlib/utils/random.h"
 
 #ifdef PLAT_HOST
 #define GRAV_POOL
@@ -29,6 +30,7 @@ beads::Processor* processor;
 
 bool running;                             // processing: off, Beads takes no time
 float level;                              // 0: the mix only, 1: Beads' output (fading between)
+uint32_t random_state;                    // Beads' own random stream: the same grains on either core
 
 // the delay, its interpolation tail and the freeze tail in the bank (Beads checks it with an assert, left out)
 static_assert(beads::kDelayBufferSizeBits / 8 + 4 * 4 + 256 * sizeof(beads::FloatFrame) <=
@@ -76,10 +78,15 @@ extern "C" void grav_beads_init(void) {
   processor->Init(banks, reverb_buffer);
   running = false;
   level = 0.0f;
+  random_state = 0xBEAD5u;
 }
 
 extern "C" int grav_beads_on(void) {
   return running;
+}
+
+extern "C" int grav_beads_busy(const grav_beads_params_t* p) {
+  return running || p->dry_wet > 0.0f || p->reverb > 0.0f || p->freeze;
 }
 
 extern "C" void grav_beads_process(const grav_beads_params_t* p, const float* in, float* l, float* r,
@@ -88,13 +95,17 @@ extern "C" void grav_beads_process(const grav_beads_params_t* p, const float* in
   // frozen, it runs on even at DRY/WET and REVERB 0: what it holds stays
   const bool on = p->dry_wet > 0.0f || p->reverb > 0.0f || p->freeze;
 
-  if (!running) {
-    if (!on) {
-      for (uint32_t i = 0; i < n; ++i) {
-        l[i] = r[i] = in[i];
-      }
-      return;
+  if (!running && !on) {
+    for (uint32_t i = 0; i < n; ++i) {
+      l[i] = r[i] = in[i];
     }
+    return;
+  }
+
+  // Beads' randomness (grains' times, pans) from its own stream, whichever core runs it
+  const uint32_t previous_random = stmlib::Random::state();
+  stmlib::Random::Seed(random_state);
+  if (!running) {
     processor->Configure(media, true);    // a fresh start: the delay cleared. Mono: twice the time
     running = true;
     level = 0.0f;
@@ -144,4 +155,6 @@ extern "C" void grav_beads_process(const grav_beads_params_t* p, const float* in
       running = false;
     }
   }
+  random_state = stmlib::Random::state();
+  stmlib::Random::Seed(previous_random);
 }

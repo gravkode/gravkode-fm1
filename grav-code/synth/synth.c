@@ -150,21 +150,22 @@ void synth_envelopes(synth_t *s, float attack, float decay, float sustain, float
 void synth_shed(synth_t *s)
 {
     synth_voice_t *oldest = 0;
+    uint32_t sounding = 0;
     if (s->voices == 1)
         return;                              /* MONO keeps its one voice */
     for (uint32_t i = 0; i < s->voices; i++) {
         synth_voice_t *v = &s->voice[i];
         if (v->shed || (!v->gate && v->env.stage == ENV_IDLE))
             continue;                        /* quiet already */
+        sounding++;
         if (!oldest || (!v->gate && oldest->gate) || (v->gate == oldest->gate && v->age < oldest->age))
             oldest = v;                      /* one let go first, then the oldest */
     }
-    if (!oldest)
-        return;
+    if (!oldest || sounding < 2)
+        return;                              /* the last one sounding stays: cutting it would only lose the note */
     oldest->shed = 1;
     s->shed_count++;
-    oldest->gate = 0;
-    envelope_init(&oldest->env);             /* silent at once */
+    oldest->gate = 0;                        /* the render fades it out (dsp/grav_engine.c), then its envelope rests */
 }
 
 uint32_t synth_voices_held(const synth_t *s)

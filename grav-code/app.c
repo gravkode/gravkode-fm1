@@ -838,7 +838,7 @@ static void draw_debug(void)
     debug_number(126, 36, "PEAK", audio.peak_us * 100u / budget, 1);
     debug_number(8, 48, "SYN0", d.voice_us[0], 0);
     debug_number(126, 48, "SYN1", d.voice_us[1], 0);
-    debug_number(8, 60, "FX", d.fx_us, 0);
+    debug_number(8, 60, d.fx_core ? "FX1" : "FX0", d.fx_us, 0);   /* the effect's time, on CPU1 or CPU0 */
     debug_number(126, 60, "WAIT", d.wait_us, 0);
     debug_number(8, 72, "XRUN", plat_xruns() - ui.debug_xruns_base, 0);
     debug_number(126, 72, "SHED", d.shed, 0);
@@ -1082,6 +1082,8 @@ int app_expect(const char *what, int *got)
         *got = (int)grav_debug.jobs;
     else if (!strcmp(what, "worker_mask"))
         *got = (int)grav_debug.masks[1];
+    else if (!strcmp(what, "fx_core"))       /* the core the effect ran on: 1 CPU1, a chunk behind the voices */
+        *got = (int)grav_debug.fx_core;
     else if (!strcmp(what, "render_voices"))
         *got = (int)grav_debug.active;
     else if (!strcmp(what, "shed"))

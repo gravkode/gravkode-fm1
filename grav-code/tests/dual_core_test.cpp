@@ -172,7 +172,55 @@ static bool six_op_controls() {
     return true;
 }
 
+// The overload protection: a lone voice is kept; a voice taken fades out over GRAV_SHED_FADE (128) samples,
+// from where it was (no step at the cut), then sleeps.
+static bool shed_fade() {
+    for (unsigned voices = 2; voices <= 4; voices += 2) {
+        std::vector<int32_t> runs[2];
+        for (int shed = 0; shed < 2; ++shed) {
+            stmlib::Random::Seed(0x21);
+            synth_t synth;
+            grav_engine_t dsp;
+            synth_init(&synth);
+            synth_set_voices(&synth, voices);
+            synth_envelopes(&synth, 0.0f, 0.0f, 0.7f, 2.0f, 44100.0f);
+            grav_engine_init(&dsp);
+            grav_dual_core = 0;
+            grav_beads_params_t fx = {};
+            synth_note_on(&synth, 60, 100);
+            synth_shed(&synth);                        // alone: kept
+            if (synth.shed_count) {
+                std::fprintf(stderr, "Shed took the only voice sounding\n");
+                return false;
+            }
+            synth_note_on(&synth, 67, 100);
+            int32_t out[512];
+            for (unsigned b = 0; b < 8; ++b) {
+                if (b == 4 && shed) synth_shed(&synth);   // takes the older note, C4
+                grav_engine_render(&dsp, out, 256, &synth, GRAV_ENGINE_VIRTUAL_ANALOG, 3200, 0.5f, 0.5f, 0.5f, 0.0f, &fx);
+                if (b >= 4) runs[shed].insert(runs[shed].end(), out, out + 512);
+            }
+            if (shed && (synth.shed_count != 1 || synth_voices_held(&synth) != 1)) {
+                std::fprintf(stderr, "Shed did not take exactly one of two voices\n");
+                return false;
+            }
+        }
+        // the first block after the cut: the same first sample, then the difference grows as C4 fades
+        const int32_t first = runs[0][0] - runs[1][0];
+        double early = 0, late = 0;
+        for (unsigned i = 0; i < 16; ++i) early += std::fabs(double(runs[0][2 * i] - runs[1][2 * i]));
+        for (unsigned i = 128; i < 144; ++i) late += std::fabs(double(runs[0][2 * i] - runs[1][2 * i]));
+        if (first != 0 || !(late > 8 * early && late > 0)) {
+            std::fprintf(stderr, "Shed fade failure voices=%u: first %d, early %g, late %g\n", voices, first, early, late);
+            return false;
+        }
+    }
+    std::puts("PASS: overload protection keeps a lone voice and fades a voice it takes");
+    return true;
+}
+
 int main() {
+    if (!shed_fade()) return 1;
     // Retrigger a still-audible envelope, then shorten a release which is already in progress.
     envelope_t envelope;
     envelope_init(&envelope);
