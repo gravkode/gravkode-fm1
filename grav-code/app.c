@@ -14,7 +14,7 @@
 
 /* the effect's knobs (FX: GRAIN, SHAPE, MIX; QUALITY apart), 0..100 */
 enum { FX_DENSITY, FX_TIME, FX_SIZE, FX_SHAPE, FX_PITCH, FX_FEEDBACK, FX_DRY_WET, FX_REVERB, FX_N };
-static const uint8_t FX_DEFAULT[FX_N] = {65, 30, 50, 50, 50, 30, 0, 0};   /* (DRY/WET and REVERB 0: off) */
+static const uint8_t FX_DEFAULT[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};   /* (DRY/WET and REVERB 0: off) */
 
 #define SET_MAGIC 0x47525639u
 #define PREV_SET_MAGIC 0x54504C32u
@@ -533,7 +533,7 @@ static volatile int32_t *param_of(uint32_t page, uint32_t index)
     return &fx_params[(page - PAGE_FX_GRAIN) * 3u + index];
 }
 
-/* drawn from the middle: DENSITY (no grains there: random left, clocked right) and PITCH (0 there) */
+/* drawn from the middle: DENSITY (no grains there: clocked left, random right) and PITCH (0 there) */
 static int param_centred(uint32_t page, uint32_t index)
 {
     return (page == PAGE_FX_GRAIN && index == 0u) || (page == PAGE_FX_SHAPE && index == 1u);

@@ -1,9 +1,9 @@
 # GRAV CODE
 
 GRAV CODE turns the M-VAVE FM-1 into a polyphonic synthesizer on all 24 sound engines of Mutable Instruments'
-Plaits: up to four voices, each its own engine, played from the keys with velocity or over MIDI, shaped by an
-envelope and moved by an LFO. Everything is on the FM-1's own panel and screen; the settings stay across a power
-cycle.
+Plaits, through the granular processor, delay and reverb of Mutable Instruments' Beads: up to four voices, each its
+own engine, played from the keys with velocity or over MIDI, shaped by an envelope and moved by an LFO. Everything
+is on the FM-1's own panel and screen; the settings stay across a power cycle.
 
 ![GRAV CODE playing a chord on CHORDS: three keys held, each filled to its velocity (amber) and its pressure (white), TIMBRE 65, MORPH 50, HARMONICS 75](img/screen-playing.png "A chord on CHORDS")
 
@@ -16,12 +16,13 @@ cycle.
 3. Controls
 4. The pages
 5. The engines
-6. Voices and velocity
-7. Saving
-8. MIDI and USB audio
-9. CPU and its limits
-10. Troubleshooting
-11. Credits and licences
+6. The effect (FX)
+7. Voices and velocity
+8. Saving
+9. MIDI and USB audio
+10. CPU and its limits
+11. Troubleshooting
+12. Credits and licences
 
 ---
 
@@ -49,10 +50,11 @@ your own risk.
 
 From the top:
 
-- **The header:** GRAV CODE, the page you are on (OSC, MOD, ENV or GLO), and the battery: three bars, green when
-  full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
-- **The engine** that plays, by its name.
-- **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them.
+- **The header:** GRAV CODE, the page you are on (OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE or FX MIX), and the
+  battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
+- **The engine** that plays, by its name; beside it FREEZE, lit, while the effect is frozen.
+- **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
+  starts from a mark in the middle (DENSITY, PITCH) has its rest there.
 - **The keyboard:** a key held fills to its velocity (amber) and, pressed further, to its pressure (white).
 - **The bottom lines:** OCT (the octave), PRESET (the engine), VOL (MASTER), and when MIDI has come in, the last
   message and where from (USB or TRS). CPU is the share of its time the sound takes: it turns red once a block of
@@ -72,11 +74,14 @@ From the top:
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, the version |
+| FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
+| EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
+| SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
 | MASTER | The volume, glided: no step in the sound |
 | SAVE | Stores the settings; lit while there are changes not stored |
 
-The other buttons (FX, SEL, EDIT, ARP, SEQ, PLAY, REC) and knobs (SELECT, ALGO, K4) only say their name or count for
-now: they are free for what comes next.
+The other buttons (ARP, SEQ, PLAY, REC) and knobs (SELECT, ALGO, K4) only say their name or count for now: they are
+free for what comes next.
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when GRAV CODE starts but its USB can't be reached.
@@ -124,7 +129,7 @@ It starts at ATTACK 10 (0.2 s), DECAY 50 (1 s) and RELEASE 30 (1.2 s).
 
 ### GLO (GLO)
 
-![The GLO page: VOICES 4, VELOCITY ON, version 0.12.0, ID FM-1_73001200, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: VOICES 4, VELOCITY ON, version 0.13.0, ID FM-1_73001300, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -134,7 +139,11 @@ The firmware and its global settings:
 | K2 | VELOCITY | ON (right: the keys play as they land), OFF (left: at a fixed 100) |
 | K3 | VERSION | the firmware's version, said aloud |
 
-Under them, the package's identity (the installer's) and the number of engines. Section 6 has more on both settings.
+Under them, the package's identity (the installer's) and the number of engines. Section 7 has more on both settings.
+
+### FX GRAIN, FX SHAPE, FX MIX (FX)
+
+The effect's three pages: section 6.
 
 ---
 
@@ -193,7 +202,85 @@ the next.
 
 ---
 
-## 6. Voices and velocity
+## 6. The effect (FX)
+
+![The FX MIX page: DRY/WET 40, REVERB 25, QUALITY VINTAGE (the second of four); SEED AUTO, FX ON](img/screen-fx-mix.png "The FX MIX page")
+
+GRAV CODE's effect is Mutable Instruments Beads, its whole processor: a granular processor that plays grains of the
+voices' recent sound, a delay, Beads' tape and digital colours, and its reverb. All the voices go through it, then
+MASTER. It records in mono (twice Beads' time) and plays in stereo: the grains spread left and right.
+
+FX shows its pages, and pressed again the next: FX GRAIN, FX SHAPE, FX MIX, round. From another page, FX goes back
+to the one shown last.
+
+**On and off:** with DRY/WET and REVERB both at 0, the effect is off and costs nothing (as it starts). Turn either up
+and it starts, fading in with its recording empty; FX is lit while it runs. Both back to 0, it fades out and stops.
+
+### FX GRAIN
+
+![The FX GRAIN page, frozen: DENSITY 75 (from the middle), TIME 30, SIZE 65; FREEZE lit beside the engine](img/screen-fx-grain.png "The FX GRAIN page, frozen")
+
+| Knob | Parameter | What it does |
+| --- | --- | --- |
+| K1 | DENSITY | How many grains. 48 to 52 (the middle): none. Left of it, grains at a steady rate, faster towards 0 (up to 130 a second); right of it, grains at random moments, more towards 100 |
+| K2 | TIME | Where in the recording a grain starts: 0 the moment just past, 100 the oldest it holds |
+| K3 | SIZE | The grains' length. 0 to 33: played backwards, long to short; from 33: forwards, short (a few milliseconds) to long (seconds, as much as the recording holds); 100: the delay (below) |
+
+### FX SHAPE
+
+| Knob | Parameter | What it does |
+| --- | --- | --- |
+| K1 | SHAPE | Each grain's envelope: square-edged at 0, a smooth bell around the middle, a slower attack towards 100 |
+| K2 | PITCH | The grains' transposition, -24 to +24 semitones (shown in semitones). As on Beads, the knob rests a while on 0, 1, 3, 4, 7, 12 and 24, either way |
+| K3 | FEEDBACK | How much of the effect's sound goes back into its recording: repeats that build up, held in by Beads' limiter |
+
+### FX MIX
+
+| Knob | Parameter | What it does |
+| --- | --- | --- |
+| K1 | DRY/WET | The voices (0) against the effect (100) |
+| K2 | REVERB | Beads' reverb, its level and its length together |
+| K3 | QUALITY | How the recording is made: |
+
+| QUALITY | The recording | It holds |
+| --- | --- | --- |
+| DIGITAL | 16-bit at 44.1 kHz: clean | 1.1 s |
+| VINTAGE | 12-bit: a little grit | 1.5 s |
+| CLEAN TAPE | 12-bit at half the rate: darker | 2.9 s |
+| DIRTY TAPE | 8-bit (μ-law) at half the rate, with wow and flutter: hiss and wobble | 4.4 s |
+
+Changing QUALITY starts the recording afresh: the effect fades out and back in. The reverb is darker on all but
+DIGITAL, as on Beads.
+
+The effect starts at DENSITY 75, TIME 30, SIZE 65, SHAPE 50, PITCH 0, FEEDBACK 30, DRY/WET 0, REVERB 0, DIGITAL: off,
+and ready to be turned up.
+
+### FREEZE (EDIT)
+
+EDIT freezes the recording: nothing new goes in, and the grains play what it holds, on and on, whatever the keys do.
+EDIT is lit and FREEZE shows beside the engine, on every page. EDIT again lets go. Frozen, the effect stays on even
+with DRY/WET and REVERB at 0, so that what it holds is kept.
+
+### SEED (SEL)
+
+Beads' SEED button. At first the grains come on their own, at DENSITY's rate: AUTO, and SEL is lit while the effect
+runs. Press SEL and they come by hand (MANUAL): a grain each press, and grains at DENSITY's rate while it is held
+(with DENSITY at the middle, one a press). Hold SEL for 2 s and they come on their own again. The FX pages show
+which: SEED AUTO or SEED MANUAL.
+
+### The delay (SIZE at 100)
+
+SIZE turned to the end makes Beads a delay, crossfading over about a second. DENSITY then sets the delay time:
+longest at the middle (the whole recording), shorter either side, at the ends so short it rings at a pitch; FEEDBACK
+sets the repeats. In MANUAL, tap SEL in time: the delay follows the taps, and DENSITY picks a ratio of them. Frozen,
+it loops a slice of the recording: TIME picks which, SHAPE its envelope.
+
+> Beads ran at 48 kHz (32 kHz for its vintage sound, 24 kHz for its tapes); on the FM-1 every QUALITY records at
+> 44.1 kHz, the tapes at half of it, and the recording holds 96,000 bytes instead of Beads' 768,000: the times above.
+
+---
+
+## 7. Voices and velocity
 
 ![A chord on CHORDS: three keys, three voices](img/screen-playing.png "Three keys held, three voices")
 
@@ -214,14 +301,16 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 
 ---
 
-## 7. Saving
+## 8. Saving
 
-SAVE stores the octave, the engine, the OSC, MOD and ENV values, VOICES and VELOCITY; GRAV CODE starts with them at
-the next power-on. SAVE is lit while something has changed and isn't stored yet. A firmware update keeps them.
+SAVE stores the octave, the engine, the OSC, MOD and ENV values, VOICES and VELOCITY, and the effect's eight knobs
+and QUALITY; GRAV CODE starts with them at the next power-on. FREEZE and SEED's way are not kept: the effect starts
+unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A firmware update
+keeps them (settings saved by 0.12 load with the effect at rest).
 
 ---
 
-## 8. MIDI and USB audio
+## 9. MIDI and USB audio
 
 **MIDI in,** over USB and the TRS jack, any channel: notes play the voices, with their velocity. The last message
 shows at the bottom of the screen.
@@ -235,23 +324,30 @@ GRAV CODE has no Bluetooth or WiFi.
 
 ---
 
-## 9. CPU and its limits
+## 10. CPU and its limits
 
 CPU (bottom right) is the share of its time the sound takes. Four voices of the heaviest engines cost the most:
-FM 2-OP, PARTICLE, then the drums, STRING and MODAL. Should the sound ever take over 90 % of its time, GRAV CODE
+FM 2-OP, PARTICLE, then the drums, STRING and MODAL. The effect, when on, costs about as much as one more voice;
+off (DRY/WET and REVERB at 0, not frozen), nothing. Should the sound ever take over 90 % of its time, GRAV CODE
 silences the oldest voice sounding rather than letting the sound break up (MONO keeps its one voice). A voice let go
 and silent costs nothing.
 
-If CPU turns red (a block came late): fewer VOICES, or a lighter engine.
+If CPU turns red (a block came late): fewer VOICES, a lighter engine, or the effect off.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 **No sound:** turn MASTER up; some engines are quiet by their settings (MODAL and SWARM with TIMBRE low, NOISE and
 PARTICLE thin); a drum or a 6-OP FM patch may simply have decayed.
 
-**A crackle:** see section 9.
+**A crackle:** see section 10.
+
+**The sound goes on after the keys are let go:** the effect: FREEZE (EDIT lit: press it), a long REVERB, or FEEDBACK
+building up. DRY/WET and REVERB at 0 turn it off.
+
+**The effect makes no grains:** DENSITY at the middle (48 to 52), or SEED is MANUAL (the FX pages say so): press SEL
+or hold it 2 s for AUTO. Or the recording holds nothing yet: play.
 
 **The installer doesn't find the FM-1:** a data cable, other MIDI apps and browser tabs closed, Chrome or Edge.
 Started but out of reach over USB: hold REC while switching on (update mode), then install.
@@ -260,12 +356,13 @@ Started but out of reach over USB: hold REC while switching on (update mode), th
 
 ---
 
-## 11. Credits and licences
+## 12. Credits and licences
 
 - GRAV CODE is built on **fm1-base** (Charles Vestal) and **felucca-bsp** (Leo Kuroshita, Hügelton Instruments),
   MPL-2.0.
-- Its sound engines are **Mutable Instruments Plaits** and its library **stmlib**, by Émilie Gillet, under the MIT
-  License; the notice is in the source (`grav-code/vendor/plaits/LICENSE`) and on the site's front page.
+- Its sound engines are **Mutable Instruments Plaits**, its effect **Mutable Instruments Beads**, and their library
+  **stmlib**, by Émilie Gillet, under the MIT License; the notices are in the source
+  (`grav-code/vendor/plaits/LICENSE`, `grav-code/vendor/beads/LICENSE`) and on the site's front page.
 - The fonts are Barlow (SIL Open Font License).
 
 M-VAVE and FM-1 are trademarks of their owners. GRAV CODE is not affiliated with M-VAVE or Mutable Instruments.

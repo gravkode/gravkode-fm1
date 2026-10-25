@@ -1,9 +1,11 @@
 # GRAV CODE
 
-**Полифоническая прошивка-синтезатор для M-VAVE FM-1 на всех 24 звуковых движках Mutable Instruments Plaits.**
+**Полифоническая прошивка-синтезатор для M-VAVE FM-1 на всех 24 звуковых движках Mutable Instruments Plaits,
+с эффектом Mutable Instruments Beads.**
 
 До четырёх голосов, у каждого свой движок. Играется с клавиш FM-1 с учётом силы нажатия или по MIDI, звук формирует
-огибающая, движение даёт LFO. Всё управляется с панели и экрана самого FM-1.
+огибающая, движение даёт LFO, а дальше он идёт через гранулы, задержку и реверб Beads. Всё управляется с панели и
+экрана самого FM-1.
 
 <p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE на экране FM-1: аккорд на движке CHORDS, три нажатые клавиши показывают силу нажатия и давление"></p>
 
@@ -18,6 +20,8 @@
   резонатор, бочка, малый барабан, хай-хэт, а также восемь движков Plaits 1.2: аналог с фильтром, фазовое искажение,
   три банка шестиоператорного FM (патчи DX7), волновые ландшафты, струнная машина и чиптюн. У каждого свои TIMBRE,
   MORPH и HARMONICS, как на Plaits.
+- **Эффект Beads:** гранулярный процессор (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), задержка, четыре качества
+  записи (от чистого цифрового до «грязной» ленты) и реверб; FREEZE и SEED на кнопках панели.
 - **Полифония:** до четырёх голосов (POLY) или один с легато (MONO).
 - **Velocity** с клавиш FM-1 (или фиксированная), давление клавиш уходит по MIDI как полифоническое послекасание.
 - **Огибающая** (атака, спад, затухание) и **LFO** на TIMBRE, MORPH или высоту тона.
@@ -28,7 +32,7 @@
 
 ## Экран и страницы
 
-<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Четыре страницы: OSC (TIMBRE, MORPH, HARMONICS), MOD (скорость, глубина и назначение LFO), ENV (атака, спад, затухание) и GLO (голоса, velocity, версия)"></p>
+<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Шесть страниц: OSC (TIMBRE, MORPH, HARMONICS), MOD (скорость, глубина и назначение LFO), ENV (атака, спад, затухание), GLO (голоса, velocity, версия), FX GRAIN (DENSITY, TIME, SIZE, включён FREEZE) и FX MIX (DRY/WET, REVERB, QUALITY)"></p>
 
 | Кнопка | Страница | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
@@ -36,8 +40,13 @@
 | LFO | MOD | LFO RATE (0,05–20 Гц) | LFO DEPTH (глубина) | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
 | GLO | GLO | VOICES (MONO, 2, 3, 4) | VELOCITY (ON, OFF) | версия прошивки |
+| FX | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
+| FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
+| FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 
-Ручка PRESET выбирает движок, OCT- и OCT+ — октаву (от -2 до +2), MASTER — громкость, SAVE сохраняет всё.
+Ручка PRESET выбирает движок, OCT- и OCT+ — октаву (от -2 до +2), MASTER — громкость, SAVE сохраняет всё. EDIT
+замораживает запись эффекта (FREEZE); SEL запускает гранулу вручную, а если держать его 2 с — гранулы снова идут
+сами (SEED). При DRY/WET и REVERB на 0 эффект выключен и не тратит процессор.
 
 ## Движки
 
@@ -80,7 +89,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.12.0.fwsc 0.12.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.13.0.fwsc 0.13.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -95,21 +104,22 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.12.0      # grav-code/build/grav_code-0.12.0.fwsc
+python3 tools/build.py grav-code --release 0.13.0      # grav-code/build/grav_code-0.13.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
 ```
 
 Тесты (`grav-code/tests/`): `basic.txt` (клавиши, октава, сохранение, MIDI), `engines.txt` (все движки звучат),
-`voices.txt` (полифония, MONO, velocity), `screens.txt` (скриншоты). Подробнее — в
+`voices.txt` (полифония, MONO, velocity), `fx.txt` (эффект: страницы, FREEZE, SEED, QUALITY, сохранение),
+`screens.txt` (скриншоты). Подробнее — в
 [grav-code/README.md](grav-code/README.md).
 
 ## Что где лежит
 
 | Путь | Что |
 | --- | --- |
-| `grav-code/` | Сама прошивка: приложение (`app.c`), DSP (`dsp/`: движки Plaits по голосам, микшер), голоса и модуляция (`synth/`), Plaits и прочий сторонний код (`vendor/`), тесты, документация, страница сайта |
+| `grav-code/` | Сама прошивка: приложение (`app.c`), DSP (`dsp/`: движки Plaits по голосам, Beads, микшер), голоса и модуляция (`synth/`), Plaits, Beads и прочий сторонний код (`vendor/`), тесты, документация, страница сайта |
 | `device/`, `include/`, `lib/`, `host/`, `web/`, `tools/` | Платформа fm1-base: работа с FM-1, симулятор, эмулятор, установщик, сборка ([FM1-BASE.md](FM1-BASE.md)) |
 | `bsp/` | felucca-bsp: поддержка чипа и платы FM-1 |
 | `template/`, `tests/`, `ble/` | Эталонное приложение fm1-base и тесты платформы, стек Bluetooth (в GRAV CODE не собирается) |
@@ -118,8 +128,9 @@ python3 tools/build.py grav-code --web                 # эмулятор в б�
 
 - Основа: **fm1-base** (Charles Vestal) и **felucca-bsp** (Leo Kuroshita, Hügelton Instruments), MPL-2.0; см.
   [CREDITS.md](CREDITS.md) и [LICENSING.md](LICENSING.md).
-- Звуковые движки: **Mutable Instruments Plaits** и **stmlib**, автор — Émilie Gillet, лицензия MIT
-  ([grav-code/vendor/plaits/LICENSE](grav-code/vendor/plaits/LICENSE)); что ещё взято со стороны и под какими
+- Звуковые движки — **Mutable Instruments Plaits**, эффект — **Mutable Instruments Beads**, их библиотека —
+  **stmlib**; автор — Émilie Gillet, лицензия MIT ([grav-code/vendor/plaits/LICENSE](grav-code/vendor/plaits/LICENSE),
+  [grav-code/vendor/beads/LICENSE](grav-code/vendor/beads/LICENSE)); что ещё взято со стороны и под какими
   лицензиями — [grav-code/vendor/README.md](grav-code/vendor/README.md).
 - Собственный код GRAV CODE — MPL-2.0.
 

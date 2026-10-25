@@ -11,7 +11,7 @@ extern "C" {
 enum { GRAV_FX_DIGITAL = 0, GRAV_FX_VINTAGE, GRAV_FX_CLEAN_TAPE, GRAV_FX_DIRTY_TAPE, GRAV_FX_QUALITIES };
 
 typedef struct {
-    float density, time, size, shape;    /* 0..1, as Beads' knobs (DENSITY: none at 0.5, random left, clocked right;
+    float density, time, size, shape;    /* 0..1, as Beads' knobs (DENSITY: none at 0.5, clocked left, random right;
                                           * SIZE at 1: the delay) */
     float pitch;                         /* 0..1, Beads' PITCH knob: -24..+24 semitones, 0 at 0.5 (grav_beads_pitch) */
     float feedback, dry_wet, reverb;     /* 0..1 */

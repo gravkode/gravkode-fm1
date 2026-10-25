@@ -32,5 +32,24 @@ shot screen-env.png
 tap GLO
 wait 400
 shot screen-glo.png
+# FX: the effect on, MIX (DRY/WET up, VINTAGE), then GRAIN, frozen (FREEZE on every page, EDIT lit)
+tap FX
+wait 30
+tap FX
+wait 30
+tap FX
+wait 30
+turn K1 40
+turn K2 25
+turn K3 1
+wait 400
+shot screen-fx-mix.png
+tap FX
+wait 30
+tap EDIT
+wait 400
+shot screen-fx-grain.png
+tap EDIT
+wait 30
 tap HOME
 wait 30
