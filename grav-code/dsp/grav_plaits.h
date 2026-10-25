@@ -9,7 +9,7 @@ extern "C" {
 #define GRAV_PLAITS_BLOCK 24u           /* the caller's chunk (the engines run 12 at a time, as on Plaits) */
 
 enum {                                   /* the engines, by the settings' engine_id: the first four as 0.10 saved
-                                          * them, the others after (PRESET steps through them in Plaits' order) */
+                                          * them, the others after (ALGO steps through them in Plaits' order) */
     GRAV_ENGINE_WAVESHAPING = 0,
     GRAV_ENGINE_FM,
     GRAV_ENGINE_VIRTUAL_ANALOG,
@@ -42,7 +42,7 @@ enum {                                   /* the engines, by the settings' engine
 };
 
 #define GRAV_VOICES 8u                  /* engines run side by side: one per voice (synth/synth.h SYNTH_VOICES_MAX) */
-#define GRAV_BIG_VOICES 4u              /* voices 0..3 take any engine (the synth tracks'); 4..7 a drum (BASS DRUM,
+#define GRAV_BIG_VOICES 4u              /* voices 0..3 take any engine (the synth tracks'); 4..7 a drum (KICK,
                                          * SNARE, HI-HAT, and their second models: the drum tracks'), in small
                                          * slots of their own, with knobs of their own (dsp/grav_drums.h) */
 
@@ -70,13 +70,14 @@ void grav_plaits_reset_voice(uint32_t voice);
 int grav_plaits_render(uint32_t voice, const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
 
 const char *grav_engine_name(uint32_t engine);           /* on the screen: 10 characters at most */
-int grav_engine_is_drum(uint32_t engine);                /* BASS DRUM, SNARE, HI-HAT and their second models */
+const char *grav_engine_knob(uint32_t engine, uint32_t k);   /* K1..K3 (k 0..2): what each does, 10 at most */
+int grav_engine_is_drum(uint32_t engine);                /* KICK, SNARE, HI-HAT and their second models */
 int grav_drum_kind(uint32_t engine);                     /* 0 a kick, 1 a snare, 2 a hi-hat; -1 no drum */
-uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* PRESET on a drum track: among the six, round */
+uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* ALGO on a drum track: among the six, round */
 /* a drum's SHAPE knobs (0..1) as Plaits folds them on HARMONICS: the kick's PUNCH, SWEEP and DRIVE from it; the
  * snare's SNAPPY, the hi-hat's NOISE it, DRIVE none, LEVEL full */
 void grav_drum_shape(uint32_t engine, float harmonics, float shape[3]);
-uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* PRESET: steps away in Plaits' order, round */
+uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* ALGO: steps away in Plaits' order, round */
 uint32_t grav_plaits_ram_used(uint32_t voice);   /* bytes of a voice's RAM its engine's Init took */
 
 #ifdef __cplusplus

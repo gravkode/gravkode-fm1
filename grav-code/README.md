@@ -8,6 +8,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
 | `app.c` | The app: the keys and MIDI into the voices, the pages (OSC, MOD, ENV, GLO, the three FX pages), FREEZE and SEED, the screen, the settings and SAVE |
 | `synth/` | The voices (`synth.c`: four shared out among the synth tracks S1..S4, each MONO with legato, POLY or none, and one for each drum track D1..D4; the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
+| `presets/` | Four factory starting points per engine; a validated 64-slot user bank (1296 bytes), engine/track-kind filtering and browsing |
 | `seq/` | The sequencer (`seq.c`): 64 steps, length, chords, tempo, swing, MIDI clock out and in, the next pattern in at the pattern's end; each block's events at their sample offsets, on a 24-sample grid (`app.c` renders between them). The patterns' bank in the flash (`bank.c`): 16 patterns in 32 slots of 8 KiB, saved a page at a time into erased slots, the older copies erased when quiet |
 | `dsp/grav_engine.c` | The render: each voice through its engine and envelope, the mix through the effect, MASTER, the soft limiter, sleeping voices |
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), each voice its own (its track's; a drum voice's, in a small slot, one of the three drums), rendered 12 samples at a time |
@@ -43,6 +44,9 @@ From the repository's root:
     grav-code/build/host/grav_code_host grav-code/tests/drums.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/patterns.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/icons.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/presets.txt grav-code/build/host
+    python3 grav-code/tests/run_presets_test.py
+    python3 grav-code/tests/run_dual_core_test.py
     python3 grav-code/tests/run_seq_test.py
     python3 tools/build.py grav-code --web               # the browser emulator: grav-code/build/emu/
     python3 tools/fm1_install.py grav-code/build/grav_code.fwsc
@@ -52,13 +56,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.20.0    # grav-code/build/grav_code-0.20.0.fwsc, identity FM-1_73002000
+    python3 tools/build.py grav-code --release 0.21.0    # grav-code/build/grav_code-0.21.0.fwsc, identity FM-1_73002100
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.20.0.fwsc 0.20.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.21.0.fwsc 0.21.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.20.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.21.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 
@@ -69,8 +73,11 @@ Python with Pillow (the fonts).
 - Plaits' engines run 12 samples at a time, always (the 6-op FM depends on it), through a FIFO per voice.
 - The engines' RAM and each synth voice's slot are in the pool (`.pool`, PLAT_POOL): about 98 KB for four voices.
   Beads' delay (96 KiB) and reverb (64 KiB) are there too, its processor (25 KB) in `.bss`: the pool is 333 KB of
-  336, the RAM about 85 KiB of 96 (including the 8 KiB CPU1 stack, the eight voices' block buffers and the four drum
+  336, the RAM about 86 KiB of 96 (including the 8 KiB CPU1 stack, the eight voices' block buffers and the four drum
   voices: their slots and 512 bytes of RAM each, in `.bss`).
+- User presets (0.21) use store object 2, A/B sectors `0xDE000` and `0xDF000` (formerly unused BLE storage).
+  The validated versioned record is 1296 bytes. Only explicit saves write it; pending writes wait for transport
+  stop and no active voices. Existing settings, calibration and pattern addresses are unchanged.
 - The patterns (0.18) are in the flash's data area, 0x97000..0xD7000 (`seq/bank.c`), read in place: the audio
   interrupt copies the next one in at the pattern's end, so RAM holds only the one playing. A save writes a page
   (256 bytes) at a time with the interrupts off for each, into a slot erased beforehand; erasing (tens of ms with

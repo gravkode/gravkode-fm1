@@ -15,10 +15,10 @@ void app_overload(void);
 #define APP_SYSEX                        /* read-only dual-core debug snapshot over USB-MIDI */
 int app_sysex(const uint8_t *p, uint32_t n);
 
-/* the store: the app's objects (the panel calibration is the platform's), and their flash offsets. No radio: object
- * 2 is kept for OBJ_BLE (where its record may still be, from a build that had it), never written. OBJ_SEQ: the
- * sequencer's pattern (0.15; its synth tracks since 0.17), OBJ_DRUMS its drum tracks (0.17) */
-enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_RSV_BLE, OBJ_SEQ, OBJ_DRUMS, OBJ_NOBJ };
+/* Object 2's A/B sectors DE000/DF000 now hold user presets (0.21). No radio since 0.10; an old BLE object has a
+ * different size/magic and is ignored. Only an explicit preset save replaces it. Settings, panel calibration,
+ * legacy SEQ/DRUMS and the 97000..D7000 pattern bank keep their addresses. */
+enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_PRESETS, OBJ_SEQ, OBJ_DRUMS, OBJ_NOBJ };
 #define APP_STORE_MAP {0xFC000u, 0xDC000u, 0xDE000u, 0xDA000u, 0xD8000u}
 
 /* the contract: the platform calls these */

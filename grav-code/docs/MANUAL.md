@@ -49,7 +49,7 @@ your own risk.
 
 ## 2. The screen
 
-![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; TIMBRE 65, MORPH 50, HARMONICS 75 with their bars; the keyboard; OCT +0, PRESET WAVESHAPE, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
+![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; FOLD 65, ASYMMETRY 50, CURVE 75 with their bars; the keyboard; OCT +0, PRESET INIT, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
 
 From the top:
 
@@ -63,7 +63,7 @@ From the top:
 - **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
   starts from a mark in the middle (DENSITY, PITCH) has its rest there.
 - **The keyboard:** a key held fills to its velocity (amber) and, pressed further, to its pressure (white).
-- **The bottom lines:** OCT (the octave), PRESET (the selected track's engine), VOL (MASTER), and when MIDI has come in, the last
+- **The bottom lines:** OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER), and when MIDI has come in, the last
   message and where from (USB or TRS). CPU is the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on.
 
@@ -75,7 +75,8 @@ From the top:
 | --- | --- |
 | Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0 |
 | OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go. In step mode: the pages |
-| PRESET (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: its drum, one of six (section 6). Each turn shows the engine's splash for a moment |
+| ALGO (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: its drum, one of six (section 6). Each turn shows the engine's splash for a moment |
+| PRESET (knob) | Four factory presets and saved user presets for the current engine and track kind; the sound changes immediately. A sound edited with its knobs reads CUSTOM |
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
@@ -90,11 +91,10 @@ From the top:
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording (section 5) |
 | MASTER | The volume, glided: no step in the sound |
-| SAVE | Stores the settings and the pattern; lit while there are changes not stored |
+| SAVE | Tap: stores settings and pattern. Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: GRAIN, SHAPE,
-MIX; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP and the knobs ALGO and K4 only say their name or count for now: they are
-free for what comes next.
+MIX; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP is reserved for a later version.
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when GRAV CODE starts but its USB can't be reached.
@@ -117,9 +117,9 @@ with its knobs and its notes: WAVESHAPE's wave folds further as TIMBRE goes up, 
 CHORDS stacks its chord's notes, a kick's rings jump at each hit (all of them in section 6). A drum's DRUM and SHAPE
 pages show it the same way.
 
-![PRESET turned: SPEECH's splash, its icon alive, its name and its line](img/screen-splash.png "The engine's splash")
+![ALGO turned: SPEECH's splash, its icon alive, its name and its line](img/screen-splash.png "The engine's splash")
 
-**The splash:** turning PRESET shows the new engine for a moment over the page: its icon, its name and its line.
+**The splash:** turning ALGO shows the new engine for a moment over the page: its icon, its name and its line.
 
 ### DRUM, SHAPE (HOME again, on a drum track)
 
@@ -186,7 +186,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.20.0, ID FM-1_73002000, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.21.0, ID FM-1_73002100, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -310,13 +310,14 @@ tempo (0.15's, of one track, as S1's; 0.16's with the drum tracks empty).
 
 ![Every engine's icon on its sound page: the 24 engines in Plaits' order, then the drums' second models](img/readme-icons.png "The engines' icons")
 
-PRESET steps the selected track's engine through all 24 engines of Plaits, in Plaits' own order: its first sixteen,
-then the eight its firmware 1.2 added. K1 is TIMBRE, K2 MORPH, K3 HARMONICS; what they do, engine by engine, is
-below. On a drum track PRESET steps among six drums alone, each with its DRUM and SHAPE knobs (section 4):
+ALGO steps the selected track's engine through all 24 engines of Plaits, in Plaits' own order: its first sixteen,
+then the eight its firmware 1.2 added. K1 is TIMBRE, K2 MORPH, K3 HARMONICS; their screen labels describe the engine (FM 2-OP: INDEX, FEEDBACK, RATIO;
+WAVESHAPE: FOLD, ASYMMETRY, CURVE). What they do, engine by engine, is
+below. On a drum track ALGO steps among six drums alone, each with its DRUM and SHAPE knobs (section 4):
 
 | Drum | What it is |
 | --- | --- |
-| BASS DRUM | Plaits' analog kick: a pulse into a resonant filter, its pitch pushed by PUNCH and SWEEP, then DRIVE |
+| KICK | Plaits' analog kick: a pulse into a resonant filter, its pitch pushed by PUNCH and SWEEP, then DRIVE |
 | SYN KICK | Plaits' second, digital kick (its AUX out): a sine with a pitch envelope (PUNCH its depth, SWEEP its time) and dirt (DRIVE) |
 | SNARE | Plaits' analog snare: the drum's modes and the snares' noise (SNAPPY) |
 | SYN SNARE | Plaits' digital snare: an FM drum (TONE: its FM) and noise |
@@ -339,7 +340,7 @@ below. On a drum track PRESET steps among six drums alone, each with its DRUM an
 | 11 | PARTICLE | Density of the particles | Filter: an all-pass reverb, then resonant band-pass | Frequency randomness |
 | 12 | STRING | Brightness of the excitation | Decay | Inharmonicity, the material |
 | 13 | MODAL | Brightness of the excitation | Decay | Inharmonicity, the material |
-| 14 | BASS DRUM | Brightness | Decay | Attack sharpness and overdrive |
+| 14 | KICK | Brightness | Decay | Attack sharpness and overdrive |
 | 15 | SNARE | Balance of the drum's modes | Decay | Tone against noise |
 | 16 | HI-HAT | High-pass cutoff | Decay | Metal against noise |
 | 17 | VA VCF | Filter cutoff | Waveform and sub level | Resonance and character, smooth to harsh |
@@ -478,6 +479,26 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 ---
 
 ## 9. Saving
+
+**Sound presets (0.21).** ALGO chooses the engine; PRESET scrolls through its four factory starting points and
+user presets saved for the same engine and track kind. A synth preset stores its three engine knobs; a dedicated
+drum preset stores TUNE, DECAY, TONE and all three SHAPE controls. Track assignment, VOICES, ENV, LFO, FX, tempo and
+patterns are outside the preset. Synth-track drums and dedicated drums have separate preset lists because their
+controls differ. Factory starting points still need musical refinement by listening on the FM-1.
+
+Hold SAVE for 300 ms to open the 64-slot grid. OCT-/+ chooses one of four pages of sixteen; the sixteen white keys
+save the selected track's sound to the corresponding slot, **replacing it if occupied**. Lit slots contain a
+preset; S/D marks its track kind. Names are USER 01 through USER 64. Release SAVE to close. Holding SAVE without
+choosing a key closes without saving settings. The modifier keys never play or record notes.
+
+PRESET QUEUED means the new sound is still in RAM: stop playback and release the notes, then wait for
+**PRESET SAVED** before powering off. Flash writing waits until no voice is active; a write may briefly interrupt
+an effect tail. PRESET FAILED leaves SAVE lit; tap SAVE to retry. A firmware update preserves the bank. Preset
+saving is independent of saving the track settings: tap SAVE as well to keep the current track's sound at boot.
+
+![Factory sound with engine-specific knob labels](img/preset-factory.png)
+![User preset slots, sixteen white keys per page](img/preset-slots.png)
+
 
 SAVE stores the octave, each track's engine (a drum track's drum) and OSC values (a drum's DRUM and SHAPE), the synth
 tracks' VOICES, the MOD

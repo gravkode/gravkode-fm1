@@ -20,6 +20,7 @@ o2 = [
     "synth/event_queue.c",
     "seq/seq.c",
     "seq/bank.c",                               # the patterns in the flash (main loop)
+    "presets/presets.c",
     "dsp/grav_plaits.cpp",
     "dsp/grav_beads.cpp",
     "vendor/stmlib/dsp/units.cc",

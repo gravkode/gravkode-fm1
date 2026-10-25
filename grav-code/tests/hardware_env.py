@@ -58,10 +58,10 @@ def capture(path, device):
                        if re.search(r"\. WAVE ([^.]+)", t)), None)
         if engine != "6-OP FM 2":
             order = ["ANALOG", "WAVESHAPE", "FM 2-OP", "GRAIN", "ADDITIVE", "WAVETABLE", "CHORDS", "SPEECH",
-                     "SWARM", "NOISE", "PARTICLE", "STRING", "MODAL", "BASS DRUM", "SNARE", "HI-HAT", "VA VCF",
+                     "SWARM", "NOISE", "PARTICLE", "STRING", "MODAL", "KICK", "SNARE", "HI-HAT", "VA VCF",
                      "PHASE DIST", "6-OP FM 1", "6-OP FM 2", "6-OP FM 3", "TERRAIN", "STRING MCH", "CHIPTUNE"]
             if engine not in order: raise RuntimeError(f"No engine name in reply: {description!r}")
-            command("turn", "PRESET", str(order.index("6-OP FM 2") - order.index(engine)))
+            command("turn", "ALGO", str(order.index("6-OP FM 2") - order.index(engine)))
         state = command("tap", "EDIT")
         if "FREEZE ON" in state:
             command("tap", "EDIT")

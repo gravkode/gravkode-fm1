@@ -44,7 +44,7 @@ turn K2 40
 wait 300
 shot lfo-destinations.png
 # 6-OP FM 2: a zero outer release must close the output even if the DX patch is still ringing.
-turn PRESET 18
+turn ALGO 18
 wait 30
 expect wave 19
 tap ENV

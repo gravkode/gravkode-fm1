@@ -369,6 +369,12 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         if (work.own_envelope[v] ? work.peak[v] < GRAV_ASLEEP_PEAK : voice->env.stage == ENV_IDLE) {
             if (six_op[v])
                 grav_plaits_reset_voice(v);   /* no deferred old DX release on the next note */
+            /* A self-enveloped drum can finish before the outer release. Sleeping stops processing that
+             * release too: finish it here, otherwise synth_quiet stays false forever and idle saves stall. */
+            if (work.own_envelope[v]) {
+                voice->env.stage = ENV_IDLE;
+                voice->env.level = 0.0f;       /* retain its configured attack/decay/release for the next note */
+            }
             e->asleep[v] = 1;
         }
     }

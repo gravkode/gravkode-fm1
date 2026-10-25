@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
 /* GRAV CODE: up to four voices on Plaits' engines (dsp/), with an envelope and an LFO (synth/), through Beads (the
- * effect). The keys play them with velocity and go out over USB MIDI (MIDI in, USB or TRS, plays them too); PRESET
- * picks the engine, K1-K3 the page's parameters (HOME: OSC, LFO: MOD, ENV: ENV, GLO: GLO, FX: the effect's three
+ * effect). The keys play them with velocity and go out over USB MIDI (MIDI in, USB or TRS, plays them too); ALGO
+ * picks the engine, PRESET its sound, K1-K3 the page's parameters (HOME: OSC, LFO: MOD, ENV: ENV, GLO: GLO, FX: the effect's three
  * pages), EDIT freezes the effect, SEL seeds it, OCT- / OCT+ the octave, MASTER the volume, SAVE stores it all. No
  * radio: Bluetooth and WiFi are left out of the build. Part of the unity build (device/unity.c, host/plat_host.c),
  * after the platform: gfx.c and announce.c are in scope. */
@@ -13,6 +13,7 @@
 #include "synth/event_queue.h"
 #include "seq/seq.h"
 #include "seq/bank.h"
+#include "presets/presets.h"
 
 _Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
 
@@ -45,7 +46,7 @@ typedef struct {
     uint8_t trk_osc[SYNTH_S_TRACKS][3];
     uint8_t trk_voices[SYNTH_S_TRACKS];
     uint8_t trk_reserved[4];
-    /* 0.17: the drum tracks' sounds (D1..D4): a drum engine (BASS DRUM, SNARE, HI-HAT), OSC's three knobs */
+    /* 0.17: the drum tracks' sounds (D1..D4): a drum engine (KICK, SNARE, HI-HAT), OSC's three knobs */
     uint8_t drum_engine[SYNTH_D_TRACKS];
     uint8_t drum_osc[SYNTH_D_TRACKS][3];
     /* 0.18: the song's tempo (every pattern's), and the pattern it was on */
@@ -152,11 +153,30 @@ static volatile int32_t osc_params[SYNTH_TRACKS][3];
 static volatile int32_t drum_tune[SYNTH_D_TRACKS];          /* the drums' TUNE (50: the note; a half semitone each) */
 static volatile int32_t drum_shape[SYNTH_D_TRACKS][3];      /* and SHAPE's knobs (dsp/grav_drums.h), 0..100 */
 static volatile uint8_t track_sel;       /* the track selected (SELECT): the keys, MIDI in and the pages play it */
+static preset_bank_t user_presets;
+static int8_t preset_id[SYNTH_TRACKS];
+static uint8_t preset_dirty, preset_write_req;
+_Static_assert(sizeof user_presets <= PLAT_STORE_MAX, "user presets fit a platform store object");
 static const char *const TRACK_NAME[SYNTH_TRACKS] = {"S1", "S2", "S3", "S4", "D1", "D2", "D3", "D4"};
 
 static uint8_t *track_engine(uint32_t t)   /* a track's engine, where the settings keep it */
 {
     return t < SYNTH_S_TRACKS ? &set.trk_engine[t] : &set.drum_engine[(t - SYNTH_S_TRACKS) % SYNTH_D_TRACKS];
+}
+
+static void preset_capture(uint32_t t, preset_t *p)
+{
+    memset(p, 0, sizeof *p);
+    p->engine = *track_engine(t);
+    p->drum = SYNTH_IS_DRUM(t);
+    p->tune = 50;
+    for (uint32_t i = 0; i < 3; i++) p->osc[i] = (uint8_t)osc_params[t][i];
+    if (p->drum) {
+        const uint32_t d = t - SYNTH_S_TRACKS;
+        p->tune = (uint8_t)drum_tune[d];
+        p->osc[2] = 0;
+        for (uint32_t i = 0; i < 3; i++) p->shape[i] = (uint8_t)drum_shape[d][i];
+    }
 }
 
 /* Parameters for future modulation and envelope DSP. */
@@ -625,6 +645,15 @@ void app_init(void)
     set_stored = set;
     if (loaded != (int)sizeof set)           /* (an older record, or none: SAVE writes this one) */
         memset(&set_stored, 0, sizeof set_stored);
+    if (plat_store_load(OBJ_PRESETS, &user_presets, sizeof user_presets) != (int)sizeof user_presets ||
+        !presets_valid(&user_presets))
+        presets_init(&user_presets);
+    preset_dirty = preset_write_req = 0;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+        preset_t p;
+        preset_capture(t, &p);
+        preset_id[t] = (int8_t)preset_match(&user_presets, &p);
+    }
 #if FM1B_CPU2
     plat_cpu2_set(1);                     /* boot only, before audio/timers start */
 #endif
@@ -678,9 +707,74 @@ static struct {
     /* the icons (0.20) */
     int32_t live_x, live_y, live_w, live_h; /* the live area on the page (0 wide: none): its icon redrawn alone */
     uint32_t live_at, live_frames;       /* its last frame; frames drawn (the tests) */
-    uint32_t splash_until;               /* PRESET turned: the engine's splash shown until then */
+    uint32_t splash_until;               /* ALGO turned: the engine's splash shown until then */
+    uint8_t preset_down, preset_used, preset_shown, preset_page;
+    uint32_t preset_at, key_preset;      /* SAVE modifier, its grid, and keys that must never play/record notes */
     uint32_t icon_strikes[SYNTH_TRACKS], icon_hit_at[SYNTH_TRACKS];   /* each track's notes begun: its icon's strike */
 } ui;
+
+static const char *preset_label(uint32_t t)
+{
+    /* Factory names are copied into a small scratch record; the caller consumes the pointer immediately. */
+    static preset_t p;
+    return preset_get(&user_presets, *track_engine(t), SYNTH_IS_DRUM(t), preset_id[t], &p) ? p.name : "CUSTOM";
+}
+
+static void preset_turn(int32_t e)
+{
+    const uint32_t t = track_sel;
+    const int id = preset_next(&user_presets, *track_engine(t), SYNTH_IS_DRUM(t), preset_id[t], e);
+    preset_t p;
+    if (!preset_get(&user_presets, *track_engine(t), SYNTH_IS_DRUM(t), id, &p)) return;
+    const uint32_t f = plat_lock();
+    for (uint32_t i = 0; i < 3; i++) osc_params[t][i] = p.osc[i];
+    if (p.drum) {
+        const uint32_t d = t - SYNTH_S_TRACKS;
+        drum_tune[d] = p.tune;
+        for (uint32_t i = 0; i < 3; i++) drum_shape[d][i] = p.shape[i];
+    }
+    plat_unlock(f);
+    preset_id[t] = (int8_t)id;
+    set_dirty = 1;
+    ui.splash_until = ui.tracks_until = ui.patterns_until = 0;
+    app_say("PRESET", p.name);
+    ui.redraw = 1;
+}
+
+static void preset_save_slot(uint32_t slot)
+{
+    preset_t p;
+    preset_capture(track_sel, &p);
+    memcpy(p.name, "USER 00", 8);
+    p.name[5] = (char)('0' + (slot + 1u) / 10u);
+    p.name[6] = (char)('0' + (slot + 1u) % 10u);
+    if (!preset_put(&user_presets, slot, &p)) return;
+    /* A slot may have been selected by several tracks. Overwriting it must not rename an old sound. */
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        if (preset_id[t] == (int)(PRESET_FACTORY + slot)) preset_id[t] = PRESET_CUSTOM;
+    preset_id[track_sel] = (int8_t)(PRESET_FACTORY + slot);
+    preset_dirty = preset_write_req = 1;
+    ui.redraw = 1;
+    app_say("PRESET QUEUED", seq.playing ? "STOP TO SAVE" : p.name);
+}
+
+static void presets_poll(void)
+{
+    if (ui.preset_down && !ui.preset_shown && plat_ms() - ui.preset_at >= 300u) {
+        ui.preset_shown = 1;
+        ui.redraw = 1;
+    }
+    if (!preset_write_req || seq.playing || seq.want == SEQ_WANT_PLAY || ui.keys ||
+        !synth_quiet(&synth) || grav_debug.active || bank_busy(&bank)) return;
+    preset_write_req = 0;                   /* a failed write retries only on the next explicit SAVE */
+    if (plat_store_save(OBJ_PRESETS, &user_presets, sizeof user_presets) == 0) {
+        preset_dirty = 0;
+        app_say("PRESET SAVED", "");
+    } else {
+        app_say("PRESET FAILED", "TAP SAVE TO RETRY");
+    }
+    ui.redraw = 1;
+}
 
 #include "ui/icons.c"
 
@@ -1009,6 +1103,9 @@ static const char *param_name(uint32_t page, uint32_t index)
         const int kind = grav_drum_kind(*track_engine(track_sel));
         return SHAPE[kind > 0 ? kind : 0][index % 3u];
     }
+    if (page == PAGE_OSC)                    /* (0.21) by what each does on the engine: WAVESHAPE's FOLD, ASYMMETRY,
+                                              * CURVE; FM 2-OP's INDEX, FEEDBACK, RATIO */
+        return grav_engine_knob(*track_engine(track_sel), index);
     return PARAM_NAME[page][index % 3u];
 }
 
@@ -1381,7 +1478,7 @@ static void lights(uint32_t btn, uint32_t keys)
             ui.shown_hits[t] = seq.hits[t];
             ui.hit_at[t] = now;
         }
-    uint32_t lit = (btn & ~play) | (set_dirty || seq.edits != seq.saved ? 1u << B_SAVE : 0u) |
+    uint32_t lit = (btn & ~play) | (set_dirty || preset_dirty || seq.edits != seq.saved ? 1u << B_SAVE : 0u) |
                    (fx_freeze ? 1u << B_EDIT : 0u) |
                    (ui.step_mode ? 1u << B_SEQ : 0u);
     uint32_t mid = 0, lit_keys = keys, mid_keys = 0, dim_keys = 0;
@@ -1457,6 +1554,15 @@ static void lights(uint32_t btn, uint32_t keys)
                 dim_keys |= bit;
         }
     }
+    if (ui.preset_down) {
+        lit_keys = mid_keys = dim_keys = 0;
+        for (uint32_t n = 0; n < 16u; n++) {
+            const uint32_t bit = 1u << WHITE_KEYS[n], slot = 16u * ui.preset_page + n;
+            if (ui.key_preset & bit) lit_keys |= bit;
+            else if (preset_used(&user_presets, slot)) mid_keys |= bit;
+            else dim_keys |= bit;
+        }
+    }
     {
         uint32_t dim = ((1u << NB) - 1u) & ~lit & ~mid;
         if (!(lit & LED_PLAY_GREEN) && !(lit & play))
@@ -1492,10 +1598,24 @@ static void input(void)
     int32_t e;
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
+    /* Modifiers are latched before keys, including SAVE and a white key arriving in the same input frame. */
+    if ((btn & 1u << B_SAVE) && !(ui.btn & 1u << B_SAVE)) {
+        ui.preset_down = 1;
+        ui.preset_used = ui.preset_shown = 0;
+        ui.preset_at = plat_ms();
+    }
     for (k = 0; k < NKEYS; k++) {            /* key 0 is F3 (MIDI 53) */
         uint32_t bit = 1u << k, v;
         int32_t note = 53 + (int32_t)k + 12 * set.octave;
         if ((keys & bit) && !(ui.keys & bit)) {
+            if (ui.preset_down) {
+                const int w = key_index(WHITE_KEYS, 16, k);
+                ui.key_preset |= bit;
+                ui.preset_used = 1;
+                ui.preset_shown = 1;
+                if (w >= 0) preset_save_slot(16u * ui.preset_page + (uint32_t)w);
+                continue;
+            }
             if (ui.home_down) {              /* HOME held: a white key is a pattern (1..16) */
                 const int w = key_index(WHITE_KEYS, 16, k);
                 ui.key_pat |= bit;
@@ -1529,6 +1649,10 @@ static void input(void)
             if (ui.chord_n < SEQ_NOTES)
                 ui.chord[ui.chord_n++] = (uint8_t)clamp(note, 0, 127);
         } else if (!(keys & bit) && (ui.keys & bit)) {
+            if (ui.key_preset & bit) {
+                ui.key_preset &= ~bit;
+                continue;
+            }
             if (ui.key_pat & bit) {          /* (pressed as a pattern) */
                 ui.key_pat &= ~bit;
                 continue;
@@ -1544,7 +1668,7 @@ static void input(void)
             ui.prs[k] = 0;
             queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0, ui.key_track[k]);
             plat_midi_send(0x08u | (0x80u | ui.key_track[k]) << 8 | (uint32_t)note << 16, TO_USB);
-        } else if ((keys & bit) && !((ui.key_step | ui.key_pat) & bit) && touch_pressure(k) != ui.prs[k]) {
+        } else if ((keys & bit) && !((ui.key_step | ui.key_pat | ui.key_preset) & bit) && touch_pressure(k) != ui.prs[k]) {
             note = ui.note[k];
             ui.prs[k] = touch_pressure(k);
             ui.redraw = 1;
@@ -1552,7 +1676,7 @@ static void input(void)
                            TO_USB);
         }
     }
-    if (ui.chord_open && !(keys & ~ui.key_step)) {   /* every note let go: the chord is done */
+    if (ui.chord_open && !(keys & ~(ui.key_step | ui.key_pat | ui.key_preset))) {
         ui.chord_open = 0;
         chord_done();
     }
@@ -1605,6 +1729,9 @@ static void input(void)
             fx_seed = 1;
             app_say("SEED", fx_seed_auto ? "MANUAL" : "");
             fx_seed_auto = 0;
+        } else if ((k == B_OCTDN || k == B_OCTUP) && ui.preset_down) {
+            ui.preset_page = (uint8_t)clamp((int32_t)ui.preset_page + (k == B_OCTUP ? 1 : -1), 0, 3);
+            ui.preset_used = ui.preset_shown = ui.redraw = 1;
         } else if ((k == B_OCTDN || k == B_OCTUP) && ui.step_mode) {   /* step mode: the pages */
             char t[4];
             ui.view_page = (uint8_t)clamp((int32_t)ui.view_page + (k == B_OCTUP ? 1 : -1), 0, SEQ_PAGES - 1);
@@ -1614,8 +1741,15 @@ static void input(void)
             octave_step(-1);
         else if (k == B_OCTUP)
             octave_step(1);
-        else if (k == B_SAVE) {              /* the settings when they changed (an erase: a gap in the sound), and
-                                              * the pattern (patterns(): a few pages a frame, then SAVED) */
+        else if (k == B_SAVE) {              /* tap is handled on release; held SAVE opens the preset slots */
+        } else {
+            app_say("BUTTON", BTN_NAME[k]);
+        }
+    }
+    if (ui.preset_down && !(btn & 1u << B_SAVE)) {
+        ui.preset_down = 0;
+        ui.redraw = 1;
+        if (!ui.preset_used && !ui.preset_shown) {
             settings_capture();
             if (memcmp(&set, &set_stored, sizeof set) && plat_store_save(OBJ_SETTINGS, &set, sizeof set) != 0) {
                 app_say("SAVE", "FAILED");
@@ -1624,9 +1758,9 @@ static void input(void)
                 set_dirty = 0;
                 ui.save_req = 1;
             }
-        } else {
-            app_say("BUTTON", BTN_NAME[k]);
+            if (preset_dirty) preset_write_req = 1;
         }
+        ui.preset_shown = 0;
     }
     if (ui.home_down && !(btn & 1u << B_HOME)) {   /* HOME let go: its page, unless it picked a pattern */
         ui.home_down = 0;
@@ -1653,7 +1787,7 @@ static void input(void)
         fx_seed_auto = 1;
         app_say("SEED", "AUTO");
     }
-    for (k = 0; k < NE; k++) {               /* an encoder turned: its count; PRESET also changes the wave */
+    for (k = 0; k < NE; k++) {
         char t[12];
         if ((e = plat_enc((int)k)) == 0)
             continue;
@@ -1700,18 +1834,23 @@ static void input(void)
             volatile int32_t *value = param_of(active_page, index);
             int32_t previous = *value;
             *value = clamp_percent(previous + e);
-            if (*value != previous)
+            if (*value != previous) {
                 set_dirty = 1;
+                if (active_page == PAGE_OSC || active_page == PAGE_SHAPE) preset_id[track_sel] = PRESET_CUSTOM;
+            }
             param_text(active_page, index, *value, t);
             app_say(param_name(active_page, index), t);
         } else if (k == EN_K4) {             /* the pattern: the next (or the one queued) and on */
             pattern_pick((int32_t)(seq.next != SEQ_NO_PATTERN ? seq.next : seq.pattern) + e);
         } else if (k == EN_PRESET) {
+            preset_turn(e);
+        } else if (k == EN_ALGO) {
             uint8_t *engine = track_engine(track_sel);   /* Plaits' order; a drum track: its six drums */
             *engine = (uint8_t)(SYNTH_IS_DRUM(track_sel) ? grav_drum_step(*engine, e) : grav_engine_step(*engine, e));
             set_dirty = 1;
+            preset_id[track_sel] = PRESET_CUSTOM;
             ui.splash_until = plat_ms() + 1500u;   /* its splash, a moment */
-            app_say("WAVE", grav_engine_name(*track_engine(track_sel)));
+            app_say("ALGO", grav_engine_name(*track_engine(track_sel)));
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -1943,6 +2082,29 @@ static void draw_patterns(void)
     }
 }
 
+static void draw_preset_slots(void)
+{
+    char t[12];
+    cv_rect(4, 20, 232, 123, C_LINE);
+    cv_rect(5, 21, 230, 121, C_BLACK);
+    cv_text(12, 24, &FONT_XS, "SAVE PRESET", C_HI);
+    int_text(ui.preset_page + 1, t);
+    text_cat(t, "/4");
+    cv_text(195, 24, &FONT_XS, t, C_WHITE);
+    for (uint32_t n = 0; n < 16u; n++) {
+        const uint32_t slot = 16u * ui.preset_page + n;
+        const int used = preset_used(&user_presets, slot), held = ui.key_preset >> WHITE_KEYS[n] & 1u;
+        const int32_t x = 9 + (int32_t)(n % 4u) * 57, y = 41 + (int32_t)(n / 4u) * 21;
+        cv_rect(x, y, 53, 20, held ? C_HI : C_LINE);
+        if (!held) cv_rect(x + 1, y + 1, 51, 18, C_BLACK);
+        int_text(slot + 1, t);
+        cv_text(x + 6, y + 2, &FONT_S, t, held ? C_BLACK : used ? C_WHITE : C_DIM);
+        if (used) cv_text(x + 39, y + 5, &FONT_XS, user_presets.slot[slot].drum ? "D" : "S",
+                          held ? C_BLACK : C_HI);
+    }
+    cv_text(10, 128, &FONT_T, "OCT-/+ PAGE  KEY: SAVE/REPLACE", C_GRAY);
+}
+
 /* SELECT turned: the four tracks for a moment, over the page; the selected one lit */
 static void draw_tracks(void)
 {
@@ -1961,7 +2123,7 @@ static void draw_tracks(void)
     }
 }
 
-/* PRESET turned: the engine's splash for a moment, over the page: its icon, alive; its name; its line */
+/* ALGO turned: the engine's splash for a moment, over the page: its icon, alive; its name; its line */
 static void draw_splash(void)
 {
     const uint32_t e = *track_engine(track_sel);
@@ -2127,12 +2289,14 @@ static void draw(void)
         draw_knobs();
     if (ui.splash_until)
         draw_splash();
-    if (ui.tracks_until || ui.patterns_until || ui.home_shown)
+    if (ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown)
         ui.live_w = 0;                       /* (a list over it: no live area) */
     if (ui.tracks_until)
         draw_tracks();
     if (ui.patterns_until || ui.home_shown)
         draw_patterns();
+    if (ui.preset_shown)
+        draw_preset_slots();
 
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
@@ -2146,8 +2310,8 @@ static void draw(void)
     octave_text(t);
     cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
     cv_text(30, 36, &FONT_XS, t, C_HI);
-    cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
-    cv_text(112, 36, &FONT_XS, grav_engine_name(*track_engine(track_sel)), C_HI);
+    cv_text(54, 36, &FONT_XS, "PRESET", C_GRAY);
+    cv_text(98, 36, &FONT_XS, preset_label(track_sel), C_HI);
     if (active_page == PAGE_DEBUG) {
         debug_number(4, 48, "QUEUE", synth_queue_overflows, 0);
     } else if (midi_count) {                        /* the last MIDI message in, and where from */
@@ -2202,6 +2366,7 @@ void app_frame(void)
     }
     input();
     patterns();
+    presets_poll();
     speak();
     for (i = 0; i < NE; i++)                 /* an encoder's light goes out */
         if (ui.turned_at[i] && now - ui.turned_at[i] < 400u && now > lit_until)
@@ -2258,7 +2423,7 @@ void app_frame(void)
         ui.shown_playing = seq.playing;
         ui.redraw_grid = 1;
     }
-    if (ui.redraw_grid && (ui.tracks_until || ui.patterns_until || ui.home_shown))   /* (a list over the steps: the
+    if (ui.redraw_grid && (ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown))   /* (a list over the steps: the
                                                                                          * whole page, not the strip) */
         ui.redraw = 1;
     if (ui.splash_until && now >= ui.splash_until) {   /* the splash goes */
@@ -2415,6 +2580,16 @@ int app_expect(const char *what, int *got)
         *got = (int)grav_debug.steals;
     else if (!strcmp(what, "wave"))          /* the selected track's engine */
         *got = *track_engine(track_sel);
+    else if (!strcmp(what, "preset"))
+        *got = preset_id[track_sel];
+    else if (!strcmp(what, "preset_dirty"))
+        *got = preset_dirty;
+    else if (!strcmp(what, "preset_grid"))
+        *got = ui.preset_shown;
+    else if (!strcmp(what, "preset_page"))
+        *got = ui.preset_page;
+    else if (!strncmp(what, "preset_used", 11))
+        *got = preset_used(&user_presets, (uint32_t)atoi(what + 11));
     else if (!strcmp(what, "track"))         /* the track selected: 0..3 (S1..S4) */
         *got = track_sel;
     else if (!strncmp(what, "trk_voices", 10))   /* trk_voicesN, trk_engineN: track N's (0..3) */

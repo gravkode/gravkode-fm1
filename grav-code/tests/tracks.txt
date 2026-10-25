@@ -1,5 +1,5 @@
 # The synth tracks (0.16): S1..S4, each its engine, OSC knobs, voices and steps. SELECT picks one (on every page,
-# with the tracks' list for a moment); the keys, MIDI in, PRESET, OSC, GLO VOICES and step mode are for it; the
+# with the tracks' list for a moment); the keys, MIDI in, ALGO, OSC, GLO VOICES and step mode are for it; the
 # black keys 1..4 pick one in step mode (5..8 the drum tracks, tests/drums.txt); each track's notes go out on its
 # MIDI channel; SAVE keeps them all.
 #   grav-code/build/host/grav_code_host grav-code/tests/tracks.txt grav-code/build/host
@@ -23,8 +23,8 @@ expect wave 16
 said S2 VA VCF
 wait 200
 shot tracks.png
-# PRESET changes S2's engine alone (after VA VCF in Plaits' order: PHASE DIST)
-turn PRESET 1
+# ALGO changes S2's engine alone (after VA VCF in Plaits' order: PHASE DIST)
+turn ALGO 1
 wait 30
 expect trk_engine1 17
 expect trk_engine0 0

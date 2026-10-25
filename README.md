@@ -13,8 +13,8 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.20.0** — every engine has an icon drawn by code, alive: it moves with the engine's knobs and its
-notes, on the sound page above the knobs; turning PRESET shows the engine's splash.
+Current version: **0.21.0** — engine-specific knob labels, four factory presets per engine and 64 user slots.
+ALGO selects the engine, PRESET selects its sound; hold SAVE and press a white key to save a user preset.
 
 ## What it does
 
@@ -57,9 +57,11 @@ notes, on the sound page above the knobs; turning PRESET shows the engine's spla
 | FX again | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO again | DEBUG | one/two cores | reset peaks/counters | — |
 
-SELECT picks the track (S1–S4, D1–D4) the keys, PRESET, OSC, VOICES and the steps are for; PRESET picks its
+SELECT picks the track (S1–S4, D1–D4) the keys, ALGO, PRESET, OSC, VOICES and the steps are for; ALGO picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
-stores it all. SEQ turns step mode on (the white keys are the steps; hold one and turn K1..K3 for its note,
+stores the settings and pattern. PRESET browses four factory sounds and the user presets for this engine.
+Hold SAVE for the 64 user slots (four pages, OCT-/+); a white key saves or replaces that slot. A queued preset
+is written after stopping and releasing the notes; wait for PRESET SAVED before powering off. SEQ turns step mode on (the white keys are the steps; hold one and turn K1..K3 for its note,
 velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length), PLAY
 starts and stops, REC (stopped) records notes and chords step by step. HOME held and a white key, or K4, picks the
 pattern (playing: at the pattern's end). The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
@@ -72,7 +74,7 @@ still trigger voice cuts above 90% of an audio block; the smoothed CPU meter can
 
 ## The engines
 
-K1 TIMBRE, K2 MORPH, K3 HARMONICS; in PRESET's order (Plaits' own):
+K1 TIMBRE, K2 MORPH, K3 HARMONICS (shown with engine-specific names); in ALGO's order (Plaits' own):
 
 | # | Engine | TIMBRE | MORPH | HARMONICS |
 | --- | --- | --- | --- | --- |
@@ -111,7 +113,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.20.0.fwsc 0.20.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.21.0.fwsc 0.21.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -126,7 +128,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.20.0      # grav-code/build/grav_code-0.20.0.fwsc
+python3 tools/build.py grav-code --release 0.21.0      # grav-code/build/grav_code-0.21.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -134,7 +136,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

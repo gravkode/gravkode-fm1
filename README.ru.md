@@ -13,8 +13,8 @@
 
 ---
 
-Текущая версия: **0.20.0** — у каждого движка своя живая иконка, нарисованная кодом: она двигается вместе с ручками
-движка и нотами, на странице звука над ручками; поворот PRESET показывает заставку движка.
+Текущая версия: **0.21.0** — свои подписи ручек, четыре заводских пресета на движок и 64 пользовательские
+ячейки. ALGO выбирает движок, PRESET — его звук; SAVE зажат + белая клавиша сохраняет свой пресет.
 
 ## Возможности
 
@@ -56,9 +56,12 @@
 | FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO ещё раз | DEBUG | одно/два ядра | сброс пиков и счётчиков | — |
 
-SELECT выбирает дорожку (S1–S4, D1–D4), для неё работают клавиши, PRESET, OSC, VOICES и шаги. Ручка PRESET
+SELECT выбирает дорожку (S1–S4, D1–D4), для неё работают клавиши, ALGO, PRESET, OSC, VOICES и шаги. Ручка ALGO
 выбирает её движок (на барабанной дорожке: бочка, малый барабан, хай-хэт), OCT- и OCT+ — октаву (от -2 до +2),
-MASTER — громкость, SAVE сохраняет всё. SEQ включает режим шагов (белые клавиши — шаги;
+MASTER — громкость, короткий SAVE сохраняет настройки и паттерн. PRESET перебирает четыре заводских звука
+и пользовательские пресеты этого движка. Удержание SAVE открывает 64 ячейки (четыре страницы, OCT-/+); белая
+клавиша сохраняет или заменяет ячейку. Запись ждёт остановки и отпускания нот; перед выключением дождись
+PRESET SAVED. SEQ включает режим шагов (белые клавиши — шаги;
 зажал шаг и крутишь K1..K3 — его нота, сила, длина; чёрные клавиши 1–8 — дорожки; OCT- / OCT+ — страницы; SEQ
 зажат + шаг — длина), PLAY запускает и останавливает, REC (на стопе) записывает ноты и аккорды по шагу. HOME зажат +
 белая клавиша или ручка K4 — паттерн (при игре — в конце текущего). Кнопка открытой страницы мигает, на следующей её
@@ -73,7 +76,7 @@ MASTER — громкость, SAVE сохраняет всё. SEQ включа�
 
 ## Движки
 
-K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRESET (как на Plaits):
+K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои названия для движка); в порядке ручки ALGO (как на Plaits):
 
 | # | Движок | TIMBRE | MORPH | HARMONICS |
 | --- | --- | --- | --- | --- |
@@ -112,7 +115,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.20.0.fwsc 0.20.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.21.0.fwsc 0.21.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -127,7 +130,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.20.0      # grav-code/build/grav_code-0.20.0.fwsc
+python3 tools/build.py grav-code --release 0.21.0      # grav-code/build/grav_code-0.21.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

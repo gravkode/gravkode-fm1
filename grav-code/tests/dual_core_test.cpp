@@ -11,6 +11,7 @@
 extern "C" {
 #include "dsp/grav_engine.h"
 #include "dsp/grav_plaits.h"
+#include "presets/presets.h"
 #include "plat.h"
 }
 
@@ -242,7 +243,76 @@ static bool shed_fade() {
     return true;
 }
 
+static bool preset_audio() {
+    preset_bank_t bank;
+    presets_init(&bank);
+    unsigned count = 0;
+    for (unsigned drum = 0; drum < 2; ++drum)
+        for (unsigned e = 0; e < GRAV_ENGINE_ALL; ++e)
+            for (int id = 0; id < int(PRESET_FACTORY); ++id) {
+                preset_t preset;
+                if (!preset_get(&bank, e, drum, id, &preset)) continue;
+                grav_plaits_init();
+                const unsigned voice = drum ? 4 : 0;
+                grav_plaits_voice_engine(voice, e);
+                grav_plaits_params_t p = {};
+                p.note = drum ? (e == 13 || e == 24 ? 36 : 60) : 60;
+                p.timbre = preset.osc[0] * 0.01f;
+                p.morph = preset.osc[1] * 0.01f;
+                p.harmonics = preset.osc[2] * 0.01f;
+                for (unsigned k = 0; k < 3; ++k) p.shape[k] = preset.shape[k] * 0.01f;
+                p.accent = 100.0f / 127.0f;
+                float peak = 0;
+                for (unsigned b = 0; b < 400; ++b) {
+                    float out[24], aux[24];
+                    p.strike = b == 0;
+                    p.gate = b < 300;
+                    grav_plaits_render(voice, &p, out, aux, 24);
+                    for (unsigned k = 0; k < 24; ++k) {
+                        if (!std::isfinite(out[k]) || !std::isfinite(aux[k])) {
+                            std::fprintf(stderr, "Invalid factory audio engine=%u drum=%u preset=%d block=%u out=%g aux=%g\n",
+                                         e, drum, id, b, out[k], aux[k]);
+                            return false;
+                        }
+                        peak = std::fmax(peak, std::fabs(out[k]));
+                    }
+                }
+                if (peak < 1e-9f) {
+                    std::fprintf(stderr, "Silent factory audio engine=%u drum=%u preset=%d\n", e, drum, id);
+                    return false;
+                }
+                ++count;
+            }
+    // A short drum, a long external release: idle saves must not wait forever on an envelope frozen asleep.
+    synth_t synth;
+    grav_engine_t dsp;
+    synth_init(&synth);
+    synth_envelopes(&synth, 0, 0, 0.7f, 20, 44100);
+    grav_engine_init(&dsp);
+    grav_dual_core = 0;
+    grav_sound_t sound[SYNTH_TRACKS] = {};
+    for (unsigned t = 4; t < 8; ++t) {
+        sound[t].engine = GRAV_ENGINE_BASS_DRUM;
+        sound[t].timbre = 0.3f;
+        sound[t].morph = 0.05f;
+    }
+    synth_track_note_on(&synth, 4, 36, 100);
+    grav_beads_params_t fx = {};
+    for (unsigned b = 0; b < 1000; ++b) {
+        if (b == 2) synth_track_note_off(&synth, 4, 36);
+        int32_t out[512];
+        grav_engine_render_tracks(&dsp, out, 256, &synth, 3200, sound, 0, &fx);
+    }
+    if (grav_debug.active || !synth_quiet(&synth)) {
+        std::fprintf(stderr, "A silent drum blocked idle saving\n");
+        return false;
+    }
+    std::printf("PASS: %u factory presets produce finite nonzero audio; a finished drum permits idle saving\n", count);
+    return true;
+}
+
 int main() {
+    if (!preset_audio()) return 1;
     if (!shed_fade()) return 1;
     // Retrigger a still-audible envelope, then shorten a release which is already in progress.
     envelope_t envelope;

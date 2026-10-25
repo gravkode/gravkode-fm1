@@ -23,7 +23,7 @@ def run(output, reverbs=(0, 60)):
     rows = []
     sr = [0x7d, 0x53, 0x52]
     order = ["ANALOG", "WAVESHAPE", "FM 2-OP", "GRAIN", "ADDITIVE", "WAVETABLE", "CHORDS", "SPEECH",
-             "SWARM", "NOISE", "PARTICLE", "STRING", "MODAL", "BASS DRUM", "SNARE", "HI-HAT", "VA VCF",
+             "SWARM", "NOISE", "PARTICLE", "STRING", "MODAL", "KICK", "SNARE", "HI-HAT", "VA VCF",
              "PHASE DIST", "6-OP FM 1", "6-OP FM 2", "6-OP FM 3", "TERRAIN", "STRING MCH", "CHIPTUNE"]
 
     def announcements():
@@ -51,7 +51,7 @@ def run(output, reverbs=(0, 60)):
         fm.run(["listen"])
         announcements()
         engine = current_engine()
-        fm.run(["turn", "PRESET", str(order.index("PHASE DIST") - order.index(engine))])
+        fm.run(["turn", "ALGO", str(order.index("PHASE DIST") - order.index(engine))])
         assert current_engine() == "PHASE DIST"
         fm.run(["tap", "EDIT"])
         messages = announcements()

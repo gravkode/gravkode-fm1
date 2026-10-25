@@ -1,0 +1,213 @@
+# 0.21: ALGO chooses the engine, PRESET its sound. SAVE held + white key captures a user slot; OCT pages 1..4.
+# A modifier key never plays, records, changes a step or emits MIDI. Writes wait for transport stop and silence.
+wait 600
+expect preset 0
+expect store_writes 0
+tap HOME
+wait 30
+listen
+turn PRESET 1
+wait 30
+expect wave 0
+expect preset 1
+expect osc0 20
+expect osc1 35
+expect osc2 35
+said PRESET SOFT FOLD
+shot preset-factory.png
+# A knob makes a custom sound; changing global ENV leaves the preset alone.
+turn K1 7
+wait 30
+expect preset -1
+expect osc0 27
+tap ENV
+turn K1 10
+wait 30
+expect env0 20
+expect preset -1
+# Save to slot 1 while step mode is active: no step is edited, no note is sent.
+tap SEQ
+wait 30
+expect step_mode 1
+out
+press SAVE
+wait 400
+expect preset_grid 1
+expect live_w 0
+shot preset-slots.png
+key 0 down 100 0
+wait 30
+expect preset_used0 1
+expect preset 4
+expect voices_held 0
+expect midi_out 0
+expect step0 0
+expect preset_dirty 1
+expect store_writes 0
+# Release modifier first: key-up must still be swallowed.
+release SAVE
+wait 30
+expect preset_grid 0
+key 0 up
+wait 300
+expect midi_out 0
+expect step0 0
+expect preset_dirty 0
+expect store_writes 1
+said PRESET SAVED
+tap SEQ
+wait 30
+# Browse back to factory and forward to the saved sound, then a different engine excludes that user slot.
+turn PRESET -1
+wait 30
+expect preset 3
+expect osc0 85
+turn PRESET 1
+wait 30
+expect preset 4
+expect osc0 27
+expect env0 20
+turn ALGO 1
+wait 30
+expect wave 1
+expect preset -1
+turn PRESET 4
+wait 30
+expect wave 1
+expect preset 3
+turn PRESET 1
+wait 30
+expect preset 0
+# Ordinary SAVE persists settings and pattern; a restart keeps the user bank as a separate object.
+tap SAVE
+wait 100
+reboot
+wait 600
+expect wave 1
+expect preset_used0 1
+expect env0 20
+turn ALGO -1
+turn PRESET -1
+wait 30
+expect preset 4
+expect osc0 27
+# Slot 64 on the fourth page, no octave change; overwriting a slot is explicit and stays within this bank.
+press SAVE
+wait 400
+tap OCT+
+tap OCT+
+tap OCT+
+wait 30
+expect preset_page 3
+expect octave 0
+shot preset-page4.png
+key 26 down 100 0
+wait 30
+key 26 up
+release SAVE
+wait 300
+expect preset_used63 1
+expect preset 67
+# Dedicated drum: all six controls round-trip. Global ENV and other tracks stay intact.
+turn SELECT 4
+wait 1600
+turn PRESET 2
+wait 30
+expect wave 13
+expect preset 1
+tap HOME
+wait 30
+expect page 0
+turn K1 -7
+turn K2 9
+turn K3 11
+tap HOME
+wait 30
+expect page 9
+turn K1 3
+turn K2 4
+turn K3 5
+wait 30
+expect preset -1
+expect tune 43
+expect osc0 46
+expect osc1 29
+expect shape0 38
+expect shape1 49
+expect shape2 5
+press SAVE
+wait 400
+key 0 down 100 0
+wait 30
+key 0 up
+release SAVE
+wait 300
+expect preset_used48 1
+expect preset 52
+turn PRESET -1
+turn PRESET 1
+wait 30
+expect preset 52
+expect tune 43
+expect osc0 46
+expect osc1 29
+expect shape0 38
+expect shape1 49
+expect shape2 5
+expect env0 20
+expect trk_engine0 0
+tap SAVE
+wait 300
+reboot
+wait 600
+turn SELECT 4
+wait 1600
+expect preset 52
+expect tune 43
+expect shape2 5
+# Save during playback queues RAM only; no flash erase until stopped, and held notes defer it further.
+tap PLAY
+wait 100
+press SAVE
+wait 400
+tap OCT+
+tap OCT+
+tap OCT+
+key 2 down 100 0
+wait 30
+key 2 up
+release SAVE
+wait 200
+expect preset_used49 1
+expect preset_dirty 1
+key 7 down 100 0
+wait 30
+tap PLAY
+wait 200
+expect preset_dirty 1
+key 7 up
+wait 2000
+expect preset_dirty 0
+# Failed writes remain visibly dirty, do not retry in a loop, and can be retried by tapping SAVE.
+flash_fail 1
+listen
+press SAVE
+wait 400
+key 4 down 100 0
+wait 30
+key 4 up
+release SAVE
+wait 2000
+expect preset_dirty 1
+said PRESET FAILED
+flash_fail 0
+tap SAVE
+wait 300
+expect preset_dirty 0
+reboot
+wait 600
+expect preset_used0 1
+expect preset_used48 1
+expect preset_used49 1
+expect preset_used50 1
+expect preset_used63 1

@@ -1,197 +1,197 @@
-# The README's sheet of the engines' icons: each engine's sound page, in PRESET's (Plaits') order, then the drum
+# The README's sheet of the engines' icons: each engine's sound page, in ALGO's (Plaits') order, then the drum
 # tracks' second models; each a moment after a note. tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/icon_sheet.txt grav-code/docs/img
 # and python3 grav-code/docs/img/compose.py (it makes readme-icons.png of them, and removes them)
 wait 600
 tap HOME
 wait 30
-turn PRESET -1
+turn ALGO -1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-00.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-01.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-02.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-03.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-04.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-05.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-06.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-07.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-08.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-09.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-10.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-11.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-12.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-13.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-14.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-15.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-16.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-17.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-18.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-19.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-20.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-21.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-22.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-23.png
 key 7 up
 wait 30
-turn PRESET 1
+turn ALGO 1
 wait 1600
 turn SELECT 4
 wait 1600
-turn PRESET 1
+turn ALGO 1
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-24.png
 key 7 up
 wait 30
-turn PRESET 2
+turn ALGO 2
 wait 1600
 key 7 down 100 0
 wait 80
 shot icon-25.png
 key 7 up
 wait 30
-turn PRESET 2
+turn ALGO 2
 wait 1600
 key 7 down 100 0
 wait 80

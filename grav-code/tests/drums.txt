@@ -1,5 +1,5 @@
-# The drum tracks (0.17): D1..D4 after S1..S4, each its one voice (4..7) playing a drum of Plaits' (BASS DRUM, SNARE,
-# HI-HAT, and since 0.19 their second models: SYN KICK, SYN SNARE, RING HAT). PRESET picks among those six; HOME again
+# The drum tracks (0.17): D1..D4 after S1..S4, each its one voice (4..7) playing a drum of Plaits' (KICK, SNARE,
+# HI-HAT, and since 0.19 their second models: SYN KICK, SYN SNARE, RING HAT). ALGO picks among those six; HOME again
 # opens the drum's DRUM page (TUNE, DECAY, TONE), again its SHAPE page (the kick's PUNCH, SWEEP, DRIVE; the snare's
 # SNAPPY, the hi-hat's NOISE, DRIVE, LEVEL); GLO VOICES shows DRUM; a new step plays the drum's own note; the black
 # keys 5..8 pick them in step mode; out on MIDI channels 5..8; an overload takes a synth voice before a drum; SAVE keeps
@@ -17,23 +17,23 @@ turn SELECT 4
 wait 30
 expect track 4
 expect wave 13
-said D1 BASS DRUM
+said D1 KICK
 wait 200
 shot drum-tracks.png
 expect engine_ram <513
-# PRESET: among the six drums alone, round (BASS DRUM, SYN KICK, SNARE, SYN SNARE, HI-HAT, RING HAT)
-turn PRESET 1
+# ALGO: among the six drums alone, round (KICK, SYN KICK, SNARE, SYN SNARE, HI-HAT, RING HAT)
+turn ALGO 1
 wait 30
 expect wave 24
 said SYN KICK
-turn PRESET 1
+turn ALGO 1
 wait 30
 expect wave 14
-turn PRESET -3
+turn ALGO -3
 wait 30
 expect wave 26
 said RING HAT
-turn PRESET 1
+turn ALGO 1
 wait 30
 expect wave 13
 expect trk_engine0 0
@@ -223,7 +223,7 @@ wait 30
 expect step2 1
 expect stepnote2 55
 # 0.16's settings (no drums in them): the kit as it comes, the synth tracks' as saved
-turn PRESET 1
+turn ALGO 1
 wait 30
 expect wave 25
 save016

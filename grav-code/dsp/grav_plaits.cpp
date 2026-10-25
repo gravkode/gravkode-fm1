@@ -58,44 +58,45 @@ struct Info {
                                     // (TIMBRE 65, MORPH 50, HARMONICS 75, C4 at velocity 100), the RMS while held
                                     // brought to about -34 dB, the first three's (kept at 1); a drum by its peak
   const uint8_t* user_data;         // the 6-op FM's patch bank
+  const char* knob[3];              // its K1..K3 (Plaits' TIMBRE, MORPH, HARMONICS), by what each does (0.21)
 };
 
 // By engine_id. Constant data only: the FM-1 runs no C++ static constructors, so nothing here may need one.
 const Info info[] = {
-  /* WAVESHAPING      */ { "WAVESHAPE",  FREE,  false, 1.0f,  nullptr },
-  /* FM               */ { "FM 2-OP",    FREE,  false, 1.0f,  nullptr },
-  /* VIRTUAL_ANALOG   */ { "ANALOG",     FREE,  false, 1.0f,  nullptr },
-  /* MODAL            */ { "MODAL",      BOWED, false, 0.16f, nullptr },
-  /* GRAIN            */ { "GRAIN",      FREE,  false, 1.75f, nullptr },
-  /* ADDITIVE         */ { "ADDITIVE",   FREE,  false, 1.55f, nullptr },
-  /* WAVETABLE        */ { "WAVETABLE",  FREE,  false, 1.7f,  nullptr },
-  /* CHORDS           */ { "CHORDS",     FREE,  false, 1.0f,  nullptr },
-  /* SPEECH           */ { "SPEECH",     GATE,  false, 2.0f,  nullptr },
-  /* SWARM            */ { "SWARM",      FREE,  false, 4.5f,  nullptr },
-  /* NOISE            */ { "NOISE",      FREE,  false, 0.72f, nullptr },
-  /* PARTICLE         */ { "PARTICLE",   GATE,  false, 3.0f,  nullptr },
-  /* STRING           */ { "STRING",     BOWED, false, 0.62f, nullptr },
-  /* BASS_DRUM        */ { "BASS DRUM",  GATE,  true,  2.5f,  nullptr },
-  /* SNARE_DRUM       */ { "SNARE",      GATE,  true,  1.5f,  nullptr },
-  /* HI_HAT           */ { "HI-HAT",     GATE,  true,  2.2f,  nullptr },
-  /* VA_VCF           */ { "VA VCF",     FREE,  false, 0.85f, nullptr },
-  /* PHASE_DISTORTION */ { "PHASE DIST", FREE,  false, 0.73f, nullptr },
+  /* WAVESHAPING      */ { "WAVESHAPE",  FREE,  false, 1.0f,  nullptr, {"FOLD", "ASYMMETRY", "CURVE"} },
+  /* FM               */ { "FM 2-OP",    FREE,  false, 1.0f,  nullptr, {"INDEX", "FEEDBACK", "RATIO"} },
+  /* VIRTUAL_ANALOG   */ { "ANALOG",     FREE,  false, 1.0f,  nullptr, {"SQUARE", "SAW", "DETUNE"} },
+  /* MODAL            */ { "MODAL",      BOWED, false, 0.16f, nullptr, {"EXCITE", "DECAY", "MATERIAL"} },
+  /* GRAIN            */ { "GRAIN",      FREE,  false, 1.75f, nullptr, {"FORMANT", "WIDTH", "RATIO"} },
+  /* ADDITIVE         */ { "ADDITIVE",   FREE,  false, 1.55f, nullptr, {"PEAK", "SHAPE", "BUMPS"} },
+  /* WAVETABLE        */ { "WAVETABLE",  FREE,  false, 1.7f,  nullptr, {"ROW", "COLUMN", "BANK"} },
+  /* CHORDS           */ { "CHORDS",     FREE,  false, 1.0f,  nullptr, {"INVERSION", "WAVE", "CHORD"} },
+  /* SPEECH           */ { "SPEECH",     GATE,  false, 2.0f,  nullptr, {"SPECIES", "PHONEME", "BANK"} },
+  /* SWARM            */ { "SWARM",      FREE,  false, 4.5f,  nullptr, {"DENSITY", "LENGTH", "RANDOM"} },
+  /* NOISE            */ { "NOISE",      FREE,  false, 0.72f, nullptr, {"CLOCK", "RESONANCE", "FILTER"} },
+  /* PARTICLE         */ { "PARTICLE",   GATE,  false, 3.0f,  nullptr, {"DENSITY", "FILTER", "RANDOM"} },
+  /* STRING           */ { "STRING",     BOWED, false, 0.62f, nullptr, {"EXCITE", "DECAY", "MATERIAL"} },
+  /* BASS_DRUM        */ { "KICK",       GATE,  true,  2.5f,  nullptr, {"TONE", "DECAY", "PUNCH"} },
+  /* SNARE_DRUM       */ { "SNARE",      GATE,  true,  1.5f,  nullptr, {"TONE", "DECAY", "SNAPPY"} },
+  /* HI_HAT           */ { "HI-HAT",     GATE,  true,  2.2f,  nullptr, {"TONE", "DECAY", "NOISE"} },
+  /* VA_VCF           */ { "VA VCF",     FREE,  false, 0.85f, nullptr, {"CUTOFF", "WAVE", "RESONANCE"} },
+  /* PHASE_DISTORTION */ { "PHASE DIST", FREE,  false, 0.73f, nullptr, {"AMOUNT", "ASYMMETRY", "FREQUENCY"} },
   // FM operator envelopes shape the patch's timbre; the app's ENV still shapes its final amplitude.
-  /* SIX_OP_1         */ { "6-OP FM 1",  GATE,  false, 1.8f,  plaits::syx_bank_0 },
-  /* SIX_OP_2         */ { "6-OP FM 2",  GATE,  false, 1.8f,  plaits::syx_bank_1 },
-  /* SIX_OP_3         */ { "6-OP FM 3",  GATE,  false, 1.8f,  plaits::syx_bank_2 },
-  /* WAVE_TERRAIN     */ { "TERRAIN",    FREE,  false, 1.65f, nullptr },
-  /* STRING_MACHINE   */ { "STRING MCH", FREE,  false, 3.3f,  nullptr },
-  /* CHIPTUNE         */ { "CHIPTUNE",   FREE,  false, 1.0f,  nullptr },
+  /* SIX_OP_1         */ { "6-OP FM 1",  GATE,  false, 1.8f,  plaits::syx_bank_0, {"BRIGHTNESS", "ENVELOPE", "PATCH"} },
+  /* SIX_OP_2         */ { "6-OP FM 2",  GATE,  false, 1.8f,  plaits::syx_bank_1, {"BRIGHTNESS", "ENVELOPE", "PATCH"} },
+  /* SIX_OP_3         */ { "6-OP FM 3",  GATE,  false, 1.8f,  plaits::syx_bank_2, {"BRIGHTNESS", "ENVELOPE", "PATCH"} },
+  /* WAVE_TERRAIN     */ { "TERRAIN",    FREE,  false, 1.65f, nullptr, {"RADIUS", "OFFSET", "TERRAIN"} },
+  /* STRING_MACHINE   */ { "STRING MCH", FREE,  false, 3.3f,  nullptr, {"CHORUS", "WAVE", "CHORD"} },
+  /* CHIPTUNE         */ { "CHIPTUNE",   FREE,  false, 1.0f,  nullptr, {"ARPEGGIO", "PULSE", "CHORD"} },
   // a drum voice's alone (dsp/grav_drums.h): Plaits' second models, brought to the first ones' peaks (measured at
   // the kit's defaults: C2, G3, C4 at velocity 100)
-  /* SYN_KICK         */ { "SYN KICK",   GATE,  true,  1.62f, nullptr },
-  /* SYN_SNARE        */ { "SYN SNARE",  GATE,  true,  1.84f, nullptr },
-  /* RING_HAT         */ { "RING HAT",   GATE,  true,  1.21f, nullptr },
+  /* SYN_KICK         */ { "SYN KICK",   GATE,  true,  1.62f, nullptr, {"TONE", "DECAY", "PUNCH"} },
+  /* SYN_SNARE        */ { "SYN SNARE",  GATE,  true,  1.84f, nullptr, {"TONE", "DECAY", "SNAPPY"} },
+  /* RING_HAT         */ { "RING HAT",   GATE,  true,  1.21f, nullptr, {"TONE", "DECAY", "NOISE"} },
 };
 static_assert(sizeof(info) / sizeof(info[0]) == GRAV_ENGINE_ALL, "an Info for each engine");
 
-// PRESET's order: Plaits' own, its first sixteen engines, then the eight of its 1.2 firmware.
+// ALGO's order: Plaits' own, its first sixteen engines, then the eight of its 1.2 firmware.
 const uint8_t order[] = {
   GRAV_ENGINE_VIRTUAL_ANALOG, GRAV_ENGINE_WAVESHAPING, GRAV_ENGINE_FM, GRAV_ENGINE_GRAIN, GRAV_ENGINE_ADDITIVE,
   GRAV_ENGINE_WAVETABLE, GRAV_ENGINE_CHORDS, GRAV_ENGINE_SPEECH, GRAV_ENGINE_SWARM, GRAV_ENGINE_NOISE,
@@ -103,7 +104,7 @@ const uint8_t order[] = {
   GRAV_ENGINE_HI_HAT, GRAV_ENGINE_VA_VCF, GRAV_ENGINE_PHASE_DISTORTION, GRAV_ENGINE_SIX_OP_1, GRAV_ENGINE_SIX_OP_2,
   GRAV_ENGINE_SIX_OP_3, GRAV_ENGINE_WAVE_TERRAIN, GRAV_ENGINE_STRING_MACHINE, GRAV_ENGINE_CHIPTUNE,
 };
-static_assert(sizeof(order) == GRAV_ENGINE_COUNT, "each engine once in PRESET's order");
+static_assert(sizeof(order) == GRAV_ENGINE_COUNT, "each engine once in ALGO's order");
 
 constexpr size_t Larger(size_t a, size_t b) { return a > b ? a : b; }
 
@@ -403,6 +404,10 @@ extern "C" void grav_drum_shape(uint32_t engine, float harmonics, float shape[3]
 
 extern "C" const char* grav_engine_name(uint32_t engine) {
   return info[engine < GRAV_ENGINE_ALL ? engine : 0].name;
+}
+
+extern "C" const char* grav_engine_knob(uint32_t engine, uint32_t k) {
+  return info[engine < GRAV_ENGINE_ALL ? engine : 0].knob[k % 3];
 }
 
 extern "C" uint32_t grav_engine_step(uint32_t engine, int32_t steps) {
