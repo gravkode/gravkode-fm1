@@ -58,7 +58,8 @@ From the top:
   runs on USB power. The page you are on is the one whose button blinks (faster on its second and third pages).
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
 - **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
-  is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine and voices.
+  is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine, its icon
+  (small) and its voices.
 - **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
   starts from a mark in the middle (DENSITY, PITCH) has its rest there.
 - **The keyboard:** a key held fills to its velocity (amber) and, pressed further, to its pressure (white).

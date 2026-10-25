@@ -8,7 +8,8 @@ Package: `grav_code-0.20.0.fwsc`, identity `FM-1_73002000`.
   chord's notes, STRING rings after each pluck, a kick's rings jump at each hit, 6-OP FM shows its operators. All 27
   engines, the drums' second models among them; lines in the theme's two hues, a strike's flash white.
 - **The sound page** (OSC; a drum's DRUM and SHAPE) shows the icon in a live area above the knobs, with a line on
-  the engine beside it. Elsewhere the engine is its name alone, as before.
+  the engine beside it. The tracks' list (SELECT) shows each track's engine with its icon, small; the line over the
+  page shows the engine by its name alone, as before.
 - **The splash:** turning PRESET shows the new engine for 1.5 s over the page: its icon alive, its name, its line.
 - **The live area** is redrawn alone between the screen's redraws, about 30 times a second (10 while the sound takes
   over 75 % of its time), and stops while a list is over it.

@@ -1955,6 +1955,8 @@ static void draw_tracks(void)
             cv_rect(7, y, 226, 14, C_HI);
         cv_text(12, y + 1, &FONT_XS, TRACK_NAME[t], sel ? C_BLACK : C_WHITE);
         cv_text(42, y + 1, &FONT_XS, grav_engine_name(*track_engine(t)), sel ? C_BLACK : C_HI);
+        cv_rect(142, y + 1, 20, 12, C_BLACK);   /* its icon, small (the list is where a track is picked) */
+        icon_box(t, 143, y + 1, 18, 12, 1);
         cv_text(170, y + 1, &FONT_XS, track_voices_text(t), sel ? C_BLACK : C_GRAY);
     }
 }
