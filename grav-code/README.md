@@ -21,7 +21,8 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Build, test, install
 
-Version 0.14.0 enables a second-core audio worker and the DEBUG page (REC).
+Version 0.14 renders on both cores, with the DEBUG page (REC); since 0.14.1 Beads runs on the second core,
+a chunk behind the voices.
 K1 switches one/two-core processing; K2 clears peaks and counters. See
 [the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
 
@@ -42,13 +43,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.14.0    # grav-code/build/grav_code-0.14.0.fwsc, identity FM-1_73001400
+    python3 tools/build.py grav-code --release 0.14.1    # grav-code/build/grav_code-0.14.1.fwsc, identity FM-1_73001401
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.0.fwsc 0.14.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.1.fwsc 0.14.1 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.14.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.14.1   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

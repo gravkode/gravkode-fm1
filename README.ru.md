@@ -13,7 +13,8 @@
 
 ---
 
-Текущая версия: **0.14.0** — расчёт голосов на двух ядрах и страница DEBUG с нагрузкой и диагностикой звука.
+Текущая версия: **0.14.1** — голоса и эффект Beads на двух ядрах, страница DEBUG с нагрузкой и диагностикой
+звука; защита от перегрузки гасит голос плавно и никогда не трогает последний.
 
 ## Возможности
 
@@ -97,7 +98,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.0.fwsc 0.14.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.1.fwsc 0.14.1 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -112,7 +113,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.14.0      # grav-code/build/grav_code-0.14.0.fwsc
+python3 tools/build.py grav-code --release 0.14.1      # grav-code/build/grav_code-0.14.1.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

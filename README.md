@@ -13,7 +13,8 @@ screen.
 
 ---
 
-Current version: **0.14.0** — voice rendering on two cores, with a DEBUG page for load and audio diagnostics.
+Current version: **0.14.1** — voices and the Beads effect on two cores, with a DEBUG page for load and audio
+diagnostics; the overload protection fades a voice out and never takes the last one.
 
 ## What it does
 
@@ -95,7 +96,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.0.fwsc 0.14.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.1.fwsc 0.14.1 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -110,7 +111,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.14.0      # grav-code/build/grav_code-0.14.0.fwsc
+python3 tools/build.py grav-code --release 0.14.1      # grav-code/build/grav_code-0.14.1.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)

@@ -145,7 +145,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: VOICES 4, VELOCITY ON, version 0.14.0, ID FM-1_73001400, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: VOICES 4, VELOCITY ON, version 0.14.1, ID FM-1_73001401, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -342,20 +342,23 @@ GRAV CODE has no Bluetooth or WiFi.
 
 ## 10. CPU and its limits
 
-CPU (bottom right) is the smoothed share of each audio block's time used by rendering. Version 0.14.0
-splits active Plaits voices across both cores by default; CPU0 then mixes them and processes Beads. REC opens
-DEBUG, where K1 selects one/two-core processing and K2 resets peaks and counters. These debug choices are temporary.
+CPU (bottom right) is the smoothed share of each audio block's time used by rendering. GRAV CODE uses both of
+the FM-1's cores. With the effect off, the sounding Plaits voices are split between them. With the effect on,
+Beads (more than half a block's time by itself on the FM-1) runs on the second core, a 24-sample chunk behind the
+voices, while the first renders them; the voices go to whichever core has room. Nothing is added to the latency,
+and the sound is the same on one core or two. REC opens DEBUG, where K1 selects one/two-core processing and K2
+resets peaks and counters. These debug choices are temporary.
 
-Beads, when on, can take a substantial share of the block by itself; off (DRY/WET and REVERB at 0, not frozen),
-it is bypassed. If any individual block exceeds 90% of its time, GRAV CODE silences an active voice
-(MONO keeps its one voice). This immediate cut can click. The average CPU display can stay below 90% even
-when short peaks trigger protection. A released voice that is silent costs nothing.
+Off (DRY/WET and REVERB at 0, not frozen), Beads is bypassed and costs nothing. If a block takes over 90% of its
+time, GRAV CODE takes a voice: one let go first, else the oldest. It fades out over 3 ms, so there is no click, and
+the last voice sounding is never taken (nor MONO's one voice). The average CPU display can stay below 90% even when
+short peaks trigger protection. A released voice that is silent costs nothing.
 
 DEBUG's PEAK, OVER, SHED and XRUN distinguish peaks, protection cuts and missed audio deadlines. The footer
 CPU turns red once a block is late and remains red until power-on. Fewer VOICES, a lighter engine, or the effect
 off can reduce load. Two cores increase capacity but do not guarantee four voices at every FX setting.
 
-See [DEBUG controls and fields](DUAL_CORE_DEBUG.md) and [measured hardware results](DUAL_CORE_RESULTS.md).
+See [DEBUG controls and fields](https://github.com/gravkode/gravkode-fm1/blob/main/grav-code/docs/DUAL_CORE_DEBUG.md) and [measured hardware results](https://github.com/gravkode/gravkode-fm1/blob/main/grav-code/docs/DUAL_CORE_RESULTS.md).
 
 ![The DEBUG page: core status, average and peak load, synthesis and effect times, audio errors and voice cuts](img/screen-debug.png "The DEBUG page")
 
