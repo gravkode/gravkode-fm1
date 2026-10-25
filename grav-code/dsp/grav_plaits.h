@@ -34,12 +34,17 @@ enum {                                   /* the engines, by the settings' engine
     GRAV_ENGINE_WAVE_TERRAIN,
     GRAV_ENGINE_STRING_MACHINE,
     GRAV_ENGINE_CHIPTUNE,
-    GRAV_ENGINE_COUNT
+    GRAV_ENGINE_COUNT,                   /* the 24 engines of Plaits' any voice takes */
+    GRAV_ENGINE_SYN_KICK = GRAV_ENGINE_COUNT,   /* 0.19: a drum voice's alone, Plaits' second models (its AUX out) */
+    GRAV_ENGINE_SYN_SNARE,
+    GRAV_ENGINE_RING_HAT,
+    GRAV_ENGINE_ALL
 };
 
 #define GRAV_VOICES 8u                  /* engines run side by side: one per voice (synth/synth.h SYNTH_VOICES_MAX) */
 #define GRAV_BIG_VOICES 4u              /* voices 0..3 take any engine (the synth tracks'); 4..7 a drum (BASS DRUM,
-                                         * SNARE, HI-HAT: the drum tracks'), in small slots of their own */
+                                         * SNARE, HI-HAT, and their second models: the drum tracks'), in small
+                                         * slots of their own, with knobs of their own (dsp/grav_drums.h) */
 
 typedef struct {
     float note;                          /* a MIDI note; a fraction for the LFO's pitch */
@@ -47,6 +52,7 @@ typedef struct {
     float accent;                        /* 0..1, the note's velocity: how hard an engine that strikes strikes */
     uint8_t gate;                        /* the voice's note is held */
     uint8_t strike;                      /* a new note began on it */
+    float shape[3];                      /* a drum voice's SHAPE knobs, 0..1 (dsp/grav_drums.h) */
 } grav_plaits_params_t;
 
 void grav_plaits_init(void);
@@ -54,7 +60,7 @@ void grav_plaits_init(void);
  * switches to afresh. Each voice its own (a track's engine in its voices); grav_plaits_engine: every voice the same */
 void grav_plaits_voice_engine(uint32_t voice, uint32_t engine);
 void grav_plaits_engine(uint32_t engine);
-uint32_t grav_plaits_voice_engine_id(uint32_t voice);   /* the engine built in it */
+uint32_t grav_plaits_voice_engine_id(uint32_t voice);   /* the engine built in it (GRAV_ENGINE_ALL: none) */
 /* At zero outer amplitude, discard a six-op voice's held gate/FIFO before it sleeps. Joined worker only. */
 void grav_plaits_reset_voice(uint32_t voice);
 /* size samples of voice (12 or more, so that a strike is never lost: GRAV_PLAITS_BLOCK chunks), the engine's
@@ -64,8 +70,12 @@ void grav_plaits_reset_voice(uint32_t voice);
 int grav_plaits_render(uint32_t voice, const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
 
 const char *grav_engine_name(uint32_t engine);           /* on the screen: 10 characters at most */
-int grav_engine_is_drum(uint32_t engine);                /* BASS DRUM, SNARE, HI-HAT: a drum voice's */
-uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* PRESET on a drum track: among those three, round */
+int grav_engine_is_drum(uint32_t engine);                /* BASS DRUM, SNARE, HI-HAT and their second models */
+int grav_drum_kind(uint32_t engine);                     /* 0 a kick, 1 a snare, 2 a hi-hat; -1 no drum */
+uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* PRESET on a drum track: among the six, round */
+/* a drum's SHAPE knobs (0..1) as Plaits folds them on HARMONICS: the kick's PUNCH, SWEEP and DRIVE from it; the
+ * snare's SNAPPY, the hi-hat's NOISE it, DRIVE none, LEVEL full */
+void grav_drum_shape(uint32_t engine, float harmonics, float shape[3]);
 uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* PRESET: steps away in Plaits' order, round */
 uint32_t grav_plaits_ram_used(uint32_t voice);   /* bytes of a voice's RAM its engine's Init took */
 

@@ -52,12 +52,17 @@ typedef struct {
     uint16_t bpm;                        /* SEQ_BPM_MIN..SEQ_BPM_MAX */
     uint8_t pattern;                     /* 0..BANK_PATTERNS - 1 */
     uint8_t rsv18;
+    /* 0.19: the drums' knobs beyond TONE and DECAY (drum_osc's TIMBRE and MORPH): TUNE (50: as the note), and SHAPE's
+     * three (dsp/grav_drums.h); drum_osc's HARMONICS unread since */
+    uint8_t drum_tune[SYNTH_D_TRACKS];
+    uint8_t drum_shape[SYNTH_D_TRACKS][3];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
 #define SET_SIZE_016 56                  /* as 0.16 saved it: up to trk_reserved[] (no drums) */
 #define SET_SIZE_017 72                  /* as 0.17 saved it: up to drum_osc[] (the tempo the pattern's) */
-_Static_assert(sizeof(settings_t) == 76 && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
+#define SET_SIZE_018 76                  /* as 0.18 saved it: up to rsv18 (the drums on Plaits' three knobs) */
+_Static_assert(sizeof(settings_t) == 92 && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
                SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine) &&
                SET_SIZE_016 == __builtin_offsetof(settings_t, drum_engine) &&
                SET_SIZE_017 == __builtin_offsetof(settings_t, bpm), "the settings record's layout");
@@ -90,6 +95,7 @@ enum {
     PAGE_FX_MIX,                         /* DRY/WET, REVERB, QUALITY */
     PAGE_DEBUG,                          /* GLO again: dual-core diagnostics */
     PAGE_SEQ,                            /* HOME: the sequence (HOME again: OSC, the sound) */
+    PAGE_SHAPE,                          /* a drum track's: HOME after its DRUM page (OSC's): SHAPE's knobs */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN && (p) <= PAGE_FX_MIX)
@@ -99,7 +105,7 @@ static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG",
-                                              "SEQ"};
+                                              "SEQ", "SHAPE"};
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -143,6 +149,8 @@ static const char *const QUALITY_NAME[GRAV_FX_QUALITIES] = {"DIGITAL", "VINTAGE"
 
 /* Plaits' three knobs (OSC), each track's: 0..100% */
 static volatile int32_t osc_params[SYNTH_TRACKS][3];
+static volatile int32_t drum_tune[SYNTH_D_TRACKS];          /* the drums' TUNE (50: the note; a half semitone each) */
+static volatile int32_t drum_shape[SYNTH_D_TRACKS][3];      /* and SHAPE's knobs (dsp/grav_drums.h), 0..100 */
 static volatile uint8_t track_sel;       /* the track selected (SELECT): the keys, MIDI in and the pages play it */
 static const char *const TRACK_NAME[SYNTH_TRACKS] = {"S1", "S2", "S3", "S4", "D1", "D2", "D3", "D4"};
 
@@ -167,7 +175,8 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"SHAPE", "PITCH", "FEEDBACK"},
     {"DRY/WET", "REVERB", "QUALITY"},
     {"", "", ""},
-    {"TEMPO", "SWING", "LENGTH"}
+    {"TEMPO", "SWING", "LENGTH"},
+    {"PUNCH", "SWEEP", "DRIVE"}
 };
 
 
@@ -349,10 +358,12 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
         if (morph < 0.0f) morph = 0.0f;
         if (morph > 1.0f) morph = 1.0f;
         sound[t].engine = *track_engine(t);
-        sound[t].pitch = drum ? 0.0f : pitch_offset;
-        sound[t].timbre = timbre;
-        sound[t].morph = morph;
+        sound[t].pitch = drum ? (float)(drum_tune[t - SYNTH_S_TRACKS] - 50) * 0.5f : pitch_offset;
+        sound[t].timbre = timbre;            /* (a drum: TONE) */
+        sound[t].morph = morph;              /* (a drum: DECAY) */
         sound[t].harmonics = (float)osc_params[t][2] / 100.0f;
+        for (uint32_t i = 0; i < 3; i++)
+            sound[t].shape[i] = drum ? (float)drum_shape[t - SYNTH_S_TRACKS][i] * 0.01f : 0.0f;
     }
 
     grav_engine_render_tracks(&grav_engine, lr, n, &synth, master_q12, sound, 0.0f, fx);
@@ -380,12 +391,22 @@ void app_panic(void)
 }
 
 /* --------------------------------------------------------------- settings --- */
+static void drum_knobs_from(settings_t *s, uint32_t d)   /* a drum's TUNE and SHAPE from Plaits' HARMONICS */
+{
+    float shape[3];
+    grav_drum_shape(s->drum_engine[d], (float)s->drum_osc[d][2] * 0.01f, shape);
+    s->drum_tune[d] = 50;
+    for (uint32_t i = 0; i < 3; i++)
+        s->drum_shape[d][i] = (uint8_t)(shape[i] * 100.0f + 0.5f);
+}
+
 static void drum_defaults(settings_t *s)   /* the drum tracks' kit */
 {
     for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
         s->drum_engine[d] = DRUM_ENGINE[d];
         for (uint32_t i = 0; i < 3; i++)
             s->drum_osc[d][i] = DRUM_OSC[d][i];
+        drum_knobs_from(s, d);
     }
 }
 
@@ -437,9 +458,13 @@ static void settings_capture(void)
     for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)
         for (uint32_t i = 0; i < 3; i++)
             set.trk_osc[t][i] = (uint8_t)osc_params[t][i];
-    for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++)
-        for (uint32_t i = 0; i < 3; i++)
+    for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
+        for (uint32_t i = 0; i < 3; i++) {
             set.drum_osc[d][i] = (uint8_t)osc_params[SYNTH_S_TRACKS + d][i];
+            set.drum_shape[d][i] = (uint8_t)drum_shape[d][i];
+        }
+        set.drum_tune[d] = (uint8_t)drum_tune[d];
+    }
     set.engine_id = set.trk_engine[0];       /* (S1's, where older readers look) */
     for (uint32_t i = 0; i < 3; i++)
         set.osc[i] = set.trk_osc[0][i];
@@ -467,10 +492,11 @@ void app_init(void)
 
     int tempo_old = 1;                       /* (no tempo of its own in the settings: the 0.17 pattern's) */
     if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == SET_SIZE_013 || loaded == SET_SIZE_016 ||
-         loaded == SET_SIZE_017 || loaded == (int)sizeof loaded_settings) &&
+         loaded == SET_SIZE_017 || loaded == SET_SIZE_018 || loaded == (int)sizeof loaded_settings) &&
         loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
-        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_017 || loaded == SET_SIZE_016 ||
+        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_018 || loaded == SET_SIZE_017 ||
+             loaded == SET_SIZE_016 ||
              loaded == SET_SIZE_013 || loaded == SET_SIZE_012) &&
             loaded_settings.magic == SET_MAGIC &&
             loaded_settings.engine_id < GRAV_ENGINE_COUNT) {
@@ -490,6 +516,15 @@ void app_init(void)
             if (loaded_settings.bpm < SEQ_BPM_MIN || loaded_settings.bpm > SEQ_BPM_MAX ||
                 loaded_settings.pattern >= BANK_PATTERNS)
                 valid = 0;
+            for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
+                if (loaded <= SET_SIZE_018)  /* (saved before 0.19: TUNE as the note, SHAPE from HARMONICS) */
+                    drum_knobs_from(&loaded_settings, d);
+                if (loaded_settings.drum_tune[d] > 100u)
+                    valid = 0;
+                for (uint32_t i = 0; i < 3; i++)
+                    if (loaded_settings.drum_shape[d][i] > 100u)
+                        valid = 0;
+            }
             for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
                 if (!grav_engine_is_drum(loaded_settings.drum_engine[d]))
                     valid = 0;
@@ -543,6 +578,11 @@ void app_init(void)
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
         for (uint32_t i = 0; i < 3; i++)
             osc_params[t][i] = t < SYNTH_S_TRACKS ? set.trk_osc[t][i] : set.drum_osc[t - SYNTH_S_TRACKS][i];
+    for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
+        drum_tune[d] = set.drum_tune[d];
+        for (uint32_t i = 0; i < 3; i++)
+            drum_shape[d][i] = set.drum_shape[d][i];
+    }
 
     for (int i = 0; i < 3; ++i) {
         mod_params[i] = set.mod[i];
@@ -830,11 +870,17 @@ static void glo_turn(uint32_t index, int32_t e)
     }
 }
 
-/* a page's knob: K1..K3 (index 0..2) on OSC, MOD, ENV and the FX pages (not GLO's, nor MIX's QUALITY) */
+/* a page's knob: K1..K3 (index 0..2) on OSC, MOD, ENV, the FX pages and a drum's SHAPE (not GLO's, nor MIX's
+ * QUALITY). A drum track's OSC is its DRUM page: TUNE, DECAY (MORPH), TONE (TIMBRE) */
 static volatile int32_t *param_of(uint32_t page, uint32_t index)
 {
+    const uint32_t d = (track_sel - SYNTH_S_TRACKS) % SYNTH_D_TRACKS;
+    if (page == PAGE_OSC && SYNTH_IS_DRUM(track_sel))
+        return index == 0u ? &drum_tune[d] : &osc_params[track_sel][2u - index];
     if (page == PAGE_OSC)
         return &osc_params[track_sel][index];
+    if (page == PAGE_SHAPE)
+        return &drum_shape[d][index % 3u];
     if (page == PAGE_MOD)
         return &mod_params[index];
     if (page == PAGE_ENV)
@@ -842,16 +888,43 @@ static volatile int32_t *param_of(uint32_t page, uint32_t index)
     return &fx_params[(page - PAGE_FX_GRAIN) * 3u + index];
 }
 
-/* drawn from the middle: DENSITY (no grains there: clocked left, random right) and PITCH (0 there) */
+/* drawn from the middle: DENSITY (no grains there: clocked left, random right), PITCH and a drum's TUNE (0 there) */
 static int param_centred(uint32_t page, uint32_t index)
 {
-    return (page == PAGE_FX_GRAIN && index == 0u) || (page == PAGE_FX_SHAPE && index == 1u);
+    return (page == PAGE_FX_GRAIN && index == 0u) || (page == PAGE_FX_SHAPE && index == 1u) ||
+           (page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel));
+}
+
+/* a knob's name: a drum track's DRUM and SHAPE pages by its drum (dsp/grav_drums.h) */
+static const char *param_name(uint32_t page, uint32_t index)
+{
+    static const char *const DRUM[3] = {"TUNE", "DECAY", "TONE"};
+    static const char *const SHAPE[3][3] = {{"PUNCH", "SWEEP", "DRIVE"}, {"SNAPPY", "DRIVE", "LEVEL"},
+                                            {"NOISE", "DRIVE", "LEVEL"}};
+    if (page == PAGE_OSC && SYNTH_IS_DRUM(track_sel))
+        return DRUM[index % 3u];
+    if (page == PAGE_SHAPE) {
+        const int kind = grav_drum_kind(*track_engine(track_sel));
+        return SHAPE[kind > 0 ? kind : 0][index % 3u];
+    }
+    return PARAM_NAME[page][index % 3u];
+}
+
+static const char *page_name(uint32_t page)   /* a drum track's OSC: DRUM */
+{
+    return page == PAGE_OSC && SYNTH_IS_DRUM(track_sel) ? "DRUM" : PAGE_NAME[page];
 }
 
 /* a knob's value as the screen and a screen reader give it: PITCH in semitones (Beads' law), the rest as it is */
 static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
 {
-    if (page == PAGE_MOD && index == 2u) {
+    if (page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel)) {   /* TUNE: semitones, a half each */
+        const int32_t half = value - 50, a = half < 0 ? -half : half;
+        t[0] = half < 0 ? '-' : '+';
+        int_text(a / 2, t + 1);
+        if (a & 1)
+            text_cat(t, ".5");
+    } else if (page == PAGE_MOD && index == 2u) {
         t[0] = 0;
         text_cat(t, LFO_DEST_NAME[lfo_destination(value)]);
     } else if (page == PAGE_FX_SHAPE && index == 1u) {
@@ -1144,6 +1217,10 @@ static void track_select(uint32_t t)
         track_sel = (uint8_t)t;
         ui.step_held = -1;
     }
+    if (!SYNTH_IS_DRUM(t) && home_page == PAGE_SHAPE)   /* (SHAPE: a drum's; a synth track's sound instead) */
+        home_page = PAGE_OSC;
+    if (!SYNTH_IS_DRUM(t) && active_page == PAGE_SHAPE)
+        active_page = PAGE_OSC;
     ui.tracks_until = plat_ms() + 1500u;
     ui.redraw = 1;
     b[0] = 0;
@@ -1180,15 +1257,16 @@ static void chord_done(void)
 
 static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
-    return page == PAGE_SEQ || page == PAGE_OSC ? B_HOME : page == PAGE_MOD ? B_LFO : page == PAGE_ENV ? B_ENV :
+    return page == PAGE_SEQ || page == PAGE_OSC || page == PAGE_SHAPE ? B_HOME : page == PAGE_MOD ? B_LFO :
+           page == PAGE_ENV ? B_ENV :
            page == PAGE_GLO || page == PAGE_DEBUG ? B_GLO : B_FX;
 }
 
 /* its blink's period: the first of a button's pages slow, the next faster (FX: GRAIN, SHAPE, MIX) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_OSC || page == PAGE_DEBUG || page == PAGE_FX_SHAPE ? 500u : page == PAGE_FX_MIX ? 250u :
-           1000u;
+    return page == PAGE_OSC || page == PAGE_DEBUG || page == PAGE_FX_SHAPE ? 500u :
+           page == PAGE_FX_MIX || page == PAGE_SHAPE ? 250u : 1000u;
 }
 
 /* the lights: the buttons (the open page's blinking, PLAY green on the beat, red recording) and, in step mode, the
@@ -1292,15 +1370,17 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
 {
     if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
         fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
-    if (k == B_HOME)                         /* HOME: SEQ, again OSC (the sound), and back */
-        home_page = active_page == PAGE_SEQ ? PAGE_OSC : active_page == PAGE_OSC ? PAGE_SEQ : home_page;
+    if (k == B_HOME)                         /* HOME: SEQ, again OSC (the sound; a drum: DRUM, then SHAPE), and back */
+        home_page = active_page == PAGE_SEQ ? PAGE_OSC :
+                    active_page == PAGE_OSC ? (SYNTH_IS_DRUM(track_sel) ? PAGE_SHAPE : PAGE_SEQ) :
+                    active_page == PAGE_SHAPE ? PAGE_SEQ : home_page;
     if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
         glo_page = active_page == PAGE_GLO ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
     active_page = k == B_HOME ? home_page :
                   k == B_LFO  ? PAGE_MOD :
                   k == B_ENV  ? PAGE_ENV :
                   k == B_GLO  ? glo_page : fx_page;
-    app_say("PAGE", PAGE_NAME[active_page]);
+    app_say("PAGE", page_name(active_page));
     ui.redraw = 1;
 }
 
@@ -1521,7 +1601,7 @@ static void input(void)
             if (*value != previous)
                 set_dirty = 1;
             param_text(active_page, index, *value, t);
-            app_say(PARAM_NAME[active_page][index], t);
+            app_say(param_name(active_page, index), t);
         } else if (k == EN_K4) {             /* the pattern: the next (or the one queued) and on */
             pattern_pick((int32_t)(seq.next != SEQ_NO_PATTERN ? seq.next : seq.pattern) + e);
         } else if (k == EN_PRESET) {
@@ -1568,7 +1648,7 @@ static void draw_knobs(void)
     char t[12];
     for (uint32_t i = 0; i < 3u; i++) {
         int32_t x = 8 + (int32_t)i * 78;
-        cv_text(x, 42, &FONT_XS, PARAM_NAME[active_page][i], C_GRAY);
+        cv_text(x, 42, &FONT_XS, param_name(active_page, i), C_GRAY);
         if (active_page == PAGE_MOD && i == 2u) {
             uint32_t destination = lfo_destination(mod_params[2]);
             cv_text(x, 66, &FONT_S, LFO_DEST_NAME[destination], C_WHITE);
@@ -1864,7 +1944,6 @@ static void draw(void)
         cv_text(x, 6, &FONT_B, ui.bpm_text, ui.shown_ext ? C_HI : C_WHITE);
         cv_text(x + w - text_w(&FONT_T, "BPM"), 10, &FONT_T, "BPM", C_GRAY);
     }
-    cv_text(196 - text_w(&FONT_XS, PAGE_NAME[active_page]), 10, &FONT_XS, PAGE_NAME[active_page], C_HI);   /* the page */
 
 
 
@@ -2135,9 +2214,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
             plat_data_erase(off);
         return 1;
     }
-    if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016")) {   /* the settings as 0.12 / 0.16 saved them */
+    if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016") || !strcmp(cmd, "save018")) {   /* the settings as 0.12,
+                                                                                                * 0.16, 0.18 saved them */
         settings_capture();
-        plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 : SET_SIZE_016);
+        plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 :
+                                            !strcmp(cmd, "save016") ? SET_SIZE_016 : SET_SIZE_018);
         return 1;
     }
     return 0;
@@ -2173,6 +2254,10 @@ int app_expect(const char *what, int *got)
         *got = (int)bank_count(&bank, BANK_FREE);
     else if (!strcmp(what, "bank_stale"))
         *got = (int)bank_count(&bank, BANK_STALE);
+    else if (!strcmp(what, "tune"))          /* the selected drum's TUNE; SHAPE's knobs (shape0..2) */
+        *got = drum_tune[(track_sel - SYNTH_S_TRACKS) % SYNTH_D_TRACKS];
+    else if (!strncmp(what, "shape", 5) && what[5] >= '0' && what[5] <= '2')
+        *got = drum_shape[(track_sel - SYNTH_S_TRACKS) % SYNTH_D_TRACKS][what[5] - '0'];
     else if (!strncmp(what, "vgate", 5))     /* vgateN: voice N's note held (0..3 the synth tracks', 4..7 the drums') */
         *got = synth.voice[atoi(what + 5) % SYNTH_VOICES_MAX].gate;
     else if (!strcmp(what, "render_voices"))

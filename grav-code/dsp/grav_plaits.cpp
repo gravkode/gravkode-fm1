@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "grav_plaits.h"
+#include "grav_drums.h"
 
 #include "plaits/dsp/dsp.h"
 #include "plaits/dsp/engine/additive_engine.h"
@@ -86,8 +87,13 @@ const Info info[] = {
   /* WAVE_TERRAIN     */ { "TERRAIN",    FREE,  false, 1.65f, nullptr },
   /* STRING_MACHINE   */ { "STRING MCH", FREE,  false, 3.3f,  nullptr },
   /* CHIPTUNE         */ { "CHIPTUNE",   FREE,  false, 1.0f,  nullptr },
+  // a drum voice's alone (dsp/grav_drums.h): Plaits' second models, brought to the first ones' peaks (measured at
+  // the kit's defaults: C2, G3, C4 at velocity 100)
+  /* SYN_KICK         */ { "SYN KICK",   GATE,  true,  1.62f, nullptr },
+  /* SYN_SNARE        */ { "SYN SNARE",  GATE,  true,  1.84f, nullptr },
+  /* RING_HAT         */ { "RING HAT",   GATE,  true,  1.21f, nullptr },
 };
-static_assert(sizeof(info) / sizeof(info[0]) == GRAV_ENGINE_COUNT, "an Info for each engine");
+static_assert(sizeof(info) / sizeof(info[0]) == GRAV_ENGINE_ALL, "an Info for each engine");
 
 // PRESET's order: Plaits' own, its first sixteen engines, then the eight of its 1.2 firmware.
 const uint8_t order[] = {
@@ -124,8 +130,8 @@ const size_t kSlotAlign = LargestAlign<GRAV_ENGINE_TYPES>();
 // 6-op FM 5, the string machine 4); tests/engines.txt checks every engine's share.
 const size_t kVoiceRam = 20 * 1024;
 
-// A drum voice's: the three drums' engines (a few hundred bytes each; the hi-hat's Init takes 192 bytes of RAM)
-#define GRAV_DRUM_TYPES plaits::BassDrumEngine, plaits::SnareDrumEngine, plaits::HiHatEngine
+// A drum voice's: GRAV CODE's drums (a few hundred bytes each; the hi-hat's Init takes 192 bytes of RAM)
+#define GRAV_DRUM_TYPES grav::Kick, grav::Snare, grav::Hat
 const size_t kDrumSlotSize = LargestSize<GRAV_DRUM_TYPES>();
 const size_t kDrumSlotAlign = LargestAlign<GRAV_DRUM_TYPES>();
 const size_t kDrumRam = 512;
@@ -150,8 +156,9 @@ struct Voice {
   uint32_t fifo_read;                // kBlockSize: all read, the next sample wants a new block
   bool fifo_enveloped;
   uint32_t random_state;             // voice-local stream: independent of scheduling and of Beads
-  uint32_t id;                       // the engine built in it (GRAV_ENGINE_*; GRAV_ENGINE_COUNT: none yet)
+  uint32_t id;                       // the engine built in it (GRAV_ENGINE_*; GRAV_ENGINE_ALL: none yet)
   uint32_t ram_used;                 // bytes of its RAM the engine's Init took
+  grav::Drum* drum;                  // a drum voice's drum (its SHAPE knobs set before each block), or none
 };
 
 // The voices (plain data: nothing to construct); the synth voices' slots and RAM in the FM-1's pool (4 x 24 KB),
@@ -165,6 +172,18 @@ char drum_ram[kDrumVoices][kDrumRam] __attribute__((aligned(8)));
 static_assert(GRAV_VOICES > GRAV_BIG_VOICES, "drum voices after the synth's");
 
 bool initialized;
+
+// A drum voice's drum, GRAV CODE's (dsp/grav_drums.h): the first model or the second
+grav::Drum* BuildDrum(uint32_t engine, void* slot) {
+  switch (engine) {
+    case GRAV_ENGINE_SYN_KICK: return new (slot) grav::Kick(true);
+    case GRAV_ENGINE_SNARE_DRUM: return new (slot) grav::Snare(false);
+    case GRAV_ENGINE_SYN_SNARE: return new (slot) grav::Snare(true);
+    case GRAV_ENGINE_HI_HAT: return new (slot) grav::Hat(false);
+    case GRAV_ENGINE_RING_HAT: return new (slot) grav::Hat(true);
+    default: return new (slot) grav::Kick(false);
+  }
+}
 
 // An engine built in a slot (the 6-op FM's three banks are one engine with three sets of user data, as on Plaits).
 plaits::Engine* Build(uint32_t engine, void* slot) {
@@ -199,14 +218,25 @@ plaits::Engine* Build(uint32_t engine, void* slot) {
 // An engine chosen for a voice: built in it, from Init, with its user data (the 6-op FM's bank) and a fresh start,
 // as Plaits' Voice starts an engine it switches to. (The engines' destructors do nothing: a slot is just reused.)
 // Each voice its own (since 0.16: each track's engine in its voices).
-bool is_drum(uint32_t engine) {
-  return engine == GRAV_ENGINE_BASS_DRUM || engine == GRAV_ENGINE_SNARE_DRUM || engine == GRAV_ENGINE_HI_HAT;
+int drum_kind(uint32_t engine) {
+  switch (engine) {
+    case GRAV_ENGINE_BASS_DRUM: case GRAV_ENGINE_SYN_KICK: return 0;
+    case GRAV_ENGINE_SNARE_DRUM: case GRAV_ENGINE_SYN_SNARE: return 1;
+    case GRAV_ENGINE_HI_HAT: case GRAV_ENGINE_RING_HAT: return 2;
+    default: return -1;
+  }
 }
+
+bool is_drum(uint32_t engine) { return drum_kind(engine) >= 0; }
 
 void choose(uint32_t i, uint32_t engine) {
   Voice& v = voices[i];
-  if (i >= GRAV_BIG_VOICES && !is_drum(engine)) {
+  const bool drum_voice = i >= GRAV_BIG_VOICES;
+  if (drum_voice && !is_drum(engine)) {
     engine = GRAV_ENGINE_BASS_DRUM;   // (a drum voice's slot fits a drum alone)
+  }
+  if (!drum_voice && engine >= GRAV_ENGINE_COUNT) {
+    engine = GRAV_ENGINE_WAVESHAPING; // (the second drum models: a drum voice's alone)
   }
   const uint32_t previous_random = stmlib::Random::state();
   stmlib::Random::Seed(0x21u + i * 0x9e3779b9u);
@@ -214,7 +244,8 @@ void choose(uint32_t i, uint32_t engine) {
   // A newly selected engine must not consume samples/state left by a previous engine.
   std::memset(v.slot, 0, v.slot_size);
   std::memset(v.ram, 0, v.ram_size);
-  v.engine = Build(engine, v.slot);
+  v.drum = drum_voice ? BuildDrum(engine, v.slot) : nullptr;
+  v.engine = drum_voice ? static_cast<plaits::Engine*>(v.drum) : Build(engine, v.slot);
   stmlib::BufferAllocator allocator(v.ram, v.ram_size);
   v.engine->Init(&allocator);
   v.ram_used = v.ram_size - allocator.free();
@@ -249,11 +280,11 @@ extern "C" void grav_plaits_voice_engine(uint32_t voice, uint32_t engine) {
   if (voice >= GRAV_VOICES) {
     return;
   }
-  if (engine >= GRAV_ENGINE_COUNT) {
-    engine = GRAV_ENGINE_WAVESHAPING;
+  if (engine >= GRAV_ENGINE_ALL || (voice < GRAV_BIG_VOICES && engine >= GRAV_ENGINE_COUNT)) {
+    engine = GRAV_ENGINE_WAVESHAPING; // (as choose builds it: not built anew at every block)
   }
   if (voice >= GRAV_BIG_VOICES && !is_drum(engine)) {
-    engine = GRAV_ENGINE_BASS_DRUM;   // (as choose builds it: not built anew at every block)
+    engine = GRAV_ENGINE_BASS_DRUM;
   }
   if (engine != voices[voice].id) {
     choose(voice, engine);
@@ -267,7 +298,7 @@ extern "C" void grav_plaits_engine(uint32_t engine) {
 }
 
 extern "C" uint32_t grav_plaits_voice_engine_id(uint32_t voice) {
-  return voice < GRAV_VOICES ? voices[voice].id : GRAV_ENGINE_COUNT;
+  return voice < GRAV_VOICES ? voices[voice].id : GRAV_ENGINE_ALL;
 }
 
 extern "C" void grav_plaits_reset_voice(uint32_t voice) {
@@ -286,7 +317,12 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
   Voice& v = voices[voice < GRAV_VOICES ? voice : 0];
   const uint32_t previous_random = stmlib::Random::state();
   stmlib::Random::Seed(v.random_state);
-  const Info& e = info[v.id < GRAV_ENGINE_COUNT ? v.id : 0];
+  const Info& e = info[v.id < GRAV_ENGINE_ALL ? v.id : 0];
+  if (v.drum) {                      // a drum: its SHAPE knobs
+    for (uint32_t k = 0; k < 3; ++k) {
+      v.drum->shape[k] = in->shape[k];
+    }
+  }
 
   int first, held;                   // the trigger in the first block, and in the blocks after it
   switch (e.mode) {
@@ -338,15 +374,35 @@ extern "C" int grav_engine_is_drum(uint32_t engine) {
   return is_drum(engine) ? 1 : 0;
 }
 
+extern "C" int grav_drum_kind(uint32_t engine) {
+  return drum_kind(engine);
+}
+
 extern "C" uint32_t grav_drum_step(uint32_t engine, int32_t steps) {
-  static const uint8_t drums[3] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM, GRAV_ENGINE_HI_HAT};
-  int32_t at = engine == GRAV_ENGINE_SNARE_DRUM ? 1 : engine == GRAV_ENGINE_HI_HAT ? 2 : 0;
-  at = ((at + steps) % 3 + 3) % 3;
+  static const uint8_t drums[6] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SYN_KICK, GRAV_ENGINE_SNARE_DRUM,
+                                   GRAV_ENGINE_SYN_SNARE, GRAV_ENGINE_HI_HAT, GRAV_ENGINE_RING_HAT};
+  int32_t at = 0;
+  while (at < 6 && drums[at] != engine) {
+    ++at;
+  }
+  at = ((at % 6 + steps) % 6 + 6) % 6;
   return drums[at];
 }
 
+extern "C" void grav_drum_shape(uint32_t engine, float harmonics, float shape[3]) {
+  if (drum_kind(engine) == 0) {      // Plaits' bass drum: its attack FM, self FM and drive, each a quarter or a half
+    shape[0] = std::min(harmonics * 4.0f, 1.0f);
+    shape[1] = std::max(std::min(harmonics * 4.0f - 1.0f, 1.0f), 0.0f);
+    shape[2] = std::max(harmonics * 2.0f - 1.0f, 0.0f);
+  } else {
+    shape[0] = harmonics;
+    shape[1] = 0.0f;
+    shape[2] = 1.0f;
+  }
+}
+
 extern "C" const char* grav_engine_name(uint32_t engine) {
-  return info[engine < GRAV_ENGINE_COUNT ? engine : 0].name;
+  return info[engine < GRAV_ENGINE_ALL ? engine : 0].name;
 }
 
 extern "C" uint32_t grav_engine_step(uint32_t engine, int32_t steps) {

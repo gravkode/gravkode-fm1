@@ -83,16 +83,20 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
         const unsigned current_engine = b >= 16 && b < 33 ? (engine + 1) % GRAV_ENGINE_COUNT : engine;
         const float timbre = float(b % 3) * 0.5f;
         if (drums) {                         // each track its sound: the synth tracks the engine, the drums a kit
-            static const unsigned KIT[SYNTH_D_TRACKS] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM,
-                                                         GRAV_ENGINE_HI_HAT, GRAV_ENGINE_HI_HAT};
+            static const unsigned KIT[2][SYNTH_D_TRACKS] = {   // Plaits' first models; the second (0.19)
+                {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM, GRAV_ENGINE_HI_HAT, GRAV_ENGINE_HI_HAT},
+                {GRAV_ENGINE_SYN_KICK, GRAV_ENGINE_SYN_SNARE, GRAV_ENGINE_RING_HAT, GRAV_ENGINE_HI_HAT}};
             grav_sound_t sound[SYNTH_TRACKS];
             for (unsigned t = 0; t < SYNTH_TRACKS; ++t) {
                 const bool drum = t >= SYNTH_S_TRACKS;
-                sound[t].engine = drum ? KIT[t - SYNTH_S_TRACKS] : current_engine;
+                sound[t].engine = drum ? KIT[engine & 1u][t - SYNTH_S_TRACKS] : current_engine;
                 sound[t].timbre = drum ? 0.3f + 0.1f * float(t - SYNTH_S_TRACKS) : timbre;
                 sound[t].morph = drum ? 0.6f : 0.5f;
                 sound[t].harmonics = drum ? 0.45f : 0.75f;
-                sound[t].pitch = 0.0f;
+                sound[t].pitch = drum ? float(t) - 5.5f : 0.0f;   // (a drum's TUNE)
+                grav_drum_shape(sound[t].engine, sound[t].harmonics, sound[t].shape);
+                if (drum)
+                    sound[t].shape[1] = 0.25f * float(t - SYNTH_S_TRACKS);   // (some DRIVE, SWEEP)
             }
             grav_engine_render_tracks(&dsp, output, n, &synth, 3200, sound, 0.0f, &fx);
         } else

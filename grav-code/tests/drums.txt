@@ -1,7 +1,9 @@
 # The drum tracks (0.17): D1..D4 after S1..S4, each its one voice (4..7) playing a drum of Plaits' (BASS DRUM, SNARE,
-# HI-HAT). PRESET picks among those three; GLO VOICES shows DRUM; a new step plays the drum's own note; the black keys
-# 5..8 pick them in step mode; out on MIDI channels 5..8; an overload takes a synth voice before a drum; SAVE keeps the
-# kit and the drums' steps (OBJ_DRUMS); 0.16's settings load with the kit as it comes.
+# HI-HAT, and since 0.19 their second models: SYN KICK, SYN SNARE, RING HAT). PRESET picks among those six; HOME again
+# opens the drum's DRUM page (TUNE, DECAY, TONE), again its SHAPE page (the kick's PUNCH, SWEEP, DRIVE; the snare's
+# SNAPPY, the hi-hat's NOISE, DRIVE, LEVEL); GLO VOICES shows DRUM; a new step plays the drum's own note; the black
+# keys 5..8 pick them in step mode; out on MIDI channels 5..8; an overload takes a synth voice before a drum; SAVE keeps
+# the kit, its knobs and the drums' steps; 0.16's settings load with the kit as it comes, 0.18's with its knobs.
 #   grav-code/build/host/grav_code_host grav-code/tests/drums.txt grav-code/build/host
 wait 600
 # the kit at first: a bass drum, a snare, two hi-hats
@@ -19,14 +21,18 @@ said D1 BASS DRUM
 wait 200
 shot drum-tracks.png
 expect engine_ram <513
-# PRESET: among the drums alone, round (BASS DRUM, SNARE, HI-HAT)
+# PRESET: among the six drums alone, round (BASS DRUM, SYN KICK, SNARE, SYN SNARE, HI-HAT, RING HAT)
+turn PRESET 1
+wait 30
+expect wave 24
+said SYN KICK
 turn PRESET 1
 wait 30
 expect wave 14
-said SNARE
-turn PRESET -2
+turn PRESET -3
 wait 30
-expect wave 15
+expect wave 26
+said RING HAT
 turn PRESET 1
 wait 30
 expect wave 13
@@ -44,20 +50,64 @@ expect_out USB 94 3C 64
 key 7 up
 wait 300
 expect_out USB 84 3C 00
-# OSC (HOME again): D1's knobs, its own
+# HOME again: D1's DRUM page, its own: TUNE (a half semitone a detent, from the middle), DECAY, TONE
 tap HOME
 wait 30
 expect page 0
+said PAGE DRUM
+expect tune 50
+turn K1 3
+wait 30
+expect tune 53
+said TUNE +1.5
+expect osc1 55
 expect osc0 40
-turn K1 10
+turn K3 10
 wait 30
 expect osc0 50
-turn SELECT -4
+said TONE 50
+wait 300
+shot drum-page.png
+# HOME again: its SHAPE page: the kick's PUNCH, SWEEP, DRIVE (from Plaits' HARMONICS 40: as it sounded)
+tap HOME
 wait 30
+expect page 9
+said PAGE SHAPE
+expect shape0 100
+expect shape1 60
+expect shape2 0
+turn K3 20
+wait 30
+expect shape2 20
+said DRIVE 20
+wait 300
+shot drum-shape.png
+# D2's: the snare's SNAPPY, DRIVE, LEVEL
+turn SELECT 1
+wait 30
+expect page 9
+expect shape0 50
+expect shape1 0
+expect shape2 100
+turn K1 1
+wait 30
+said SNAPPY 51
+# a synth track selected on SHAPE: its sound (OSC) instead; D1 again, as it was
+turn SELECT -5
+wait 30
+expect page 0
 expect osc0 65
 turn SELECT 4
 wait 30
 expect osc0 50
+expect tune 53
+# HOME from the DRUM page: SHAPE, then SEQ
+tap HOME
+wait 30
+expect page 9
+tap HOME
+wait 30
+expect page 8
 # GLO VOICES: a drum's one voice, nothing to share out
 tap GLO
 wait 30
@@ -163,6 +213,8 @@ expect trk_engine5 14
 turn SELECT 4
 wait 30
 expect osc0 50
+expect tune 53
+expect shape2 20
 expect step0 1
 expect step4 1
 expect step2 0
@@ -173,7 +225,7 @@ expect stepnote2 55
 # 0.16's settings (no drums in them): the kit as it comes, the synth tracks' as saved
 turn PRESET 1
 wait 30
-expect wave 15
+expect wave 25
 save016
 reboot
 wait 600
@@ -183,3 +235,27 @@ turn SELECT 4
 wait 30
 expect osc0 40
 expect step0 1
+expect tune 50
+# 0.18's settings (the drums on Plaits' three knobs): TUNE as the note, SHAPE from HARMONICS, TONE as saved
+tap HOME
+wait 30
+expect page 0
+turn K1 4
+turn K3 6
+wait 30
+expect tune 54
+expect osc0 46
+tap HOME
+wait 30
+turn K3 30
+wait 30
+expect shape2 30
+save018
+reboot
+wait 600
+turn SELECT 4
+wait 30
+expect tune 50
+expect osc0 46
+expect shape0 100
+expect shape2 0

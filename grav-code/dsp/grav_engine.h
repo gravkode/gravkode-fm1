@@ -25,7 +25,9 @@ typedef struct {
 typedef struct {
     uint32_t engine;                     /* GRAV_ENGINE_* */
     float timbre, morph, harmonics;      /* 0..1 */
-    float pitch;                         /* semitones on its notes (the LFO's), beside the render's pitch_offset */
+    float pitch;                         /* semitones on its notes (the LFO's; a drum's TUNE), beside the render's
+                                          * pitch_offset */
+    float shape[3];                      /* a drum's SHAPE knobs, 0..1 (dsp/grav_drums.h) */
 } grav_sound_t;
 
 void grav_engine_init(grav_engine_t *e);

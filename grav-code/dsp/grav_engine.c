@@ -203,6 +203,7 @@ void grav_engine_render(
         sound[t].morph = morph;
         sound[t].harmonics = harmonics;
         sound[t].pitch = 0.0f;
+        grav_drum_shape(engine, harmonics, sound[t].shape);   /* (a drum's, as Plaits folds them on HARMONICS) */
     }
     grav_engine_render_tracks(e, lr, n, synth, master_q12, sound, pitch_offset, fx);
 }
@@ -270,6 +271,9 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         work.p[v].timbre = snd->timbre;
         work.p[v].morph = snd->morph;
         work.p[v].harmonics = snd->harmonics;
+        work.p[v].shape[0] = snd->shape[0];
+        work.p[v].shape[1] = snd->shape[1];
+        work.p[v].shape[2] = snd->shape[2];
         work.p[v].accent = voice->velocity;
         /* Let the outer ENV own the six-op note's release. Releasing the DX gate here would
          * also start its short patch release and cut off the app's longer release. */
