@@ -13,8 +13,8 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.18.0** — sixteen patterns, picked with HOME and a white key, K4 or a MIDI program change, and
-switched at the pattern's end without a gap; each saved by itself into the flash. The tempo shows at the top.
+Current version: **0.19.0** — six drums with six knobs each: Plaits' kick, snare and hi-hat and their second
+models, on two pages (DRUM: TUNE, DECAY, TONE; SHAPE: the kick's PUNCH, SWEEP, DRIVE). Sixteen patterns since 0.18.
 
 ## What it does
 
@@ -25,8 +25,8 @@ switched at the pattern's end without a gap; each saved by itself into the flash
 - **An effect from Beads:** its granular processor (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), its delay, its four
   recording qualities (digital to dirty tape) and its reverb, with FREEZE and SEED on the panel's buttons.
 - **A sequencer of eight tracks:** four synth tracks (S1–S4), each its own engine and sound, voices (the four shared
-  out: MONO, POLY or none), and four drum tracks (D1–D4), each a bass drum, snare or hi-hat of Plaits' in a voice of
-  its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
+  out: MONO, POLY or none), and four drum tracks (D1–D4), each a kick, snare or hi-hat of Plaits' (two models each)
+  with six knobs (TUNE, DECAY, TONE; the kick's PUNCH, SWEEP, DRIVE), in a voice of its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
   (polymeters), notes and chords with their velocity and length; sixteen patterns, switched at the pattern's end;
   the song's tempo, each pattern's swing; step recording, MIDI clock out and in (it follows one); each track's notes
   on its MIDI channel (1–8).
@@ -108,7 +108,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.18.0.fwsc 0.18.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.19.0.fwsc 0.19.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -123,7 +123,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.18.0      # grav-code/build/grav_code-0.18.0.fwsc
+python3 tools/build.py grav-code --release 0.19.0      # grav-code/build/grav_code-0.19.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)

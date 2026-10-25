@@ -13,8 +13,8 @@
 
 ---
 
-Текущая версия: **0.18.0** — шестнадцать паттернов: выбор HOME + белая клавиша, ручкой K4 или MIDI Program Change,
-смена в конце паттерна без паузы; каждый сам сохраняется во флеш. Темп показан наверху экрана.
+Текущая версия: **0.19.0** — шесть барабанов по шесть ручек: кик, малый и хай-хэт Plaits и их вторые модели, на двух
+страницах (DRUM: TUNE, DECAY, TONE; SHAPE: у кика PUNCH, SWEEP, DRIVE). Шестнадцать паттернов — с 0.18.
 
 ## Возможности
 
@@ -26,8 +26,8 @@
 - **Эффект Beads:** гранулярный процессор (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), задержка, четыре качества
   записи (от чистого цифрового до «грязной» ленты) и реверб; FREEZE и SEED на кнопках панели.
 - **Секвенсор на восемь дорожек:** четыре синтовые (S1–S4), у каждой свой движок и звук, голоса (четыре на всех:
-  MONO, POLY или ни одного), и четыре барабанные (D1–D4): бочка, малый барабан или хай-хэт Plaits, у каждой свой
-  голос. У каждой дорожки свои шаги — 64, четыре страницы по 16 на белых клавишах, как у TR; своя длина от 1 до 64
+  MONO, POLY или ни одного), и четыре барабанные (D1–D4): кик, малый или хай-хэт Plaits (по две модели) с шестью
+  ручками (TUNE, DECAY, TONE; у кика PUNCH, SWEEP, DRIVE), у каждой свой голос. У каждой дорожки свои шаги — 64, четыре страницы по 16 на белых клавишах, как у TR; своя длина от 1 до 64
   (полиметрия); ноты и аккорды со своей силой и длиной; шестнадцать паттернов, смена в конце паттерна; общий темп,
   свой свинг у паттерна; пошаговая запись; MIDI clock на выход и вход; ноты каждой дорожки на своём MIDI-канале (1–8).
 - **Полифония:** до четырёх голосов (POLY) или один с легато (MONO).
@@ -110,7 +110,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.18.0.fwsc 0.18.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.19.0.fwsc 0.19.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -125,7 +125,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.18.0      # grav-code/build/grav_code-0.18.0.fwsc
+python3 tools/build.py grav-code --release 0.19.0      # grav-code/build/grav_code-0.19.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

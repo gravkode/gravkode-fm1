@@ -200,3 +200,21 @@ wait 400
 shot screen-patterns.png
 release HOME
 tap PLAY
+wait 30
+# a drum track's two pages (HOME on D1, the kick): DRUM with TUNE +1.5, then SHAPE with DRIVE 20
+turn SELECT 4
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap HOME
+wait 30
+turn K1 3
+wait 1600
+shot screen-drum.png
+tap HOME
+wait 30
+turn K3 20
+wait 400
+shot screen-shape.png

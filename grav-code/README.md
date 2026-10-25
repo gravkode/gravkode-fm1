@@ -11,6 +11,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `seq/` | The sequencer (`seq.c`): 64 steps, length, chords, tempo, swing, MIDI clock out and in, the next pattern in at the pattern's end; each block's events at their sample offsets, on a 24-sample grid (`app.c` renders between them). The patterns' bank in the flash (`bank.c`): 16 patterns in 32 slots of 8 KiB, saved a page at a time into erased slots, the older copies erased when quiet |
 | `dsp/grav_engine.c` | The render: each voice through its engine and envelope, the mix through the effect, MASTER, the soft limiter, sleeping voices |
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), each voice its own (its track's; a drum voice's, in a small slot, one of the three drums), rendered 12 samples at a time |
+| `dsp/grav_drums.h` | The drum voices' drums (0.19): Plaits' drum models, the one chosen rendered, with the DRUM and SHAPE pages' knobs (the kick's PUNCH, SWEEP and DRIVE apart, where Plaits folds them onto HARMONICS) |
 | `dsp/grav_beads.cpp` | Beads' processor, the effect: built in place, run in mono 12 samples at a time, off (and free) at DRY/WET and REVERB 0, faded in and out |
 | `dsp/grav_libc.c` | The C library functions the FM-1's link lacks (`fabsf`, `sqrtf`, `abs`, `memmove`) |
 | `vendor/` | Plaits, Beads, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
@@ -49,13 +50,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.18.0    # grav-code/build/grav_code-0.18.0.fwsc, identity FM-1_73001800
+    python3 tools/build.py grav-code --release 0.19.0    # grav-code/build/grav_code-0.19.0.fwsc, identity FM-1_73001900
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.18.0.fwsc 0.18.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.19.0.fwsc 0.19.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.18.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.19.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 
