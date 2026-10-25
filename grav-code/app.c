@@ -675,7 +675,109 @@ static struct {
     uint8_t shown_pattern;               /* the pattern announced, + 1 (0: none yet) */
     uint32_t save_gen;                   /* the edits the save under way holds */
     uint32_t quiet_at, tidy_at, blink_at;   /* the last sound (stale copies erased 3 s after), an erase, a blink */
+    /* the icons (0.20) */
+    int32_t live_x, live_y, live_w, live_h; /* the live area on the page (0 wide: none): its icon redrawn alone */
+    uint32_t live_at, live_frames;       /* its last frame; frames drawn (the tests) */
+    uint32_t splash_until;               /* PRESET turned: the engine's splash shown until then */
+    uint32_t icon_strikes[SYNTH_TRACKS], icon_hit_at[SYNTH_TRACKS];   /* each track's notes begun: its icon's strike */
 } ui;
+
+#include "ui/icons.c"
+
+static float icon_time(void) { return (float)(plat_ms() % 600000u) * 0.001f; }   /* (10 minutes round: precise) */
+
+/* a track's icon: its engine's knobs (a drum's TONE, DECAY, SHAPE's first), its notes' strike (a held one keeps
+ * some) */
+static void icon_fill(uint32_t t, icon_t *ic)
+{
+    const uint32_t now = plat_ms();
+    const int drum = SYNTH_IS_DRUM(t);
+    uint32_t strikes = 0;
+    int held = 0;
+    for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++)
+        if (synth.voice_track[v] == t) {
+            strikes += synth.voice[v].strikes;
+            held |= synth.voice[v].gate;
+        }
+    if (strikes != ui.icon_strikes[t]) {
+        ui.icon_strikes[t] = strikes;
+        ui.icon_hit_at[t] = now;
+    }
+    for (uint32_t i = 0; i < 3u; i++)
+        ic->k[i] = (float)(drum && i == 2u ? drum_shape[t - SYNTH_S_TRACKS][0] : osc_params[t][i]) * 0.01f;
+    ic->hit = fm_expf(-(float)(now - ui.icon_hit_at[t]) / (drum ? 60.0f + 700.0f * ic->k[1] * ic->k[1] : 500.0f));
+    if (held && !drum && ic->hit < 0.6f)
+        ic->hit = 0.6f;
+    ic->t = icon_time();
+}
+
+static void icon_box(uint32_t t, int32_t x, int32_t y, int32_t w, int32_t h, int small)   /* a track's icon there */
+{
+    icon_t ic;
+    ic.x = x;
+    ic.y = y;
+    ic.w = w;
+    ic.h = h;
+    ic.small = small;
+    icon_fill(t, &ic);
+    icon_draw(*track_engine(t), &ic);
+}
+
+static void live_area(int32_t x, int32_t y, int32_t w, int32_t h)   /* the selected track's icon there, alive */
+{
+    icon_box(track_sel, x, y, w, h, 0);
+    ui.live_x = x;
+    ui.live_y = y;
+    ui.live_w = w;
+    ui.live_h = h;
+}
+
+/* the live area alone, between the screen's redraws: ~30 frames a second (10 while the sound is busy), its icon
+ * drawn into a canvas of its size and sent alone (a 98 x 54 icon: 10 KB, under 2 ms out) */
+static void draw_live(void)
+{
+    icon_t ic;
+    cv_begin((uint32_t)ui.live_w, (uint32_t)ui.live_h, C_BLACK);
+    ic.x = 0;
+    ic.y = 0;
+    ic.w = ui.live_w;
+    ic.h = ui.live_h;
+    ic.small = 0;
+    icon_fill(track_sel, &ic);
+    icon_draw(*track_engine(track_sel), &ic);
+    cv_blit((uint32_t)ui.live_x, 36u + (uint32_t)ui.live_y);
+}
+
+/* text in lines of w pixels at most, word by word (lines at most): left, or centred on x + w / 2 */
+static void draw_wrapped(const char *s, int32_t x, int32_t y, int32_t w, uint32_t lines, int centre, uint16_t c)
+{
+    char line[48];
+    for (uint32_t l = 0; l < lines && *s; l++) {
+        uint32_t n = 0, fit = 0;
+        while (s[n] && n < sizeof line - 1u) {   /* the most words that fit */
+            uint32_t e = n;
+            while (s[e] == ' ')
+                e++;
+            while (s[e] && s[e] != ' ')
+                e++;
+            if (e >= sizeof line)
+                break;
+            memcpy(line, s, e);
+            line[e] = 0;
+            if (fit && text_w(&FONT_XS, line) > w)
+                break;
+            fit = n = e;
+        }
+        if (!fit)
+            break;
+        memcpy(line, s, fit);
+        line[fit] = 0;
+        cv_text(centre ? x + (w - text_w(&FONT_XS, line)) / 2 : x, y + (int32_t)l * 13, &FONT_XS, line, c);
+        s += fit;
+        while (*s == ' ')
+            s++;
+    }
+}
 
 static void text_cat(char *d, const char *s)
 {
@@ -1605,9 +1707,10 @@ static void input(void)
         } else if (k == EN_K4) {             /* the pattern: the next (or the one queued) and on */
             pattern_pick((int32_t)(seq.next != SEQ_NO_PATTERN ? seq.next : seq.pattern) + e);
         } else if (k == EN_PRESET) {
-            uint8_t *engine = track_engine(track_sel);   /* Plaits' order; a drum track: its three drums */
+            uint8_t *engine = track_engine(track_sel);   /* Plaits' order; a drum track: its six drums */
             *engine = (uint8_t)(SYNTH_IS_DRUM(track_sel) ? grav_drum_step(*engine, e) : grav_engine_step(*engine, e));
             set_dirty = 1;
+            ui.splash_until = plat_ms() + 1500u;   /* its splash, a moment */
             app_say("WAVE", grav_engine_name(*track_engine(track_sel)));
         } else {
             int_text(ui.turns[k], t);
@@ -1646,34 +1749,44 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
 static void draw_knobs(void)
 {
     char t[12];
+    int32_t y0 = 42;                         /* the knobs' row: under the icon on a sound page */
+    if (active_page == PAGE_OSC || active_page == PAGE_SHAPE) {   /* a sound page: the engine's icon, its line */
+        cv_rect(8, 22, 100, 1, C_LINE);
+        cv_rect(8, 77, 100, 1, C_LINE);
+        cv_rect(8, 22, 1, 56, C_LINE);
+        cv_rect(107, 22, 1, 56, C_LINE);
+        live_area(9, 23, 98, 54);
+        draw_wrapped(engine_desc(*track_engine(track_sel)), 116, 24, 118, 4u, 0, C_GRAY);
+        y0 = 82;
+    }
     for (uint32_t i = 0; i < 3u; i++) {
         int32_t x = 8 + (int32_t)i * 78;
-        cv_text(x, 42, &FONT_XS, param_name(active_page, i), C_GRAY);
+        cv_text(x, y0, &FONT_XS, param_name(active_page, i), C_GRAY);
         if (active_page == PAGE_MOD && i == 2u) {
             uint32_t destination = lfo_destination(mod_params[2]);
-            cv_text(x, 66, &FONT_S, LFO_DEST_NAME[destination], C_WHITE);
+            cv_text(x, y0 + 24, &FONT_S, LFO_DEST_NAME[destination], C_WHITE);
             for (uint32_t d = 0; d < 3; ++d)
-                cv_rect(x + (int32_t)d * 24, 100, 20, 3, d == destination ? C_HI : C_LINE);
+                cv_rect(x + (int32_t)d * 24, y0 + 58, 20, 3, d == destination ? C_HI : C_LINE);
             continue;
         }
         if (active_page == PAGE_FX_MIX && i == 2u) {
-            cv_text(x, 66, &FONT_S, QUALITY_NAME[fx_quality], C_WHITE);
+            cv_text(x, y0 + 24, &FONT_S, QUALITY_NAME[fx_quality], C_WHITE);
             for (int32_t q = 0; q < GRAV_FX_QUALITIES; q++)
-                cv_rect(x + q * 18, 100, 14, 3, q == fx_quality ? C_HI : C_LINE);
+                cv_rect(x + q * 18, y0 + 58, 14, 3, q == fx_quality ? C_HI : C_LINE);
             continue;
         }
         int32_t value = *param_of(active_page, i);
         param_text(active_page, i, value, t);
-        cv_text(x, 62, &FONT_M, t, C_WHITE);
-        cv_rect(x, 100, 68, 3, C_LINE);
+        cv_text(x, y0 + 20, &FONT_M, t, C_WHITE);
+        cv_rect(x, y0 + 58, 68, 3, C_LINE);
         if (param_centred(active_page, i)) { /* from the middle, its mark there */
             int32_t at = value * 68 / 100;
             int32_t a = at < 34 ? at : 34, b = at < 34 ? 34 : at;
             if (b > a)
-                cv_rect(x + a, 100, b - a, 3, C_HI);
-            cv_rect(x + 33, 97, 2, 9, C_GRAY);
+                cv_rect(x + a, y0 + 58, b - a, 3, C_HI);
+            cv_rect(x + 33, y0 + 55, 2, 9, C_GRAY);
         } else if (value > 0)
-            cv_rect(x, 100, value * 68 / 100, 3, C_HI);
+            cv_rect(x, y0 + 58, value * 68 / 100, 3, C_HI);
     }
     if (IS_FX_PAGE(active_page)) {           /* the effect's state: SEED's way and on or off */
         cv_text(8, 116, &FONT_XS, "SEED", C_GRAY);
@@ -1842,8 +1955,22 @@ static void draw_tracks(void)
             cv_rect(7, y, 226, 14, C_HI);
         cv_text(12, y + 1, &FONT_XS, TRACK_NAME[t], sel ? C_BLACK : C_WHITE);
         cv_text(42, y + 1, &FONT_XS, grav_engine_name(*track_engine(t)), sel ? C_BLACK : C_HI);
+        cv_rect(142, y + 1, 20, 12, C_BLACK);   /* its icon, small */
+        icon_box(t, 143, y + 1, 18, 12, 1);
         cv_text(170, y + 1, &FONT_XS, track_voices_text(t), sel ? C_BLACK : C_GRAY);
     }
+}
+
+/* PRESET turned: the engine's splash for a moment, over the page: its icon, alive; its name; its line */
+static void draw_splash(void)
+{
+    const uint32_t e = *track_engine(track_sel);
+    const char *name = grav_engine_name(e);
+    cv_rect(4, 20, 232, 118, C_LINE);
+    cv_rect(5, 21, 230, 116, C_BLACK);
+    live_area(50, 24, 140, 60);
+    cv_text(120 - text_w(&FONT_M, name) / 2, 86, &FONT_M, name, C_HI);
+    draw_wrapped(engine_desc(e), 10, 111, 220, 2u, 1, C_GRAY);
 }
 
 /* only the steps (the step playing moved): their strip, not the whole screen */
@@ -1984,8 +2111,10 @@ static void draw(void)
     /* Synth engine and parameter page */
     cv_begin(240, 144, C_BLACK);
 
-    cv_text(8, 4, &FONT_S, TRACK_NAME[track_sel], C_WHITE);   /* the track selected, its engine */
-    cv_text(30, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
+    ui.live_w = 0;                           /* (none, unless a page draws one) */
+    cv_text(8, 4, &FONT_S, TRACK_NAME[track_sel], C_WHITE);   /* the track selected, its icon, its engine */
+    icon_box(track_sel, 27, 4, 20, 15, 1);
+    cv_text(51, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
     if (fx_freeze)                           /* the effect frozen: on every page (and EDIT lit) */
         cell(172, 2, 60, "FREEZE", 1);
 
@@ -1997,6 +2126,10 @@ static void draw(void)
         draw_seq();
     else
         draw_knobs();
+    if (ui.splash_until)
+        draw_splash();
+    if (ui.tracks_until || ui.patterns_until || ui.home_shown)
+        ui.live_w = 0;                       /* (a list over it: no live area) */
     if (ui.tracks_until)
         draw_tracks();
     if (ui.patterns_until || ui.home_shown)
@@ -2129,13 +2262,22 @@ void app_frame(void)
     if (ui.redraw_grid && (ui.tracks_until || ui.patterns_until || ui.home_shown))   /* (a list over the steps: the
                                                                                          * whole page, not the strip) */
         ui.redraw = 1;
+    if (ui.splash_until && now >= ui.splash_until) {   /* the splash goes */
+        ui.splash_until = 0;
+        ui.redraw = 1;
+    }
     if (ui.redraw) {
         ui.redraw = 0;
         ui.redraw_grid = 0;
         draw();
+        ui.live_at = now;
     } else if (ui.redraw_grid) {
         ui.redraw_grid = 0;
         draw_seq_grid();
+    } else if (ui.live_w && now - ui.live_at >= (plat_cpu_pct() >= 75u ? 96u : 30u)) {   /* (frames: 16 ms) */
+        ui.live_at = now;                    /* the icon alive: its area alone */
+        ui.live_frames++;
+        draw_live();
     }
 }
 
@@ -2258,6 +2400,12 @@ int app_expect(const char *what, int *got)
         *got = drum_tune[(track_sel - SYNTH_S_TRACKS) % SYNTH_D_TRACKS];
     else if (!strncmp(what, "shape", 5) && what[5] >= '0' && what[5] <= '2')
         *got = drum_shape[(track_sel - SYNTH_S_TRACKS) % SYNTH_D_TRACKS][what[5] - '0'];
+    else if (!strcmp(what, "live_w"))        /* the live area's width (0: none), frames drawn alone; the splash */
+        *got = ui.live_w;
+    else if (!strcmp(what, "live_frames"))
+        *got = (int)ui.live_frames;
+    else if (!strcmp(what, "splash"))
+        *got = ui.splash_until != 0;
     else if (!strncmp(what, "vgate", 5))     /* vgateN: voice N's note held (0..3 the synth tracks', 4..7 the drums') */
         *got = synth.voice[atoi(what + 5) % SYNTH_VOICES_MAX].gate;
     else if (!strcmp(what, "render_voices"))

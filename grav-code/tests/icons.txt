@@ -1,0 +1,73 @@
+# The engines' icons (0.20): drawn by code, alive. A sound page (OSC; a drum's DRUM and SHAPE) shows the track's
+# engine's icon in a live area, redrawn alone ~30 times a second between the screen's redraws; PRESET shows the
+# engine's splash for 1.5 s (its icon alive, its name, its line); a list over the page stops the live area; the
+# other pages have none. The track's line and the tracks' list show each engine's icon, small.
+#   grav-code/build/host/grav_code_host grav-code/tests/icons.txt grav-code/build/host
+wait 600
+# SEQ: no live area
+expect page 8
+expect live_w 0
+# OSC (HOME): the icon alive, ~30 frames a second
+tap HOME
+wait 30
+expect page 0
+expect live_w 98
+key 7 down 100 0
+wait 1000
+expect live_frames >24
+shot icon-osc.png
+key 7 up
+wait 30
+# PRESET: the splash, its icon alive (140 wide), gone after 1.5 s
+listen
+turn PRESET 1
+wait 300
+expect splash 1
+expect live_w 140
+expect wave 1
+shot icon-splash.png
+wait 1500
+expect splash 0
+expect live_w 98
+# SELECT: the tracks' list over the page: no live area while it shows
+turn SELECT 1
+wait 300
+expect live_w 0
+shot icon-list.png
+wait 1600
+expect live_w 98
+turn SELECT -1
+wait 1600
+# HOME held: the patterns' grid over it, no live area
+press HOME
+wait 400
+expect live_w 0
+release HOME
+wait 100
+expect page 8
+expect live_w 0
+# a drum's DRUM and SHAPE pages: the drum's icon
+turn SELECT 4
+wait 1600
+tap HOME
+wait 30
+expect page 0
+expect live_w 98
+tap HOME
+wait 30
+expect page 9
+expect live_w 98
+shot icon-shape.png
+# MOD, ENV, GLO, FX: none
+tap LFO
+wait 30
+expect live_w 0
+tap ENV
+wait 30
+expect live_w 0
+tap GLO
+wait 30
+expect live_w 0
+tap FX
+wait 30
+expect live_w 0
