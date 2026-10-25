@@ -1955,8 +1955,6 @@ static void draw_tracks(void)
             cv_rect(7, y, 226, 14, C_HI);
         cv_text(12, y + 1, &FONT_XS, TRACK_NAME[t], sel ? C_BLACK : C_WHITE);
         cv_text(42, y + 1, &FONT_XS, grav_engine_name(*track_engine(t)), sel ? C_BLACK : C_HI);
-        cv_rect(142, y + 1, 20, 12, C_BLACK);   /* its icon, small */
-        icon_box(t, 143, y + 1, 18, 12, 1);
         cv_text(170, y + 1, &FONT_XS, track_voices_text(t), sel ? C_BLACK : C_GRAY);
     }
 }
@@ -2112,9 +2110,8 @@ static void draw(void)
     cv_begin(240, 144, C_BLACK);
 
     ui.live_w = 0;                           /* (none, unless a page draws one) */
-    cv_text(8, 4, &FONT_S, TRACK_NAME[track_sel], C_WHITE);   /* the track selected, its icon, its engine */
-    icon_box(track_sel, 27, 4, 20, 15, 1);
-    cv_text(51, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
+    cv_text(8, 4, &FONT_S, TRACK_NAME[track_sel], C_WHITE);   /* the track selected, its engine */
+    cv_text(30, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
     if (fx_freeze)                           /* the effect frozen: on every page (and EDIT lit) */
         cell(172, 2, 60, "FREEZE", 1);
 

@@ -14,7 +14,7 @@ FM-1's own panel and screen.
 ---
 
 Current version: **0.20.0** — every engine has an icon drawn by code, alive: it moves with the engine's knobs and its
-notes, on the sound page, in the track's line and in the tracks' list; turning PRESET shows the engine's splash.
+notes, on the sound page above the knobs; turning PRESET shows the engine's splash.
 
 ## What it does
 
