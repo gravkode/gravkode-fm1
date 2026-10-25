@@ -12,12 +12,13 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `dsp/grav_engine.c` | The render: each voice through its engine and envelope, the mix through the effect, MASTER, the soft limiter, sleeping voices |
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), each voice its own (its track's; a drum voice's, in a small slot, one of the three drums), rendered 12 samples at a time |
 | `dsp/grav_drums.h` | The drum voices' drums (0.19): Plaits' drum models, the one chosen rendered, with the DRUM and SHAPE pages' knobs (the kick's PUNCH, SWEEP and DRIVE apart, where Plaits folds them onto HARMONICS) |
+| `ui/icons.c` | The engines' icons (0.20), drawn by code from the time, the engine's knobs and its track's notes; one line on each engine (included by `app.c`) |
 | `dsp/grav_beads.cpp` | Beads' processor, the effect: built in place, run in mono 12 samples at a time, off (and free) at DRY/WET and REVERB 0, faded in and out |
 | `dsp/grav_libc.c` | The C library functions the FM-1's link lacks (`fabsf`, `sqrtf`, `abs`, `memmove`) |
 | `vendor/` | Plaits, Beads, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
 | `words.tsv` | The screen reader's words |
-| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, and `screens.txt` (the manual's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py` and `dual_core_test.cpp` (`run_dual_core_test.py`) |
+| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py` and `dual_core_test.cpp` (`run_dual_core_test.py`) |
 | `docs/` | The manual and its pictures (`docs/img/compose.py` makes the README's from them) |
 | `site/landing.md` | The site's front page |
 
@@ -41,6 +42,7 @@ From the repository's root:
     grav-code/build/host/grav_code_host grav-code/tests/tracks.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/drums.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/patterns.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/icons.txt grav-code/build/host
     python3 grav-code/tests/run_seq_test.py
     python3 tools/build.py grav-code --web               # the browser emulator: grav-code/build/emu/
     python3 tools/fm1_install.py grav-code/build/grav_code.fwsc
@@ -50,13 +52,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.19.0    # grav-code/build/grav_code-0.19.0.fwsc, identity FM-1_73001900
+    python3 tools/build.py grav-code --release 0.20.0    # grav-code/build/grav_code-0.20.0.fwsc, identity FM-1_73002000
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.19.0.fwsc 0.19.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.20.0.fwsc 0.20.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.19.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.20.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

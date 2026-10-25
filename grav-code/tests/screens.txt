@@ -218,3 +218,10 @@ wait 30
 turn K3 20
 wait 400
 shot screen-shape.png
+wait 30
+# PRESET on S1: the next engine's splash, its icon alive
+turn SELECT -4
+wait 1600
+turn PRESET 1
+wait 300
+shot screen-splash.png

@@ -13,8 +13,8 @@
 
 ---
 
-Текущая версия: **0.19.0** — шесть барабанов по шесть ручек: кик, малый и хай-хэт Plaits и их вторые модели, на двух
-страницах (DRUM: TUNE, DECAY, TONE; SHAPE: у кика PUNCH, SWEEP, DRIVE). Шестнадцать паттернов — с 0.18.
+Текущая версия: **0.20.0** — у каждого движка своя живая иконка, нарисованная кодом: она двигается вместе с ручками
+движка и нотами, на странице звука, в строке дорожки и в списке дорожек; поворот PRESET показывает заставку движка.
 
 ## Возможности
 
@@ -22,7 +22,7 @@
   волновые таблицы, аккорды, речь, «рой» осцилляторов, фильтрованный шум, частицы, неоднородная струна, модальный
   резонатор, бочка, малый барабан, хай-хэт, а также восемь движков Plaits 1.2: аналог с фильтром, фазовое искажение,
   три банка шестиоператорного FM (патчи DX7), волновые ландшафты, струнная машина и чиптюн. У каждого свои TIMBRE,
-  MORPH и HARMONICS, как на Plaits.
+  MORPH и HARMONICS, как на Plaits, и своя иконка, нарисованная кодом, которая двигается вместе с ними.
 - **Эффект Beads:** гранулярный процессор (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), задержка, четыре качества
   записи (от чистого цифрового до «грязной» ленты) и реверб; FREEZE и SEED на кнопках панели.
 - **Секвенсор на восемь дорожек:** четыре синтовые (S1–S4), у каждой свой движок и звук, голоса (четыре на всех:
@@ -41,6 +41,8 @@
 ## Экран и страницы
 
 <p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Восемь страниц: SEQ (играющие шаги, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (скорость, глубина и назначение LFO), ENV (атака, спад, затухание), FX GRAIN (DENSITY, TIME, SIZE, включён FREEZE), FX MIX (DRY/WET, REVERB, QUALITY), GLO (голоса, velocity, версия) и DEBUG"></p>
+
+<p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="Иконки всех 27 движков, каждая на своей странице звука с описанием"></p>
 
 | Кнопка | Страница | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
@@ -110,7 +112,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS; в порядке ручки PRES
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.19.0.fwsc 0.19.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.20.0.fwsc 0.20.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -125,7 +127,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.19.0      # grav-code/build/grav_code-0.19.0.fwsc
+python3 tools/build.py grav-code --release 0.20.0      # grav-code/build/grav_code-0.20.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
@@ -133,7 +135,7 @@ python3 tools/build.py grav-code --web                 # эмулятор в б�
 
 Тесты (`grav-code/tests/`): `basic.txt` (клавиши, октава, сохранение, MIDI), `engines.txt` (все движки звучат),
 `voices.txt` (полифония, MONO, velocity), `fx.txt` (эффект: страницы, FREEZE, SEED, QUALITY, сохранение),
-`seq.txt` (секвенсор), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
+`seq.txt` (секвенсор), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
 (паттерны во флеше): `run_seq_test.py`, `screens.txt` (скриншоты). Подробнее — в
 [grav-code/README.md](grav-code/README.md).
 

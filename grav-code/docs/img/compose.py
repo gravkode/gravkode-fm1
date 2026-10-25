@@ -8,7 +8,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 SHOTS = ["screen-osc", "screen-playing", "screen-mod", "screen-env", "screen-glo", "screen-fx-grain",
          "screen-fx-mix", "screen-debug", "screen-seq", "screen-tracks", "screen-patterns",
-         "screen-drum", "screen-shape"]
+         "screen-drum", "screen-shape", "screen-splash"]
 GAP, BACK = 8, (24, 24, 24)
 
 for name in SHOTS:                       # the simulator writes them uncompressed
@@ -26,3 +26,15 @@ for i, im in enumerate(pages):
     grid.paste(im, ((i % 2) * (w + GAP), (i // 2) * (h + GAP)))
 grid.save(HERE / "readme-pages.png", optimize=True)
 print("readme-playing.png, readme-pages.png")
+
+icons = sorted(HERE.glob("icon-*.png"))   # tests/icon_sheet.txt's: each engine's track line, icon and line
+if icons:
+    tiles = [Image.open(p).convert("RGB").crop((0, 36, 240, 114)) for p in icons]
+    tw, th = tiles[0].size
+    sheet = Image.new("RGB", (3 * tw + 2 * GAP, 9 * th + 8 * GAP), BACK)
+    for i, im in enumerate(tiles):
+        sheet.paste(im, ((i % 3) * (tw + GAP), (i // 3) * (th + GAP)))
+    sheet.save(HERE / "readme-icons.png", optimize=True)
+    for p in icons:
+        p.unlink()
+    print("readme-icons.png")

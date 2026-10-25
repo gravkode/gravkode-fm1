@@ -13,15 +13,16 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.19.0** — six drums with six knobs each: Plaits' kick, snare and hi-hat and their second
-models, on two pages (DRUM: TUNE, DECAY, TONE; SHAPE: the kick's PUNCH, SWEEP, DRIVE). Sixteen patterns since 0.18.
+Current version: **0.20.0** — every engine has an icon drawn by code, alive: it moves with the engine's knobs and its
+notes, on the sound page, in the track's line and in the tracks' list; turning PRESET shows the engine's splash.
 
 ## What it does
 
 - **24 engines from Plaits:** virtual analog, waveshaping, 2-operator FM, granular formants, additive, wavetables,
   chords, speech, swarms, filtered noise, particles, inharmonic strings, modal resonators, bass drum, snare, hi-hat,
   and the eight of Plaits 1.2: virtual analog with a filter, phase distortion, three banks of 6-operator FM (DX7
-  patches), wave terrains, a string machine and chiptune. Each with Plaits' own TIMBRE, MORPH and HARMONICS.
+  patches), wave terrains, a string machine and chiptune. Each with Plaits' own TIMBRE, MORPH and HARMONICS, and an
+  icon of its own, drawn by code, that moves with them.
 - **An effect from Beads:** its granular processor (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), its delay, its four
   recording qualities (digital to dirty tape) and its reverb, with FREEZE and SEED on the panel's buttons.
 - **A sequencer of eight tracks:** four synth tracks (S1–S4), each its own engine and sound, voices (the four shared
@@ -41,6 +42,8 @@ models, on two pages (DRUM: TUNE, DECAY, TONE; SHAPE: the kick's PUNCH, SWEEP, D
 ## The screen and its pages
 
 <p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), FX GRAIN (DENSITY, TIME, SIZE, frozen), FX MIX (DRY/WET, REVERB, QUALITY), GLO (VOICES, VELOCITY, the version) and DEBUG"></p>
+
+<p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="All 27 engines' icons, each on its sound page with its line"></p>
 
 | Button | Page | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
@@ -108,7 +111,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.19.0.fwsc 0.19.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.20.0.fwsc 0.20.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -123,7 +126,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.19.0      # grav-code/build/grav_code-0.19.0.fwsc
+python3 tools/build.py grav-code --release 0.20.0      # grav-code/build/grav_code-0.20.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -131,7 +134,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

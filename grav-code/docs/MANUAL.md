@@ -49,7 +49,7 @@ your own risk.
 
 ## 2. The screen
 
-![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; WAVESHAPE; TIMBRE 65, MORPH 50, HARMONICS 75 with their bars; the keyboard; OCT +0, PRESET WAVESHAPE, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
+![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; S1, WAVESHAPE's icon and name; its icon, alive, and its line; TIMBRE 65, MORPH 50, HARMONICS 75 with their bars; the keyboard; OCT +0, PRESET WAVESHAPE, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
 
 From the top:
 
@@ -57,8 +57,9 @@ From the top:
   leads, section 5); the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1
   runs on USB power. The page you are on is the one whose button blinks (faster on its second and third pages).
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
-- **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
-  is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine and voices.
+- **The track selected** (S1 to S4, D1 to D4) and its engine, by its icon and its name; beside them FREEZE, lit,
+  while the effect is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its
+  engine, its icon and its voices.
 - **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
   starts from a mark in the middle (DENSITY, PITCH) has its rest there.
 - **The keyboard:** a key held fills to its velocity (amber) and, pressed further, to its pressure (white).
@@ -74,7 +75,7 @@ From the top:
 | --- | --- |
 | Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0 |
 | OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go. In step mode: the pages |
-| PRESET (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: its drum, one of six (section 6) |
+| PRESET (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: its drum, one of six (section 6). Each turn shows the engine's splash for a moment |
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
@@ -110,6 +111,15 @@ The sequencer's page, GRAV CODE's main one: section 5.
 
 The engine's own three parameters, as on Plaits: **TIMBRE** (K1), **MORPH** (K2) and **HARMONICS** (K3). What each
 does depends on the engine: section 6. They start at 65, 50 and 75.
+
+Above them, the engine's icon, alive, and a line on the engine. Each engine's icon is drawn by GRAV CODE and moves
+with its knobs and its notes: WAVESHAPE's wave folds further as TIMBRE goes up, FM 2-OP's modulator orbits wider,
+CHORDS stacks its chord's notes, a kick's rings jump at each hit (all of them in section 6). A drum's DRUM and SHAPE
+pages show it the same way.
+
+![PRESET turned: SPEECH's splash, its icon alive, its name and its line](img/screen-splash.png "The engine's splash")
+
+**The splash:** turning PRESET shows the new engine for a moment over the page: its icon, its name and its line.
 
 ### DRUM, SHAPE (HOME again, on a drum track)
 
@@ -176,7 +186,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.19.0, ID FM-1_73001900, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.20.0, ID FM-1_73002000, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -297,6 +307,8 @@ tempo (0.15's, of one track, as S1's; 0.16's with the drum tracks empty).
 ---
 
 ## 6. The engines
+
+![Every engine's icon on its sound page: the 24 engines in Plaits' order, then the drums' second models](img/readme-icons.png "The engines' icons")
 
 PRESET steps the selected track's engine through all 24 engines of Plaits, in Plaits' own order: its first sixteen,
 then the eight its firmware 1.2 added. K1 is TIMBRE, K2 MORPH, K3 HARMONICS; what they do, engine by engine, is
