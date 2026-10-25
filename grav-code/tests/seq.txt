@@ -145,17 +145,25 @@ expect seq_playing 1
 expect seq_count >6
 expect seq_bpm >112
 expect seq_bpm <126
+# the header's tempo: the clock in's, amber
+wait 30
+expect header_ext 1
+expect header_bpm >112
+expect header_bpm <126
 midi FC
 wait 60
 expect seq_playing 0
 wait 700
 expect seq_ext 0
 expect seq_bpm 120
-# tempo and swing on SEQ's K1 and K2
+expect header_ext 0
+expect header_bpm 120
+# tempo and swing on SEQ's K1 and K2 (the header's tempo too)
 turn K1 -20
 turn K2 10
 wait 30
 expect seq_bpm 100
+expect header_bpm 100
 expect seq_swing 60
 # SAVE, a restart: the pattern as it was
 tap SAVE

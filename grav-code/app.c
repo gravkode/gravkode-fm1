@@ -569,6 +569,9 @@ static struct {
     uint8_t beat_bar;
     int32_t shown_step;                  /* the step the screen shows playing, and whether */
     uint8_t shown_playing, redraw_grid;
+    uint32_t shown_bpm;                  /* the tempo the header shows (seq_bpm), and whether a clock in's */
+    uint8_t shown_ext;
+    char bpm_text[8];
     uint8_t key_track[NKEYS];            /* the track each held key plays (its note-off goes there) */
     uint32_t tracks_until;               /* SELECT turned: the tracks' list shown until then */
     uint32_t shown_hits[SEQ_TRACKS], hit_at[SEQ_TRACKS];   /* each track's last note begun: its light flashes */
@@ -631,7 +634,7 @@ static void octave_text(char *t)
 /* a screen reader that has just started listening (or asks) hears the whole screen */
 static void speak(void)
 {
-    char t[96], o[4];
+    char t[112], o[4], o2[8];
     if (ann_on() && ann_where()) {
         octave_text(o);
         t[0] = 0;
@@ -641,6 +644,9 @@ static void speak(void)
         text_cat(t, grav_engine_name(*track_engine(track_sel)));
         text_cat(t, ". TRACK ");
         text_cat(t, TRACK_NAME[track_sel]);
+        int_text((int32_t)seq_bpm(&seq), o2);
+        text_cat(t, ". TEMPO ");
+        text_cat(t, o2);
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -1587,7 +1593,12 @@ static void draw(void)
     /* Header */
     cv_begin(240, 32, C_BLACK);
     cv_text(6, 6, &FONT_B, "GRAV CODE", C_WHITE);
-    cv_text(136, 10, &FONT_XS, PAGE_NAME[active_page], C_HI);
+    {                                        /* the song's tempo in the middle (amber: a MIDI clock in's, leading) */
+        const int32_t w = text_w(&FONT_B, ui.bpm_text) + 3 + text_w(&FONT_T, "BPM"), x = 120 - w / 2;
+        cv_text(x, 6, &FONT_B, ui.bpm_text, ui.shown_ext ? C_HI : C_WHITE);
+        cv_text(x + w - text_w(&FONT_T, "BPM"), 10, &FONT_T, "BPM", C_GRAY);
+    }
+    cv_text(196 - text_w(&FONT_XS, PAGE_NAME[active_page]), 10, &FONT_XS, PAGE_NAME[active_page], C_HI);   /* the page */
 
 
 
@@ -1741,6 +1752,12 @@ void app_frame(void)
             ui.msg_until = 0;
         ui.redraw = 1;
     }
+    if (seq_bpm(&seq) != ui.shown_bpm || seq.ext != ui.shown_ext) {   /* the tempo: TEMPO turned, or a clock in's */
+        ui.shown_bpm = seq_bpm(&seq);
+        ui.shown_ext = seq.ext;
+        int_text((int32_t)ui.shown_bpm, ui.bpm_text);
+        ui.redraw = 1;
+    }
     if (ui.tracks_until && now >= ui.tracks_until) {   /* the tracks' list goes */
         ui.tracks_until = 0;
         ui.redraw = 1;
@@ -1857,6 +1874,10 @@ int app_expect(const char *what, int *got)
         *got = (int)grav_debug.masks[1];
     else if (!strcmp(what, "fx_core"))       /* the core the effect ran on: 1 CPU1, a chunk behind the voices */
         *got = (int)grav_debug.fx_core;
+    else if (!strcmp(what, "header_bpm"))    /* the tempo the header shows, and whether a clock in's (amber) */
+        *got = (int)ui.shown_bpm;
+    else if (!strcmp(what, "header_ext"))
+        *got = ui.shown_ext;
     else if (!strncmp(what, "vgate", 5))     /* vgateN: voice N's note held (0..3 the synth tracks', 4..7 the drums') */
         *got = synth.voice[atoi(what + 5) % SYNTH_VOICES_MAX].gate;
     else if (!strcmp(what, "render_voices"))

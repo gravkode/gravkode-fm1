@@ -49,12 +49,13 @@ your own risk.
 
 ## 2. The screen
 
-![The OSC page at rest: GRAV CODE and the page's name at the top, the battery at the right; WAVESHAPE; TIMBRE 65, MORPH 50, HARMONICS 75 with their bars; the keyboard; OCT +0, PRESET WAVESHAPE, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
+![The OSC page at rest: GRAV CODE, the tempo (120 BPM) and the page's name at the top, the battery at the right; WAVESHAPE; TIMBRE 65, MORPH 50, HARMONICS 75 with their bars; the keyboard; OCT +0, PRESET WAVESHAPE, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
 
 From the top:
 
-- **The header:** GRAV CODE, the page you are on (SEQ, OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE, FX MIX or DEBUG), and
-  the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
+- **The header:** GRAV CODE; in the middle the tempo, the whole song's, in BPM (amber while a MIDI clock coming in
+  leads, section 5); the page you are on (SEQ, OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE, FX MIX or DEBUG), and the
+  battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
 - **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
   is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine and voices.
