@@ -14,7 +14,7 @@ typedef struct {
     synth_event_type_t type;
     int32_t note;
     uint32_t velocity;
-    uint32_t track;                      /* a note's track (SYNTH_TRACKS: S1..S4 = 0..3) */
+    uint32_t track;                      /* a note's track (S1..S4 = 0..3, D1..D4 = 4..7) */
 } synth_event_t;
 
 typedef struct {

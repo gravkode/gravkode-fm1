@@ -202,6 +202,7 @@ void grav_engine_render(
         sound[t].timbre = timbre;
         sound[t].morph = morph;
         sound[t].harmonics = harmonics;
+        sound[t].pitch = 0.0f;
     }
     grav_engine_render_tracks(e, lr, n, synth, master_q12, sound, pitch_offset, fx);
 }
@@ -257,7 +258,7 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
             e->asleep[v] = 0;
             e->fade_left[v] = 0;
         }
-        if (v >= synth->voices) {        /* (VOICES changed: every note was let go) */
+        if (track == SYNTH_NO_TRACK) {   /* (no track: VOICES left it free, every note let go) */
             if (six_op[v] && !e->asleep[v])
                 grav_plaits_reset_voice(v);
             e->asleep[v] = 1;
@@ -265,7 +266,7 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         } else if (voice->shed && !e->asleep[v] && !e->fade_left[v]) {
             e->fade_left[v] = GRAV_SHED_FADE;   /* the overload protection took it: it fades out, then sleeps */
         }
-        work.p[v].note = (float)voice->note + pitch_offset;
+        work.p[v].note = (float)voice->note + pitch_offset + snd->pitch;
         work.p[v].timbre = snd->timbre;
         work.p[v].morph = snd->morph;
         work.p[v].harmonics = snd->harmonics;

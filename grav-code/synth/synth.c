@@ -2,7 +2,7 @@
 
 void synth_init(synth_t *s)
 {
-    static const uint8_t ONE_TRACK[SYNTH_TRACKS] = {1, 0, 0, 0};
+    static const uint8_t ONE_TRACK[SYNTH_S_TRACKS] = {1, 0, 0, 0};
     s->note = -1;
     s->voices = 0;
     s->clock = 0;
@@ -21,6 +21,11 @@ void synth_init(synth_t *s)
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
         s->track[t].first = s->track[t].count = 0;
         s->track[t].held_n = 0;
+    }
+    for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {   /* a drum track: its one voice, always */
+        s->track[SYNTH_S_TRACKS + d].first = (uint8_t)(SYNTH_POLY_VOICES + d);
+        s->track[SYNTH_S_TRACKS + d].count = 1;
+        s->voice_track[SYNTH_POLY_VOICES + d] = (uint8_t)(SYNTH_S_TRACKS + d);
     }
     synth_set_tracks(s, ONE_TRACK);
     lfo_init(&s->mod_lfo, 44100.0f);
@@ -147,38 +152,38 @@ void synth_panic(synth_t *s)
     }
 }
 
-void synth_set_tracks(synth_t *s, const uint8_t counts[SYNTH_TRACKS])
+void synth_set_tracks(synth_t *s, const uint8_t counts[SYNTH_S_TRACKS])
 {
     uint32_t total = 0, changed = 0;
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)
         total += counts[t];
-    if (total > SYNTH_VOICES_MAX)
+    if (total > SYNTH_POLY_VOICES)
         return;
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)
         changed |= s->track[t].count != counts[t];
     if (!changed && s->voices == total)
         return;
     synth_panic(s);
     uint32_t first = 0;
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {
         s->track[t].first = (uint8_t)first;
         s->track[t].count = counts[t];
         for (uint32_t i = 0; i < counts[t]; i++)
             s->voice_track[first + i] = (uint8_t)t;
         first += counts[t];
     }
-    for (uint32_t i = first; i < SYNTH_VOICES_MAX; i++)
+    for (uint32_t i = first; i < SYNTH_POLY_VOICES; i++)   /* (the drums' voices stay theirs) */
         s->voice_track[i] = SYNTH_NO_TRACK;
     s->voices = total;
 }
 
 void synth_set_voices(synth_t *s, uint32_t voices)
 {
-    uint8_t counts[SYNTH_TRACKS] = {0, 0, 0, 0};
+    uint8_t counts[SYNTH_S_TRACKS] = {0, 0, 0, 0};
     if (voices < 1)
         voices = 1;
-    if (voices > SYNTH_VOICES_MAX)
-        voices = SYNTH_VOICES_MAX;
+    if (voices > SYNTH_POLY_VOICES)
+        voices = SYNTH_POLY_VOICES;
     counts[0] = (uint8_t)voices;
     synth_set_tracks(s, counts);
 }
@@ -193,13 +198,15 @@ void synth_shed(synth_t *s)
 {
     synth_voice_t *oldest = 0;
     uint32_t sounding = 0;
-    for (uint32_t i = 0; i < s->voices; i++) {
+    for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++) {
         synth_voice_t *v = &s->voice[i];
-        if (v->shed || (!v->gate && v->env.stage == ENV_IDLE))
+        if (s->voice_track[i] == SYNTH_NO_TRACK || v->shed || (!v->gate && v->env.stage == ENV_IDLE))
             continue;                        /* quiet already */
         sounding++;
-        if (!oldest || (!v->gate && oldest->gate) || (v->gate == oldest->gate && v->age < oldest->age))
-            oldest = v;                      /* one let go first, then the oldest */
+        const int drum = i >= SYNTH_POLY_VOICES, oldest_drum = oldest && oldest >= &s->voice[SYNTH_POLY_VOICES];
+        if (!oldest || (oldest_drum && !drum) ||
+            (drum == oldest_drum && ((!v->gate && oldest->gate) || (v->gate == oldest->gate && v->age < oldest->age))))
+            oldest = v;                      /* a synth track's first; one let go first, then the oldest */
     }
     if (!oldest || sounding < 2)
         return;                              /* the last one sounding stays: cutting it would only lose the note */
@@ -211,7 +218,8 @@ void synth_shed(synth_t *s)
 uint32_t synth_voices_held(const synth_t *s)
 {
     uint32_t n = 0;
-    for (uint32_t i = 0; i < s->voices; i++)
-        n += s->voice[i].gate;
+    for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++)
+        if (s->voice_track[i] != SYNTH_NO_TRACK)
+            n += s->voice[i].gate;
     return n;
 }

@@ -1,6 +1,6 @@
-/* GRAV CODE's sequencer: 4 tracks (0.16; S1..S4, the synth's) of 64 steps in 4 pages of 16, each its own length of
- * 1..64 (polymeters), one tempo and swing, MIDI clock out and in. It runs in the audio interrupt: each block it gives the events that fall in it, at their sample
- * offsets on a 24-sample grid (app.c renders between them: 0.5 ms, not a block's 5.8 ms). The UI edits the pattern
+/* GRAV CODE's sequencer: 8 tracks (S1..S4 the synth's, 0.16; D1..D4 the drums', 0.17) of 64 steps in 4 pages of 16,
+ * each its own length of 1..64 (polymeters), one tempo and swing, MIDI clock out and in. It runs in the audio
+ * interrupt: each block it gives the events that fall in it, at their sample offsets on a 24-sample grid (app.c renders between them: 0.5 ms, not a block's 5.8 ms). The UI edits the pattern
  * (under plat_lock) and asks for start and stop through want. */
 #pragma once
 #include <stdint.h>
@@ -14,11 +14,13 @@
 #define SEQ_SWING_MIN 50u                /* straight */
 #define SEQ_SWING_MAX 75u
 #define SEQ_GRID 24u                     /* the events' grid in samples: GRAV_PLAITS_BLOCK, 0.54 ms */
-#define SEQ_TRACKS 4u
-#define SEQ_SOUNDING 32u                 /* notes the sequencer holds at once */
-#define SEQ_EVENTS 96u                   /* a block's events, at most */
+#define SEQ_TRACKS 8u
+#define SEQ_S_TRACKS 4u                  /* the synth tracks, 0..3; the drum tracks 4..7 */
+#define SEQ_SOUNDING 48u                 /* notes the sequencer holds at once */
+#define SEQ_EVENTS 128u                  /* a block's events, at most */
 #define SEQ_MAGIC_V1 0x53455131u         /* "SEQ1": 0.15's record, one track (seq_pattern_v1_t) */
-#define SEQ_MAGIC 0x53455132u            /* "SEQ2": the pattern's record (app.c OBJ_SEQ) */
+#define SEQ_MAGIC 0x53455132u            /* "SEQ2": the synth tracks' record (app.c OBJ_SEQ; 0.16's whole pattern) */
+#define SEQ_MAGIC_DRUMS 0x44524D31u      /* "DRM1": the drum tracks' record (app.c OBJ_DRUMS) */
 
 typedef struct {
     uint8_t on;                          /* 1: the step plays */
@@ -41,7 +43,22 @@ typedef struct {
     uint8_t swing;                       /* SEQ_SWING_MIN..MAX: the first of each pair of steps' share, in % */
     uint8_t rsv;
     seq_track_t track[SEQ_TRACKS];
+    uint32_t drum_magic;                 /* SEQ_MAGIC_DRUMS: the end of the drum tracks' record */
 } seq_pattern_t;
+
+/* saved in two records (a store object holds 3840 bytes at most), each as it lies in the pattern (no copy to save):
+ * its head, the synth tracks with the tempo (as 0.16 saved its whole pattern), and its tail, the drum tracks */
+typedef struct {
+    uint32_t magic;                      /* SEQ_MAGIC */
+    uint16_t bpm;
+    uint8_t swing, rsv;
+    seq_track_t track[SEQ_S_TRACKS];
+} seq_record_t;
+
+typedef struct {
+    seq_track_t track[SEQ_TRACKS - SEQ_S_TRACKS];
+    uint32_t magic;                      /* SEQ_MAGIC_DRUMS */
+} seq_drum_record_t;
 
 typedef struct {                         /* 0.15's record: one track */
     uint32_t magic;                      /* SEQ_MAGIC_V1 */
@@ -90,3 +107,8 @@ uint32_t seq_bpm(const seq_t *s);        /* the tempo playing: the pattern's, or
 int seq_valid(const seq_pattern_t *p);   /* a loaded record that can be played */
 /* 0.15's record, read into S1 of a pattern (the others empty); 0 if it is no such record */
 int seq_from_v1(const seq_pattern_v1_t *v1, seq_pattern_t *p);
+/* a pattern's two records, where they lie in it: OBJ_SEQ's (a seq_record_t) and OBJ_DRUMS' (a seq_drum_record_t) */
+static inline const void *seq_record_of(const seq_pattern_t *p) { return p; }
+static inline const void *seq_drum_record_of(const seq_pattern_t *p) { return &p->track[SEQ_S_TRACKS]; }
+int seq_from_record(const seq_record_t *r, seq_pattern_t *p);          /* the synth tracks, tempo, swing; 0: refused */
+int seq_from_drum_record(const seq_drum_record_t *d, seq_pattern_t *p);   /* the drum tracks; 0: refused */

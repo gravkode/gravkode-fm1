@@ -1,5 +1,6 @@
 # The sequencer (0.15): SEQ (HOME) at power-on; step mode (SEQ): the steps on the white keys, the pages on OCT- / OCT+
-# and the first black keys, SEQ held and a step: the length; a step held and K1..K3: its note, velocity, length;
+# (the black keys pick the tracks since 0.17), SEQ held and a step: the length; a step held and K1..K3: its note,
+# velocity, length;
 # REC (stopped): step recording; PLAY: start, stop, over USB MIDI (notes, clock, start, stop); MIDI clock in; SAVE
 # keeps the pattern. tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/seq.txt grav-code/build/host
@@ -32,7 +33,7 @@ expect step0 0
 # a new step plays the last chord played: C4 at 100 before any
 expect stepnote2 60
 expect stepvel2 100
-# the pages: OCT+ shows page 2 (steps 17..32), its first key is step 17; the first black key: page 1 again
+# the pages: OCT+ shows page 2 (steps 17..32), its first key is step 17; OCT-: page 1 again
 tap OCT+
 wait 30
 expect seq_page 1
@@ -42,9 +43,7 @@ wait 30
 key 0 up
 wait 30
 expect step16 1
-key 1 down 100 0
-wait 30
-key 1 up
+tap OCT-
 wait 30
 expect seq_page 0
 # SEQ held and a step: the length (step 12, the 12th white key: key 19); step mode stays on

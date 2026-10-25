@@ -20,6 +20,7 @@ void seq_defaults(seq_pattern_t *p)
 {
     memset(p, 0, sizeof *p);
     p->magic = SEQ_MAGIC;
+    p->drum_magic = SEQ_MAGIC_DRUMS;
     p->bpm = 120;
     p->swing = SEQ_SWING_MIN;
     for (uint32_t k = 0; k < SEQ_TRACKS; k++) {
@@ -47,12 +48,47 @@ static int steps_valid(const seq_step_t *step, uint32_t length)
 
 int seq_valid(const seq_pattern_t *p)
 {
-    if (p->magic != SEQ_MAGIC || p->bpm < SEQ_BPM_MIN || p->bpm > SEQ_BPM_MAX || p->swing < SEQ_SWING_MIN ||
-        p->swing > SEQ_SWING_MAX)
+    if (p->magic != SEQ_MAGIC || p->drum_magic != SEQ_MAGIC_DRUMS || p->bpm < SEQ_BPM_MIN || p->bpm > SEQ_BPM_MAX ||
+        p->swing < SEQ_SWING_MIN || p->swing > SEQ_SWING_MAX)
         return 0;
     for (uint32_t k = 0; k < SEQ_TRACKS; k++)
         if (!steps_valid(p->track[k].step, p->track[k].length))
             return 0;
+    return 1;
+}
+
+/* the records lie in the pattern as saved: its head the synth tracks', its tail the drums' */
+_Static_assert(sizeof(seq_record_t) == __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]) &&
+               __builtin_offsetof(seq_record_t, track) == __builtin_offsetof(seq_pattern_t, track) &&
+               sizeof(seq_drum_record_t) ==
+                   sizeof(seq_pattern_t) - __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]) &&
+               __builtin_offsetof(seq_drum_record_t, magic) == __builtin_offsetof(seq_pattern_t, drum_magic) -
+                                                                   __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]),
+               "a pattern's records, where they lie in it");
+_Static_assert(sizeof(seq_record_t) <= 3840u && sizeof(seq_drum_record_t) <= 3840u, "each fits a store object");
+
+int seq_from_record(const seq_record_t *r, seq_pattern_t *p)
+{
+    if (r->magic != SEQ_MAGIC || r->bpm < SEQ_BPM_MIN || r->bpm > SEQ_BPM_MAX || r->swing < SEQ_SWING_MIN ||
+        r->swing > SEQ_SWING_MAX)
+        return 0;
+    for (uint32_t k = 0; k < SEQ_S_TRACKS; k++)
+        if (!steps_valid(r->track[k].step, r->track[k].length))
+            return 0;
+    p->bpm = r->bpm;
+    p->swing = r->swing;
+    memcpy(p->track, r->track, sizeof r->track);
+    return 1;
+}
+
+int seq_from_drum_record(const seq_drum_record_t *d, seq_pattern_t *p)
+{
+    if (d->magic != SEQ_MAGIC_DRUMS)
+        return 0;
+    for (uint32_t k = 0; k < SEQ_TRACKS - SEQ_S_TRACKS; k++)
+        if (!steps_valid(d->track[k].step, d->track[k].length))
+            return 0;
+    memcpy(&p->track[SEQ_S_TRACKS], d->track, sizeof d->track);
     return 1;
 }
 

@@ -43,7 +43,7 @@ extern "C" int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg) {
 extern "C" int plat_cpu2_wait(void) { worker.join(); return 0; }
 
 static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
-                                 bool dual, bool reject, bool offline, bool toggle) {
+                                 bool dual, bool reject, bool offline, bool toggle, bool drums = false) {
     stmlib::Random::Seed(0x21);
     synth_t synth;
     grav_engine_t dsp;
@@ -69,6 +69,11 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
         }
         if (b == 1)
             for (unsigned v = 1; v < voices; ++v) synth_note_on(&synth, 60 + 3 * v, 80 + v);
+        if (drums && b % 3 == 0) {          // the drum tracks D1..D4 (voices 4..7): a hit each, in turn
+            const unsigned d = SYNTH_S_TRACKS + (b / 3) % SYNTH_D_TRACKS;
+            synth_track_note_off(&synth, d, 36 + 2 * (b / 3 % 4));
+            synth_track_note_on(&synth, d, 36 + 2 * (b / 3 % 4), 90 + b);
+        }
         if (b == 25) synth_panic(&synth);
         if (toggle) grav_dual_core = b % 3 != 0;
         fx.freeze = fx_on && b >= 20 && b < 24;
@@ -77,7 +82,21 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
         int32_t output[512];
         const unsigned current_engine = b >= 16 && b < 33 ? (engine + 1) % GRAV_ENGINE_COUNT : engine;
         const float timbre = float(b % 3) * 0.5f;
-        grav_engine_render(&dsp, output, n, &synth, current_engine, 3200, timbre, 0.5f, 0.75f, 0.0f, &fx);
+        if (drums) {                         // each track its sound: the synth tracks the engine, the drums a kit
+            static const unsigned KIT[SYNTH_D_TRACKS] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM,
+                                                         GRAV_ENGINE_HI_HAT, GRAV_ENGINE_HI_HAT};
+            grav_sound_t sound[SYNTH_TRACKS];
+            for (unsigned t = 0; t < SYNTH_TRACKS; ++t) {
+                const bool drum = t >= SYNTH_S_TRACKS;
+                sound[t].engine = drum ? KIT[t - SYNTH_S_TRACKS] : current_engine;
+                sound[t].timbre = drum ? 0.3f + 0.1f * float(t - SYNTH_S_TRACKS) : timbre;
+                sound[t].morph = drum ? 0.6f : 0.5f;
+                sound[t].harmonics = drum ? 0.45f : 0.75f;
+                sound[t].pitch = 0.0f;
+            }
+            grav_engine_render_tracks(&dsp, output, n, &synth, 3200, sound, 0.0f, &fx);
+        } else
+            grav_engine_render(&dsp, output, n, &synth, current_engine, 3200, timbre, 0.5f, 0.75f, 0.0f, &fx);
         assert(!worker.joinable());
         assert((grav_debug.masks[0] & grav_debug.masks[1]) == 0);
         result.insert(result.end(), output, output + 2 * n);
@@ -240,13 +259,15 @@ int main() {
     if (!six_op_controls()) return 1;
     unsigned comparisons = 0;
     for (unsigned e = 0; e < GRAV_ENGINE_COUNT; ++e) {
-        for (unsigned voices = 1; voices <= 4; ++voices) {
+        for (unsigned voices = 1; voices <= 5; ++voices) {   // 5: the four synth voices and the four drums'
+            const bool drums = voices > 4;
             for (bool fx : {false, true}) {
-                const auto reference = render(e, voices, fx, false, false, false, false);
+                const auto reference = render(e, drums ? 4 : voices, fx, false, false, false, false, drums);
                 for (unsigned mode = 0; mode < 4; ++mode) {
-                    const auto actual = render(e, voices, fx, true, mode == 1, mode == 2, mode == 3);
+                    const auto actual = render(e, drums ? 4 : voices, fx, true, mode == 1, mode == 2, mode == 3, drums);
                     if (actual != reference) {
-                        std::fprintf(stderr, "Mismatch engine=%u voices=%u fx=%d mode=%u\n", e, voices, fx, mode);
+                        std::fprintf(stderr, "Mismatch engine=%u voices=%u drums=%d fx=%d mode=%u\n", e,
+                                     drums ? 4 : voices, drums, fx, mode);
                         return 1;
                     }
                     ++comparisons;
@@ -255,6 +276,6 @@ int main() {
         }
     }
     assert(dispatched > 0 && overlaps > 0);
-    std::printf("PASS: %u bit-exact comparisons across 24 engines, 1..4 voices, FX off/on; "
+    std::printf("PASS: %u bit-exact comparisons across 24 engines, 1..4 voices and 4 + 4 drums, FX off/on; "
                 "%u real worker jobs, %u overlap observations\n", comparisons, dispatched, overlaps.load());
 }

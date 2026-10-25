@@ -37,7 +37,9 @@ enum {                                   /* the engines, by the settings' engine
     GRAV_ENGINE_COUNT
 };
 
-#define GRAV_VOICES 4u                  /* engines run side by side: one per voice (synth/synth.h SYNTH_VOICES_MAX) */
+#define GRAV_VOICES 8u                  /* engines run side by side: one per voice (synth/synth.h SYNTH_VOICES_MAX) */
+#define GRAV_BIG_VOICES 4u              /* voices 0..3 take any engine (the synth tracks'); 4..7 a drum (BASS DRUM,
+                                         * SNARE, HI-HAT: the drum tracks'), in small slots of their own */
 
 typedef struct {
     float note;                          /* a MIDI note; a fraction for the LFO's pitch */
@@ -62,8 +64,10 @@ void grav_plaits_reset_voice(uint32_t voice);
 int grav_plaits_render(uint32_t voice, const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
 
 const char *grav_engine_name(uint32_t engine);           /* on the screen: 10 characters at most */
+int grav_engine_is_drum(uint32_t engine);                /* BASS DRUM, SNARE, HI-HAT: a drum voice's */
+uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* PRESET on a drum track: among those three, round */
 uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* PRESET: steps away in Plaits' order, round */
-uint32_t grav_plaits_ram_used(void);     /* bytes of voice 1's RAM its engine's Init took (S1's engine) */
+uint32_t grav_plaits_ram_used(uint32_t voice);   /* bytes of a voice's RAM its engine's Init took */
 
 #ifdef __cplusplus
 }

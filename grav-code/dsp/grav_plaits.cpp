@@ -124,6 +124,13 @@ const size_t kSlotAlign = LargestAlign<GRAV_ENGINE_TYPES>();
 // 6-op FM 5, the string machine 4); tests/engines.txt checks every engine's share.
 const size_t kVoiceRam = 20 * 1024;
 
+// A drum voice's: the three drums' engines (a few hundred bytes each; the hi-hat's Init takes 192 bytes of RAM)
+#define GRAV_DRUM_TYPES plaits::BassDrumEngine, plaits::SnareDrumEngine, plaits::HiHatEngine
+const size_t kDrumSlotSize = LargestSize<GRAV_DRUM_TYPES>();
+const size_t kDrumSlotAlign = LargestAlign<GRAV_DRUM_TYPES>();
+const size_t kDrumRam = 512;
+const uint32_t kDrumVoices = GRAV_VOICES - GRAV_BIG_VOICES;
+
 // A voice's engine. The FM-1 runs no C++ static constructors (its link keeps no .init_array), so an engine can't
 // be a static object (its vtable pointer would stay zero, and the first virtual call jump to nowhere): it is built
 // in the voice's slot (placement new) whenever the voice takes up an engine.
@@ -133,7 +140,10 @@ const size_t kVoiceRam = 20 * 1024;
 // after a bank change was silent). The FM-1's blocks (256) are no multiple of 12, so the engine's blocks go
 // through a FIFO, each sample at most 11 late (0.25 ms).
 struct Voice {
-  alignas(kSlotAlign) unsigned char slot[kSlotSize];
+  unsigned char* slot;               // where its engine is built, and its RAM (a synth voice's big, a drum's small)
+  size_t slot_size;
+  char* ram;
+  size_t ram_size;
   plaits::Engine* engine;
   float fifo_out[plaits::kBlockSize];
   float fifo_aux[plaits::kBlockSize];
@@ -144,9 +154,15 @@ struct Voice {
   uint32_t ram_used;                 // bytes of its RAM the engine's Init took
 };
 
-// In the FM-1's pool (zeroed at boot; all plain data, nothing to construct): 4 x 24 KB.
-Voice voices[GRAV_VOICES] GRAV_POOL;
-char voice_ram[GRAV_VOICES][kVoiceRam] __attribute__((aligned(8))) GRAV_POOL;
+// The voices (plain data: nothing to construct); the synth voices' slots and RAM in the FM-1's pool (4 x 24 KB),
+// the drum voices' in the RAM (4 x 1 KB)
+Voice voices[GRAV_VOICES];
+alignas(kSlotAlign) unsigned char voice_slot[GRAV_BIG_VOICES][kSlotSize] GRAV_POOL;
+char voice_ram[GRAV_BIG_VOICES][kVoiceRam] __attribute__((aligned(8))) GRAV_POOL;
+alignas(kDrumSlotAlign) unsigned char drum_slot[kDrumVoices][kDrumSlotSize];
+char drum_ram[kDrumVoices][kDrumRam] __attribute__((aligned(8)));
+
+static_assert(GRAV_VOICES > GRAV_BIG_VOICES, "drum voices after the synth's");
 
 bool initialized;
 
@@ -183,18 +199,25 @@ plaits::Engine* Build(uint32_t engine, void* slot) {
 // An engine chosen for a voice: built in it, from Init, with its user data (the 6-op FM's bank) and a fresh start,
 // as Plaits' Voice starts an engine it switches to. (The engines' destructors do nothing: a slot is just reused.)
 // Each voice its own (since 0.16: each track's engine in its voices).
+bool is_drum(uint32_t engine) {
+  return engine == GRAV_ENGINE_BASS_DRUM || engine == GRAV_ENGINE_SNARE_DRUM || engine == GRAV_ENGINE_HI_HAT;
+}
+
 void choose(uint32_t i, uint32_t engine) {
   Voice& v = voices[i];
+  if (i >= GRAV_BIG_VOICES && !is_drum(engine)) {
+    engine = GRAV_ENGINE_BASS_DRUM;   // (a drum voice's slot fits a drum alone)
+  }
   const uint32_t previous_random = stmlib::Random::state();
   stmlib::Random::Seed(0x21u + i * 0x9e3779b9u);
   // Init does not clear every engine's scratch memory (notably the staggered 6-op FM buffers).
   // A newly selected engine must not consume samples/state left by a previous engine.
-  std::memset(v.slot, 0, sizeof v.slot);
-  std::memset(voice_ram[i], 0, kVoiceRam);
+  std::memset(v.slot, 0, v.slot_size);
+  std::memset(v.ram, 0, v.ram_size);
   v.engine = Build(engine, v.slot);
-  stmlib::BufferAllocator allocator(voice_ram[i], kVoiceRam);
+  stmlib::BufferAllocator allocator(v.ram, v.ram_size);
   v.engine->Init(&allocator);
-  v.ram_used = kVoiceRam - allocator.free();
+  v.ram_used = v.ram_size - allocator.free();
   v.engine->LoadUserData(info[engine].user_data);
   v.engine->Reset();
   v.fifo_read = plaits::kBlockSize;
@@ -207,8 +230,14 @@ void choose(uint32_t i, uint32_t engine) {
 }  // namespace
 
 extern "C" void grav_plaits_init(void) {
-  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
-    choose(i, GRAV_ENGINE_WAVESHAPING);
+  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {   // each voice its storage (no static constructors: set here)
+    Voice& v = voices[i];
+    const bool drum = i >= GRAV_BIG_VOICES;
+    v.slot = drum ? drum_slot[i - GRAV_BIG_VOICES] : voice_slot[i];
+    v.slot_size = drum ? kDrumSlotSize : kSlotSize;
+    v.ram = drum ? drum_ram[i - GRAV_BIG_VOICES] : voice_ram[i];
+    v.ram_size = drum ? kDrumRam : kVoiceRam;
+    choose(i, drum ? GRAV_ENGINE_BASS_DRUM : GRAV_ENGINE_WAVESHAPING);
   }
   initialized = true;
 }
@@ -222,6 +251,9 @@ extern "C" void grav_plaits_voice_engine(uint32_t voice, uint32_t engine) {
   }
   if (engine >= GRAV_ENGINE_COUNT) {
     engine = GRAV_ENGINE_WAVESHAPING;
+  }
+  if (voice >= GRAV_BIG_VOICES && !is_drum(engine)) {
+    engine = GRAV_ENGINE_BASS_DRUM;   // (as choose builds it: not built anew at every block)
   }
   if (engine != voices[voice].id) {
     choose(voice, engine);
@@ -302,6 +334,17 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
   return v.fifo_enveloped ? 1 : 0;
 }
 
+extern "C" int grav_engine_is_drum(uint32_t engine) {
+  return is_drum(engine) ? 1 : 0;
+}
+
+extern "C" uint32_t grav_drum_step(uint32_t engine, int32_t steps) {
+  static const uint8_t drums[3] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM, GRAV_ENGINE_HI_HAT};
+  int32_t at = engine == GRAV_ENGINE_SNARE_DRUM ? 1 : engine == GRAV_ENGINE_HI_HAT ? 2 : 0;
+  at = ((at + steps) % 3 + 3) % 3;
+  return drums[at];
+}
+
 extern "C" const char* grav_engine_name(uint32_t engine) {
   return info[engine < GRAV_ENGINE_COUNT ? engine : 0].name;
 }
@@ -315,6 +358,6 @@ extern "C" uint32_t grav_engine_step(uint32_t engine, int32_t steps) {
   return order[at];
 }
 
-extern "C" uint32_t grav_plaits_ram_used(void) {
-  return voices[0].ram_used;
+extern "C" uint32_t grav_plaits_ram_used(uint32_t voice) {
+  return voices[voice % GRAV_VOICES].ram_used;
 }

@@ -1,6 +1,7 @@
 # The synth tracks (0.16): S1..S4, each its engine, OSC knobs, voices and steps. SELECT picks one (on every page,
 # with the tracks' list for a moment); the keys, MIDI in, PRESET, OSC, GLO VOICES and step mode are for it; the
-# black keys 5..8 pick one in step mode; each track's notes go out on its MIDI channel; SAVE keeps them all.
+# black keys 1..4 pick one in step mode (5..8 the drum tracks, tests/drums.txt); each track's notes go out on its
+# MIDI channel; SAVE keeps them all.
 #   grav-code/build/host/grav_code_host grav-code/tests/tracks.txt grav-code/build/host
 wait 600
 # at first: S1 selected; a lead, a bass (VA VCF), chords, a pluck (STRING); one voice each
@@ -68,7 +69,7 @@ wait 50
 expect voices_held 0
 key 7 up
 wait 30
-# step mode: S1's step 1 on; the black key 6 picks S2: its steps 1 and 2 on, its length 3 (SEQ held, step 3)
+# step mode: S1's step 1 on; the black key 2 picks S2: its steps 1 and 2 on, its length 3 (SEQ held, step 3)
 turn SELECT -3
 wait 30
 expect track 0
@@ -81,9 +82,9 @@ wait 30
 key 0 up
 wait 30
 expect step0 1
-key 13 down 100 0
+key 3 down 100 0
 wait 30
-key 13 up
+key 3 up
 wait 30
 expect track 1
 expect step0 0
@@ -105,10 +106,10 @@ expect step0 1
 expect step1 1
 expect seq_length 3
 leds
-# S1's length stays 16 (black key 5: S1)
-key 10 down 100 0
+# S1's length stays 16 (black key 1: S1)
+key 1 down 100 0
 wait 30
-key 10 up
+key 1 up
 wait 30
 expect track 0
 expect seq_length 16

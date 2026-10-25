@@ -17,9 +17,9 @@ int app_sysex(const uint8_t *p, uint32_t n);
 
 /* the store: the app's objects (the panel calibration is the platform's), and their flash offsets. No radio: object
  * 2 is kept for OBJ_BLE (where its record may still be, from a build that had it), never written. OBJ_SEQ: the
- * sequencer's pattern (0.15) */
-enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_RSV_BLE, OBJ_SEQ, OBJ_NOBJ };
-#define APP_STORE_MAP {0xFC000u, 0xDC000u, 0xDE000u, 0xDA000u}
+ * sequencer's pattern (0.15; its synth tracks since 0.17), OBJ_DRUMS its drum tracks (0.17) */
+enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_RSV_BLE, OBJ_SEQ, OBJ_DRUMS, OBJ_NOBJ };
+#define APP_STORE_MAP {0xFC000u, 0xDC000u, 0xDE000u, 0xDA000u, 0xD8000u}
 
 /* the contract: the platform calls these */
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */

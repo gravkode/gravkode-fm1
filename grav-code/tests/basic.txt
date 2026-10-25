@@ -31,7 +31,7 @@ release FX
 tap SAVE
 wait 30
 expect dirty 0
-expect store_writes 2
+expect store_writes 3
 reboot
 wait 600
 expect octave 1

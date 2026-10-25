@@ -184,7 +184,8 @@ int main(void)
         CHECK(!s.ext && s.playing && ons > 5, "on our own tempo again: ext %u, %u notes", s.ext, ons);
     }
 
-    /* tracks: each its own length (polymeter), each event its track; S2 (length 3) beside S1 (length 4) */
+    /* tracks: each its own length (polymeter), each event its track; S2 (length 3) and D2 (length 5, its steps 1 and
+     * 3: a snare's note) beside S1 (length 4) */
     fresh(&s);
     for (uint32_t i = 0; i < 4; i++)
         s.pat.track[0].step[i].note[0] = (uint8_t)(60 + i);
@@ -194,10 +195,13 @@ int main(void)
         s.pat.track[1].step[i].on = 1;
         s.pat.track[1].step[i].note[0] = (uint8_t)(40 + i);
     }
+    s.pat.track[5].length = 5;
+    s.pat.track[5].step[0].on = s.pat.track[5].step[2].on = 1;
+    s.pat.track[5].step[0].note[0] = s.pat.track[5].step[2].note[0] = 38;
     s.want = SEQ_WANT_PLAY;
     run(&s, 260);                        /* 66560 samples: 12 steps */
     {
-        uint32_t k0 = 0, k1 = 0;
+        uint32_t k0 = 0, k1 = 0, k5 = 0;
         for (uint32_t i = 0; i < nlog; i++) {
             if (log_[i].e.type != SEQ_EV_ON)
                 continue;
@@ -207,12 +211,16 @@ int main(void)
             } else if (log_[i].e.track == 1) {
                 CHECK(log_[i].e.note == 40 + k1 % 3, "S2 step %u: note %u", k1, log_[i].e.note);
                 k1++;
+            } else if (log_[i].e.track == 5) {
+                CHECK(log_[i].e.note == 38, "D2: note %u", log_[i].e.note);
+                k5++;
             } else
                 CHECK(0, "a note on track %u", log_[i].e.track);
         }
         CHECK(k0 == 13 && k1 == 13, "both tracks every step: %u %u", k0, k1);
-        CHECK(s.step[0] == 0 && s.step[1] == 0 && s.hits[0] == 13 && s.hits[1] == 13,
-              "after 13 steps: S1 at %d, S2 at %d", s.step[0], s.step[1]);
+        CHECK(k5 == 6, "D2 on its steps 1 and 3 of 5 (steps 1 3 6 8 11 13): %u", k5);
+        CHECK(s.step[0] == 0 && s.step[1] == 0 && s.step[5] == 2 && s.hits[0] == 13 && s.hits[1] == 13 &&
+              s.hits[5] == 6, "after 13 steps: S1 at %d, S2 at %d, D2 at %d", s.step[0], s.step[1], s.step[5]);
     }
 
     /* a record saved, read back; 0.15's (one track) read into S1 */
@@ -237,10 +245,38 @@ int main(void)
         CHECK(!seq_from_v1(&v1, &p), "not a 0.15 record: refused");
     }
 
+    /* 0.17: the synth tracks (tempo, swing) and the drum tracks in two records (a store object: 3840 bytes at most) */
+    {
+        static seq_pattern_t p, q;
+        static seq_record_t r;
+        static seq_drum_record_t d;
+        CHECK(sizeof r <= 3840u && sizeof d <= 3840u, "the records fit the store: %u %u", (unsigned)sizeof r,
+              (unsigned)sizeof d);
+        seq_defaults(&p);
+        p.bpm = 133;
+        p.swing = 58;
+        p.track[1].length = 7;
+        p.track[1].step[3].on = 1;
+        p.track[5].length = 12;
+        p.track[5].step[9].on = 1;
+        p.track[5].step[9].note[0] = 38;
+        memcpy(&r, seq_record_of(&p), sizeof r);   /* (as the app saves them: where they lie in the pattern) */
+        memcpy(&d, seq_drum_record_of(&p), sizeof d);
+        CHECK(r.magic == SEQ_MAGIC && r.bpm == 133 && r.track[1].length == 7 && d.magic == SEQ_MAGIC_DRUMS &&
+              d.track[1].length == 12 && d.track[1].step[9].note[0] == 38, "the records in the pattern");
+        seq_defaults(&q);
+        CHECK(seq_from_record(&r, &q) && seq_from_drum_record(&d, &q) && !memcmp(&p, &q, sizeof p),
+              "both records back into the pattern");
+        d.track[2].length = 0;
+        CHECK(!seq_from_drum_record(&d, &q) && q.track[6].length == 16, "a bad drum record refused, the drums kept");
+        r.magic = 0;
+        CHECK(!seq_from_record(&r, &q) && q.bpm == 133, "not a record: refused");
+    }
+
     if (fails) {
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 4 tracks)\n");
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records)\n");
     return 0;
 }

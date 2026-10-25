@@ -40,19 +40,30 @@ typedef struct {
     uint8_t fx_reserved[3];
     /* 0.16: the synth tracks' sounds (S1..S4): engine, OSC's three knobs, voices (0..4, together 4 at most). engine_id
      * and osc[] above keep S1's, for the record's older readers */
-    uint8_t trk_engine[SYNTH_TRACKS];
-    uint8_t trk_osc[SYNTH_TRACKS][3];
-    uint8_t trk_voices[SYNTH_TRACKS];
+    uint8_t trk_engine[SYNTH_S_TRACKS];
+    uint8_t trk_osc[SYNTH_S_TRACKS][3];
+    uint8_t trk_voices[SYNTH_S_TRACKS];
     uint8_t trk_reserved[4];
+    /* 0.17: the drum tracks' sounds (D1..D4): a drum engine (BASS DRUM, SNARE, HI-HAT), OSC's three knobs */
+    uint8_t drum_engine[SYNTH_D_TRACKS];
+    uint8_t drum_osc[SYNTH_D_TRACKS][3];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
-_Static_assert(sizeof(settings_t) == 56 && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
-               SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine), "the settings record's layout");
+#define SET_SIZE_016 56                  /* as 0.16 saved it: up to trk_reserved[] (no drums) */
+_Static_assert(sizeof(settings_t) == 72 && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
+               SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine) &&
+               SET_SIZE_016 == __builtin_offsetof(settings_t, drum_engine), "the settings record's layout");
 /* a fresh FM-1's tracks: a lead, a bass, chords, a pluck; each one voice (MONO), so each plays at once */
-static const uint8_t TRACK_ENGINE[SYNTH_TRACKS] = {GRAV_ENGINE_WAVESHAPING, GRAV_ENGINE_VA_VCF, GRAV_ENGINE_CHORDS,
-                                                   GRAV_ENGINE_STRING};
-#define VOICES_DEFAULT SYNTH_VOICES_MAX
+static const uint8_t TRACK_ENGINE[SYNTH_S_TRACKS] = {GRAV_ENGINE_WAVESHAPING, GRAV_ENGINE_VA_VCF, GRAV_ENGINE_CHORDS,
+                                                     GRAV_ENGINE_STRING};
+/* and its kit: a kick, a snare, a closed and an open hi-hat (TIMBRE, MORPH: the decay, HARMONICS), each drum's note
+ * (the one a new step plays) */
+static const uint8_t DRUM_ENGINE[SYNTH_D_TRACKS] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM, GRAV_ENGINE_HI_HAT,
+                                                    GRAV_ENGINE_HI_HAT};
+static const uint8_t DRUM_OSC[SYNTH_D_TRACKS][3] = {{40, 55, 40}, {50, 50, 50}, {70, 25, 50}, {70, 70, 50}};
+static const uint8_t DRUM_NOTE[SYNTH_D_TRACKS] = {36, 55, 60, 60};
+#define VOICES_DEFAULT SYNTH_POLY_VOICES
 #define FIXED_VELOCITY 100u              /* the keys' velocity with VELOCITY off */
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
@@ -123,7 +134,12 @@ static const char *const QUALITY_NAME[GRAV_FX_QUALITIES] = {"DIGITAL", "VINTAGE"
 /* Plaits' three knobs (OSC), each track's: 0..100% */
 static volatile int32_t osc_params[SYNTH_TRACKS][3];
 static volatile uint8_t track_sel;       /* the track selected (SELECT): the keys, MIDI in and the pages play it */
-static const char *const TRACK_NAME[SYNTH_TRACKS] = {"S1", "S2", "S3", "S4"};
+static const char *const TRACK_NAME[SYNTH_TRACKS] = {"S1", "S2", "S3", "S4", "D1", "D2", "D3", "D4"};
+
+static uint8_t *track_engine(uint32_t t)   /* a track's engine, where the settings keep it */
+{
+    return t < SYNTH_S_TRACKS ? &set.trk_engine[t] : &set.drum_engine[(t - SYNTH_S_TRACKS) % SYNTH_D_TRACKS];
+}
 
 /* Parameters for future modulation and envelope DSP. */
 static volatile int32_t mod_params[3] = {50, 0, 0};
@@ -249,8 +265,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             synth_panic(&synth);
             break;
         case SYNTH_EVENT_VOICES: {           /* GLO: the tracks' voices (every voice let go) */
-            uint8_t counts[SYNTH_TRACKS];
-            for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+            uint8_t counts[SYNTH_S_TRACKS];
+            for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)
                 counts[t] = (uint8_t)((uint32_t)event.note >> (4u * t) & 15u);
             synth_set_tracks(&synth, counts);
             break;
@@ -307,24 +323,26 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
     uint32_t lfo_dest = lfo_destination(mod_params[2]);
     float pitch_offset = (lfo_dest == 2) ? lfo_value * 2.0f : 0.0f;
 
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* each track's sound, the one LFO on every track */
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* each track's sound, the one LFO on the synth tracks */
+        const int drum = SYNTH_IS_DRUM(t);
         float timbre = (float)osc_params[t][0] * 0.01f;
         float morph = (float)osc_params[t][1] * 0.01f;
-        if (lfo_dest == 0)
+        if (lfo_dest == 0 && !drum)
             timbre += lfo_value * 0.5f;
-        else if (lfo_dest == 1)
+        else if (lfo_dest == 1 && !drum)
             morph += lfo_value * 0.5f;
         if (timbre < 0.0f) timbre = 0.0f;
         if (timbre > 1.0f) timbre = 1.0f;
         if (morph < 0.0f) morph = 0.0f;
         if (morph > 1.0f) morph = 1.0f;
-        sound[t].engine = set.trk_engine[t];
+        sound[t].engine = *track_engine(t);
+        sound[t].pitch = drum ? 0.0f : pitch_offset;
         sound[t].timbre = timbre;
         sound[t].morph = morph;
         sound[t].harmonics = (float)osc_params[t][2] / 100.0f;
     }
 
-    grav_engine_render_tracks(&grav_engine, lr, n, &synth, master_q12, sound, pitch_offset, fx);
+    grav_engine_render_tracks(&grav_engine, lr, n, &synth, master_q12, sound, 0.0f, fx);
 
     lfo_advance(&synth.mod_lfo, n);
 }
@@ -349,9 +367,18 @@ void app_panic(void)
 }
 
 /* --------------------------------------------------------------- settings --- */
+static void drum_defaults(settings_t *s)   /* the drum tracks' kit */
+{
+    for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
+        s->drum_engine[d] = DRUM_ENGINE[d];
+        for (uint32_t i = 0; i < 3; i++)
+            s->drum_osc[d][i] = DRUM_OSC[d][i];
+    }
+}
+
 static void track_defaults(settings_t *s)   /* the tracks' sounds: S1 the record's one, the others their own */
 {
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {
         s->trk_engine[t] = t ? TRACK_ENGINE[t] : s->engine_id;
         s->trk_osc[t][0] = t ? 65 : s->osc[0];
         s->trk_osc[t][1] = t ? 50 : s->osc[1];
@@ -385,14 +412,18 @@ static void settings_defaults(void)
     set.reserved[0] = 0;
     fx_defaults(&set);
     track_defaults(&set);
+    drum_defaults(&set);
 }
 
 /* the knobs' parameters as they are now, into the settings record (SAVE writes the record) */
 static void settings_capture(void)
 {
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)
         for (uint32_t i = 0; i < 3; i++)
             set.trk_osc[t][i] = (uint8_t)osc_params[t][i];
+    for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++)
+        for (uint32_t i = 0; i < 3; i++)
+            set.drum_osc[d][i] = (uint8_t)osc_params[SYNTH_S_TRACKS + d][i];
     set.engine_id = set.trk_engine[0];       /* (S1's, where older readers look) */
     for (uint32_t i = 0; i < 3; i++)
         set.osc[i] = set.trk_osc[0][i];
@@ -416,10 +447,11 @@ void app_init(void)
     settings_defaults();
     set_dirty = 0;
 
-    if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == SET_SIZE_013 || loaded == (int)sizeof loaded_settings) &&
-        loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
+    if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == SET_SIZE_013 || loaded == SET_SIZE_016 ||
+         loaded == (int)sizeof loaded_settings) && loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
-        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_013 || loaded == SET_SIZE_012) &&
+        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_016 || loaded == SET_SIZE_013 ||
+             loaded == SET_SIZE_012) &&
             loaded_settings.magic == SET_MAGIC &&
             loaded_settings.engine_id < GRAV_ENGINE_COUNT) {
             int valid = 1;
@@ -428,7 +460,16 @@ void app_init(void)
                 fx_defaults(&loaded_settings);
             if (loaded <= SET_SIZE_013)      /* (saved before 0.16, one sound: S1's, the other tracks their own) */
                 track_defaults(&loaded_settings);
-            for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+            if (loaded <= SET_SIZE_016)      /* (saved before 0.17: the drums' kit as it comes) */
+                drum_defaults(&loaded_settings);
+            for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
+                if (!grav_engine_is_drum(loaded_settings.drum_engine[d]))
+                    valid = 0;
+                for (uint32_t i = 0; i < 3; i++)
+                    if (loaded_settings.drum_osc[d][i] > 100u)
+                        valid = 0;
+            }
+            for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {
                 voices += loaded_settings.trk_voices[t];
                 if (loaded_settings.trk_engine[t] >= GRAV_ENGINE_COUNT || loaded_settings.trk_voices[t] > 4u)
                     valid = 0;
@@ -436,7 +477,7 @@ void app_init(void)
                     if (loaded_settings.trk_osc[t][i] > 100u)
                         valid = 0;
             }
-            if (voices > SYNTH_VOICES_MAX)
+            if (voices > SYNTH_POLY_VOICES)
                 valid = 0;
             for (int i = 0; i < 3; ++i) {
                 if (loaded_settings.osc[i] > 100u ||
@@ -447,7 +488,7 @@ void app_init(void)
             for (int i = 0; i < FX_N; ++i)
                 if (loaded_settings.fx[i] > 100u)
                     valid = 0;
-            if (loaded_settings.voices > SYNTH_VOICES_MAX || loaded_settings.velocity_off > 1u ||
+            if (loaded_settings.voices > SYNTH_POLY_VOICES || loaded_settings.velocity_off > 1u ||
                 loaded_settings.fx_quality >= GRAV_FX_QUALITIES)
                 valid = 0;
             if (valid) {
@@ -472,7 +513,7 @@ void app_init(void)
 
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
         for (uint32_t i = 0; i < 3; i++)
-            osc_params[t][i] = set.trk_osc[t][i];
+            osc_params[t][i] = t < SYNTH_S_TRACKS ? set.trk_osc[t][i] : set.drum_osc[t - SYNTH_S_TRACKS][i];
 
     for (int i = 0; i < 3; ++i) {
         mod_params[i] = set.mod[i];
@@ -485,15 +526,14 @@ void app_init(void)
 
     seq_init(&seq);                          /* the pattern saved (0.15's: its one track S1's), or an empty one */
     {
-        union { seq_pattern_t v2; seq_pattern_v1_t v1; } rec;
+        union { seq_record_t r; seq_pattern_v1_t v1; seq_drum_record_t d; } rec;
         const int n = plat_store_load(OBJ_SEQ, &rec, sizeof rec);
-        if (n == (int)sizeof rec.v2 && seq_valid(&rec.v2))
-            seq.pat = rec.v2;
-        else if (n == (int)sizeof rec.v1) {
-            seq_pattern_t p;
-            if (seq_from_v1(&rec.v1, &p))
-                seq.pat = p;
-        }
+        if (n == (int)sizeof rec.r)
+            seq_from_record(&rec.r, &seq.pat);
+        else if (n == (int)sizeof rec.v1)
+            seq_from_v1(&rec.v1, &seq.pat);
+        if (plat_store_load(OBJ_DRUMS, &rec, sizeof rec) == (int)sizeof rec.d)
+            seq_from_drum_record(&rec.d, &seq.pat);
     }
 #if FM1B_CPU2
     plat_cpu2_set(1);                     /* boot only, before audio/timers start */
@@ -598,7 +638,7 @@ static void speak(void)
         text_cat(t, APP_NAME ". OCTAVE ");
         text_cat(t, o);
         text_cat(t, ". WAVE ");
-        text_cat(t, grav_engine_name(set.trk_engine[track_sel]));
+        text_cat(t, grav_engine_name(*track_engine(track_sel)));
         text_cat(t, ". TRACK ");
         text_cat(t, TRACK_NAME[track_sel]);
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
@@ -651,29 +691,41 @@ static void octave_step(int32_t d)
 static const char *voices_text(uint32_t voices)   /* GLO VOICES: OFF (none), MONO, or how many */
 {
     static const char *const T[] = {"OFF", "MONO", "2", "3", "4"};
-    return T[voices <= SYNTH_VOICES_MAX ? voices : 1];
+    return T[voices <= SYNTH_POLY_VOICES ? voices : 1];
+}
+
+static const char *track_voices_text(uint32_t t)   /* a track's: a synth track's VOICES, a drum's own */
+{
+    return SYNTH_IS_DRUM(t) ? "DRUM" : voices_text(set.trk_voices[t]);
 }
 
 /* the selected track's voices, by e: more take the free ones, then one from the track with the most (the last of
  * them first); fewer are left free. Every voice let go, as the layout changes */
 static void voices_turn(int32_t e)
 {
-    uint8_t c[SYNTH_TRACKS];
+    uint8_t c[SYNTH_S_TRACKS];
     const uint32_t t = track_sel;
     uint32_t total = 0;
     char a[16];
-    for (uint32_t k = 0; k < SYNTH_TRACKS; k++)
+    if (SYNTH_IS_DRUM(t)) {                  /* a drum track: its one voice, always */
+        a[0] = 0;
+        text_cat(a, TRACK_NAME[t]);
+        text_cat(a, " VOICES");
+        app_say(a, "DRUM");
+        return;
+    }
+    for (uint32_t k = 0; k < SYNTH_S_TRACKS; k++)
         total += c[k] = set.trk_voices[k];
-    int32_t want = clamp((int32_t)c[t] + e, 0, (int32_t)SYNTH_VOICES_MAX);
+    int32_t want = clamp((int32_t)c[t] + e, 0, (int32_t)SYNTH_POLY_VOICES);
     while ((int32_t)c[t] < want) {
-        if (total < SYNTH_VOICES_MAX) {
+        if (total < SYNTH_POLY_VOICES) {
             total++;
         } else {
-            uint32_t from = SYNTH_TRACKS;
-            for (uint32_t k = SYNTH_TRACKS; k-- > 0;)
-                if (k != t && c[k] && (from == SYNTH_TRACKS || c[k] > c[from]))
+            uint32_t from = SYNTH_S_TRACKS;
+            for (uint32_t k = SYNTH_S_TRACKS; k-- > 0;)
+                if (k != t && c[k] && (from == SYNTH_S_TRACKS || c[k] > c[from]))
                     from = k;
-            if (from == SYNTH_TRACKS)
+            if (from == SYNTH_S_TRACKS)
                 break;
             c[from]--;
         }
@@ -685,7 +737,7 @@ static void voices_turn(int32_t e)
         uint32_t packed = 0;
         memcpy(set.trk_voices, c, sizeof c);
         set_dirty = 1;
-        for (uint32_t k = 0; k < SYNTH_TRACKS; k++)
+        for (uint32_t k = 0; k < SYNTH_S_TRACKS; k++)
             packed |= (uint32_t)c[k] << (4u * k);
         queue_key_event(SYNTH_EVENT_VOICES, (int32_t)packed, 0, 0);   /* (the audio interrupt's to change) */
     }
@@ -831,9 +883,9 @@ static void step_key(uint32_t i, int down)
         if (!ui.step_was_on) {
             seq_step_t st = TRK.step[s];
             st.on = 1;
-            st.n = ui.last_n;
+            st.n = SYNTH_IS_DRUM(track_sel) ? 1 : ui.last_n;   /* a drum: its note; a synth track: the last chord */
             for (uint32_t k = 0; k < SEQ_NOTES; k++)
-                st.note[k] = ui.last_chord[k];
+                st.note[k] = SYNTH_IS_DRUM(track_sel) ? DRUM_NOTE[track_sel - SYNTH_S_TRACKS] : ui.last_chord[k];
             st.vel = ui.last_vel;
             st.len = 1;
             step_write(s, &st);
@@ -908,7 +960,7 @@ static void track_select(uint32_t t)
     ui.tracks_until = plat_ms() + 1500u;
     ui.redraw = 1;
     b[0] = 0;
-    text_cat(b, grav_engine_name(set.trk_engine[t]));
+    text_cat(b, grav_engine_name(*track_engine(t)));
     app_say(TRACK_NAME[t], b);
 }
 
@@ -1013,20 +1065,11 @@ static void lights(uint32_t btn, uint32_t keys)
             else if (!inside)
                 dim_keys |= bit;
         }
-        for (uint32_t p = 0; p < SEQ_PAGES; p++) {   /* the first four black keys: the pages */
-            const uint32_t bit = 1u << BLACK_KEYS[p];
-            if (p == ui.view_page)
-                lit_keys |= bit;
-            else if (p * SEQ_PAGE < length)
-                mid_keys |= bit;
-            else
-                dim_keys |= bit;
-        }
-        for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* the next four: the tracks (selected lit, a note flashes) */
-            const uint32_t bit = 1u << BLACK_KEYS[SEQ_PAGES + t];
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* black 1..8: the tracks (selected lit, a note flashes) */
+            const uint32_t bit = 1u << BLACK_KEYS[t];
             if (t == track_sel || now - ui.hit_at[t] < 80u)
                 lit_keys |= bit;
-            else if (set.trk_voices[t])
+            else if (SYNTH_IS_DRUM(t) || set.trk_voices[t])
                 mid_keys |= bit;
             else
                 dim_keys |= bit;
@@ -1053,18 +1096,13 @@ static void input(void)
         uint32_t bit = 1u << k, v;
         int32_t note = 53 + (int32_t)k + 12 * set.octave;
         if ((keys & bit) && !(ui.keys & bit)) {
-            if (ui.step_mode) {              /* step mode: a white key is a step, the first black ones the pages */
+            if (ui.step_mode) {              /* step mode: a white key is a step, black 1..8 the tracks */
                 int w = key_index(WHITE_KEYS, 16, k), b = key_index(BLACK_KEYS, 11, k);
                 ui.key_step |= bit;
                 if (w >= 0)
                     step_key((uint32_t)w, 1);
-                else if (b >= 0 && b < (int)SEQ_PAGES) {
-                    char t[4];
-                    ui.view_page = (uint8_t)b;
-                    int_text(b + 1, t);
-                    app_say("PAGE", t);
-                } else if (b >= (int)SEQ_PAGES && b < (int)(SEQ_PAGES + SYNTH_TRACKS))
-                    track_select((uint32_t)b - SEQ_PAGES);   /* the next four: the tracks */
+                else if (b >= 0 && b < (int)SYNTH_TRACKS)
+                    track_select((uint32_t)b);
                 continue;
             }
             v = set.velocity_off ? FIXED_VELOCITY : touch_vel(k);   /* GLO VELOCITY: the keys' own, or fixed */
@@ -1173,8 +1211,9 @@ static void input(void)
             octave_step(1);
         else if (k == B_SAVE) {
             settings_capture();
-            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0 &&
-                plat_store_save(OBJ_SEQ, &seq.pat, sizeof seq.pat) == 0) {
+            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0 &&   /* (the pattern's records as they lie) */
+                plat_store_save(OBJ_SEQ, seq_record_of(&seq.pat), sizeof(seq_record_t)) == 0 &&
+                plat_store_save(OBJ_DRUMS, seq_drum_record_of(&seq.pat), sizeof(seq_drum_record_t)) == 0) {
                 set_dirty = 0;
                 app_say("SAVED", "");
             } else {
@@ -1254,9 +1293,10 @@ static void input(void)
             param_text(active_page, index, *value, t);
             app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
-            set.trk_engine[track_sel] = (uint8_t)grav_engine_step(set.trk_engine[track_sel], e);   /* Plaits' order */
+            uint8_t *engine = track_engine(track_sel);   /* Plaits' order; a drum track: its three drums */
+            *engine = (uint8_t)(SYNTH_IS_DRUM(track_sel) ? grav_drum_step(*engine, e) : grav_engine_step(*engine, e));
             set_dirty = 1;
-            app_say("WAVE", grav_engine_name(set.trk_engine[track_sel]));
+            app_say("WAVE", grav_engine_name(*track_engine(track_sel)));
         } else {
             int_text(ui.turns[k], t);
             app_say(ENC_NAME[k], t);
@@ -1371,18 +1411,19 @@ static void draw_grid(int32_t y0)
         }
     }
     for (uint32_t p = 0; p < SEQ_PAGES; p++) {
-        const int32_t x = 8 + (int32_t)p * 26;
+        const int32_t x = 8 + (int32_t)p * 22;
         const uint16_t c = p == page ? C_HI : playing >= 0 && (uint32_t)playing / SEQ_PAGE == p ? C_WHITE :
                            p * SEQ_PAGE < length ? C_LINE : C_DIM;
-        cv_rect(x, y0 + 46, 22, 4, c);
+        cv_rect(x, y0 + 46, 18, 4, c);
     }
-    {                                        /* the tracks: the selected one framed, a note flashes */
+    {                                        /* the tracks (S1..S4, then D1..D4): the selected framed, a note flashes */
         const uint32_t now = plat_ms();
         for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
-            const int32_t x = 120 + (int32_t)t * 14;
+            const int32_t x = 100 + (int32_t)t * 10 + (SYNTH_IS_DRUM(t) ? 4 : 0);
             if (t == track_sel)
-                cv_rect(x - 2, y0 + 41, 14, 12, C_WHITE);
-            cv_rect(x, y0 + 43, 10, 8, now - ui.hit_at[t] < 100u ? C_HI : set.trk_voices[t] ? C_LINE : C_DIM);
+                cv_rect(x - 1, y0 + 42, 9, 10, C_WHITE);
+            cv_rect(x, y0 + 43, 7, 8, now - ui.hit_at[t] < 100u ? C_HI :
+                    SYNTH_IS_DRUM(t) || set.trk_voices[t] ? C_LINE : C_DIM);
         }
     }
     if (playing >= 0) {                      /* the step playing, of the length */
@@ -1391,7 +1432,7 @@ static void draw_grid(int32_t y0)
         char l[4];
         int_text((int32_t)length, l);
         text_cat(t, l);
-        cv_text(180, y0 + 41, &FONT_XS, t, C_WHITE);
+        cv_text(190, y0 + 41, &FONT_XS, t, C_WHITE);
     }
 }
 
@@ -1440,16 +1481,16 @@ static void draw_seq(void)
 /* SELECT turned: the four tracks for a moment, over the page; the selected one lit */
 static void draw_tracks(void)
 {
-    cv_rect(4, 20, 232, 4 * 20 + 6, C_LINE);
-    cv_rect(5, 21, 230, 4 * 20 + 4, C_BLACK);
+    cv_rect(4, 20, 232, 8 * 14 + 6, C_LINE);
+    cv_rect(5, 21, 230, 8 * 14 + 4, C_BLACK);
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
-        const int32_t y = 23 + (int32_t)t * 20;
+        const int32_t y = 23 + (int32_t)t * 14;
         const int sel = t == track_sel;
         if (sel)
-            cv_rect(7, y, 226, 18, C_HI);
-        cv_text(12, y + 1, &FONT_S, TRACK_NAME[t], sel ? C_BLACK : C_WHITE);
-        cv_text(42, y + 1, &FONT_S, grav_engine_name(set.trk_engine[t]), sel ? C_BLACK : C_HI);
-        cv_text(170, y + 1, &FONT_S, voices_text(set.trk_voices[t]), sel ? C_BLACK : C_GRAY);
+            cv_rect(7, y, 226, 14, C_HI);
+        cv_text(12, y + 1, &FONT_XS, TRACK_NAME[t], sel ? C_BLACK : C_WHITE);
+        cv_text(42, y + 1, &FONT_XS, grav_engine_name(*track_engine(t)), sel ? C_BLACK : C_HI);
+        cv_text(170, y + 1, &FONT_XS, track_voices_text(t), sel ? C_BLACK : C_GRAY);
     }
 }
 
@@ -1471,9 +1512,9 @@ static void draw_glo(void)
             cv_text(x, 66, &FONT_S, APP_VERSION, C_WHITE);
             continue;
         }
-        const uint32_t voices = set.trk_voices[track_sel];
-        int32_t fill = i == 0u ? (int32_t)voices * 68 / (int32_t)SYNTH_VOICES_MAX : set.velocity_off ? 0 : 68;
-        cv_text(x, 62, &FONT_M, i == 0u ? voices_text(voices) : set.velocity_off ? "OFF" : "ON", C_WHITE);
+        const uint32_t voices = SYNTH_IS_DRUM(track_sel) ? 1u : set.trk_voices[track_sel];
+        int32_t fill = i == 0u ? (int32_t)voices * 68 / (int32_t)SYNTH_POLY_VOICES : set.velocity_off ? 0 : 68;
+        cv_text(x, 62, &FONT_M, i == 0u ? track_voices_text(track_sel) : set.velocity_off ? "OFF" : "ON", C_WHITE);
         cv_rect(x, 100, 68, 3, C_LINE);
         if (fill > 0)
             cv_rect(x, 100, fill, 3, C_HI);
@@ -1588,7 +1629,7 @@ static void draw(void)
     cv_begin(240, 144, C_BLACK);
 
     cv_text(8, 4, &FONT_S, TRACK_NAME[track_sel], C_WHITE);   /* the track selected, its engine */
-    cv_text(30, 4, &FONT_S, grav_engine_name(set.trk_engine[track_sel]), C_HI);
+    cv_text(30, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
     if (fx_freeze)                           /* the effect frozen: on every page (and EDIT lit) */
         cell(172, 2, 60, "FREEZE", 1);
 
@@ -1616,7 +1657,7 @@ static void draw(void)
     cv_text(4, 36, &FONT_XS, "OCT", C_GRAY);
     cv_text(30, 36, &FONT_XS, t, C_HI);
     cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
-    cv_text(112, 36, &FONT_XS, grav_engine_name(set.trk_engine[track_sel]), C_HI);
+    cv_text(112, 36, &FONT_XS, grav_engine_name(*track_engine(track_sel)), C_HI);
     if (active_page == PAGE_DEBUG) {
         debug_number(4, 48, "QUEUE", synth_queue_overflows, 0);
     } else if (midi_count) {                        /* the last MIDI message in, and where from */
@@ -1796,11 +1837,12 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         app_overload();
         return 1;
     }
-    if (strcmp(cmd, "save012"))
-        return 0;
-    settings_capture();
-    plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_012);
-    return 1;
+    if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016")) {   /* the settings as 0.12 / 0.16 saved them */
+        settings_capture();
+        plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 : SET_SIZE_016);
+        return 1;
+    }
+    return 0;
 }
 
 int app_expect(const char *what, int *got)
@@ -1815,6 +1857,8 @@ int app_expect(const char *what, int *got)
         *got = (int)grav_debug.masks[1];
     else if (!strcmp(what, "fx_core"))       /* the core the effect ran on: 1 CPU1, a chunk behind the voices */
         *got = (int)grav_debug.fx_core;
+    else if (!strncmp(what, "vgate", 5))     /* vgateN: voice N's note held (0..3 the synth tracks', 4..7 the drums') */
+        *got = synth.voice[atoi(what + 5) % SYNTH_VOICES_MAX].gate;
     else if (!strcmp(what, "render_voices"))
         *got = (int)grav_debug.active;
     else if (!strcmp(what, "shed"))
@@ -1822,13 +1866,13 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "steals"))
         *got = (int)grav_debug.steals;
     else if (!strcmp(what, "wave"))          /* the selected track's engine */
-        *got = set.trk_engine[track_sel];
+        *got = *track_engine(track_sel);
     else if (!strcmp(what, "track"))         /* the track selected: 0..3 (S1..S4) */
         *got = track_sel;
     else if (!strncmp(what, "trk_voices", 10))   /* trk_voicesN, trk_engineN: track N's (0..3) */
-        *got = set.trk_voices[atoi(what + 10) % SYNTH_TRACKS];
-    else if (!strncmp(what, "trk_engine", 10))
-        *got = set.trk_engine[atoi(what + 10) % SYNTH_TRACKS];
+        *got = set.trk_voices[atoi(what + 10) % SYNTH_S_TRACKS];
+    else if (!strncmp(what, "trk_engine", 10))   /* (0..7: D1..D4 are 4..7) */
+        *got = *track_engine(atoi(what + 10) % SYNTH_TRACKS);
     else if (!strcmp(what, "seq_playing"))   /* the sequencer: playing, the step playing (-1), steps played */
         *got = seq.playing;
     else if (!strcmp(what, "seq_step"))
@@ -1863,10 +1907,10 @@ int app_expect(const char *what, int *got)
         *got = TRK.step[atoi(what + 4) % SEQ_STEPS].on;
     else if (!strcmp(what, "lfo_dest"))
         *got = (int)lfo_destination(mod_params[2]);
-    else if (!strcmp(what, "engine_ram"))    /* bytes of its voice's RAM the engine's Init took */
-        *got = (int)grav_plaits_ram_used();
-    else if (!strcmp(what, "voices"))        /* GLO VOICES, the selected track's: 0 OFF, 1 MONO, 2..4 POLY */
-        *got = set.trk_voices[track_sel];
+    else if (!strcmp(what, "engine_ram"))    /* bytes of the selected track's (first) voice's RAM its engine took */
+        *got = (int)grav_plaits_ram_used(synth.track[track_sel].first);
+    else if (!strcmp(what, "voices"))        /* GLO VOICES, the selected track's: 0 OFF, 1 MONO, 2..4 POLY; a drum 1 */
+        *got = SYNTH_IS_DRUM(track_sel) ? 1 : set.trk_voices[track_sel];
     else if (!strcmp(what, "voices_held"))   /* voices whose note is held */
         *got = (int)synth_voices_held(&synth);
     else if (!strcmp(what, "velocity_off"))  /* GLO VELOCITY off: the keys at a fixed velocity */
