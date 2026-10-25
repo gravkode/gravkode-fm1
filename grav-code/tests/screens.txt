@@ -1,16 +1,36 @@
-# The manual's screenshots (template/docs/img): tools/build.py template --host, then
-#   template/build/host/template_host template/tests/screens.txt template/docs/img
+# The manual's and the README's screenshots (grav-code/docs/img): tools/build.py grav-code --host, then
+#   grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
+# and the README's composites from them: python3 grav-code/docs/img/compose.py
 wait 900
-shot screen-ready.png
-key 7 down 90 50
-press FX
-turn K3 3
-wait 1400
+# HOME: the OSC page at rest, Waveshaping
+shot screen-osc.png
+# a chord on CHORDS (five on from Waveshaping, in PRESET's order), three keys at different velocities and pressures
+turn PRESET 5
+wait 30
+key 7 down 100 60
+key 11 down 70 20
+key 14 down 115 85
+wait 700
 shot screen-playing.png
-release FX
 key 7 up
-tap OCT+
+key 11 up
+key 14 up
 wait 30
-turn PRESET 1
+# LFO: the MOD page, its depth up
+tap LFO
 wait 30
-shot screen-settings.png
+turn K2 40
+wait 400
+shot screen-mod.png
+turn K2 -40
+wait 30
+# ENV: the envelope page
+tap ENV
+wait 400
+shot screen-env.png
+# GLO: the firmware and its global settings
+tap GLO
+wait 400
+shot screen-glo.png
+tap HOME
+wait 30

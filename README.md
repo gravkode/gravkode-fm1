@@ -1,149 +1,125 @@
-# fm1-base
+# GRAV CODE
 
-A base for M-VAVE FM-1 firmware, on [felucca-bsp](https://github.com/hugelton/felucca-bsp): the platform layer
-above the hardware (screen, drawing and fonts, panel, LEDs, audio, MIDI over USB and TRS, storage, the screen reader),
-a host simulator and a browser emulator that run the same app, and the tools to build, package and install it.
-MPL-2.0: an app built on it may use any licence. See [DESIGN.md](DESIGN.md), [LICENSING.md](LICENSING.md) and
-[CREDITS.md](CREDITS.md).
+**A polyphonic synthesizer firmware for the M-VAVE FM-1, on all 24 sound engines of Mutable Instruments' Plaits.**
 
-**Status: beta.** Two firmwares are built on it so far, and they are its proof points:
-[CTL-1](https://github.com/charlesvestal/fm1-ctl) (with Bluetooth MIDI) and
-[Radio](https://github.com/charlesvestal/fm1-radio) (with WiFi). Expect the platform interface (`include/plat.h`)
-and `fm1.toml`'s settings to change before 1.0.
+Up to four voices, each its own engine, played from the FM-1's keys with velocity or over MIDI, shaped by an
+envelope and moved by an LFO, all on the FM-1's own panel and screen.
 
-The template (`template/`) runs on an FM-1: screen, keys and their LEDs, sound, MASTER, encoders, settings kept
-across a power cycle, USB-MIDI both ways, the screen reader, and an update started from the template itself. The same
-app runs on the computer in the host simulator and in the browser: try the template's at
-<https://charlesvestal.github.io/fm1-base/emu/>.
+<p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE on the FM-1's screen: a chord on CHORDS, three keys held, each filled to its velocity and pressure"></p>
 
-    git clone --recursive https://github.com/charlesvestal/fm1-base
+[Русская версия](README.ru.md) · [The manual](grav-code/docs/MANUAL.md)
 
-## Optional parts
+---
 
-A firmware has only what its fm1.toml asks for (and its app.h, for velocity and pressure); every build prints the
-parts it has.
+## What it does
 
-| Part | How to include it | What the app calls |
-| --- | --- | --- |
-| Bluetooth MIDI with a computer or tablet | `ble = true` (`tools/build.py --no-ble` leaves it out of one build) | `TO_BLE`, `PORT_BLE`; `plat_ble_state`, `plat_ble_connected`; `plat_ble_enable` |
-| Bluetooth MIDI devices (the FM-1 connects to a keyboard or controller) | `ble_central = true`, with `ble` | `plat_ble_scan`, `plat_ble_found`, `plat_ble_connect`, `plat_ble_disconnect`, `plat_ble_device`; `TO_BLE_HOST`, `TO_BLE_DEV`, `plat_midi_in_from` (one link at a time) |
-| USB audio: the FM-1 recorded over the cable | on unless `usb_audio_in = false` | nothing: the master output |
-| USB audio: a computer plays through the FM-1 | on unless `usb_audio_out = false` (needs the input too) | nothing: mixed after the app, at MASTER |
-| Velocity and pressure from the keys | `#define APP_TOUCH` in app.h | `touch_on`, `touch_poll`, `touch_keys`, `touch_vel`, `touch_pressure` (lib/touch.h) |
-| WiFi: a station on the networks around, with lwIP's sockets | `wifi = true` (not with `ble`, yet), and `net = [...]` for the app's network code | `plat_wifi_on`, `plat_wifi_state`, `plat_wifi_scan`, `plat_wifi_found`, `plat_wifi_join`, `plat_wifi_saved`, `plat_wifi_forget`, `plat_net_task` |
-| A page for Bluetooth MIDI devices: the scan while it's up, the list, SAVE to connect or let go, and what happened in words | `#define APP_BTDEV` in app.h, with `ble_central` | `btdev_page`, `btdev_event`, `btdev_word`, `btdev_found`, `btdev_choose`, `btdev_save`, `btdev_title` (lib/btdev.h) |
-| USB audio at full level, MASTER for the speaker and headphones only | with the USB audio input | `plat_usb_audio_full` (the app's setting) |
-| Screen mirroring: the screen and panel live on a computer (web/mirror, a PNG with `tools/fm1_mirror.py`), the panel played from it | `mirror = true` | nothing; `APP_REDRAW` (what a slow link dropped, drawn again), `APP_MIRROR_TEST` (a test session from the remote) |
-| Backup and restore of the app's saved objects over USB, all or nothing (web/backup, `tools/fm1_backup.py`) | `backup = true` | app.h: `APP_BACKUP_OBJS`, `APP_BACKUP_MAGIC`, `APP_BACKUP_VERSION`, `APP_BACKUP_WHAT`; `app_backup_playing`, `_flush`, `_hold`, `_restored` |
-| The app's own commands over USB, in the update's framing, data pulled from the host | `#define APP_USB_CMD` in app.h | `app_usb_cmd`; `plat_host_read`, `plat_host_patience` |
-| Lower case in the big fonts | `font_full = ["L"]` | the fonts as ever |
+- **24 engines from Plaits:** virtual analog, waveshaping, 2-operator FM, granular formants, additive, wavetables,
+  chords, speech, swarms, filtered noise, particles, inharmonic strings, modal resonators, bass drum, snare, hi-hat,
+  and the eight of Plaits 1.2: virtual analog with a filter, phase distortion, three banks of 6-operator FM (DX7
+  patches), wave terrains, a string machine and chiptune. Each with Plaits' own TIMBRE, MORPH and HARMONICS.
+- **Polyphony:** up to four voices (POLY), or one with legato (MONO).
+- **Velocity** from the FM-1's keys (or a fixed one), pressure sent as polyphonic aftertouch.
+- **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
+- **Settings that stay** across a power cycle and a firmware update.
+- **MIDI** in over USB and TRS, out over USB; the FM-1 is also a **USB sound card**.
+- **A CPU meter**, and voices that give way before the sound would break up.
+- **A web installer** (Chrome or Edge), and the stock firmware back from the same page.
 
-Every firmware also counts each port's MIDI messages, in and out: `plat_midi_count(PORT_*, out)` for counters,
-`plat_midi_ago` for activity lights.
-And: `plat_midi_out_room(to)` (room in the out queues, each Bluetooth link's its own, for a sequencer's note-offs),
-`plat_midi_in_from()` (where the last message in came from, as an out: for MIDI thru) and `plat_midi_out_link()` (a new
-USB connection); `plat_store_size` and `plat_store_head` (an object whole or not at all; its header only); big data in
-flash beyond the store with `plat_data*`, in the data area and two more windows (`PLAT_XDATA0`, `PLAT_XDATA1`).
+## The screen and its pages
 
-## Bluetooth and WiFi
+<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="The four pages: OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE) and GLO (VOICES, VELOCITY, the version)"></p>
 
-A firmware has Bluetooth or WiFi, not both: each fills most of what the FM-1 has (the chip has no external RAM),
-and together they don't fit. Each needs JieLi's AC79 SDK (`$AC79_SDK`) for its libraries; a build without either
-links nothing of JieLi's.
+| Button | Page | K1 | K2 | K3 |
+| --- | --- | --- | --- | --- |
+| HOME | OSC | TIMBRE | MORPH | HARMONICS |
+| LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
+| ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
+| GLO | GLO | VOICES (MONO, 2, 3, 4) | VELOCITY (ON, OFF) | the version |
 
-### Turning Bluetooth on
+PRESET picks the engine, OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE stores it all.
 
-1. In fm1.toml, `ble = true`. Add `ble_central = true` for the FM-1 to connect to MIDI devices too (a keyboard,
-   a controller), beside a computer.
-2. In app.h, give it a store object: `OBJ_BLE` in the app's object enum, and its offset in `APP_STORE_MAP` (the
-   radio's address and pairing are kept there).
-3. In the app: MIDI goes out with `TO_BLE` and comes in on `PORT_BLE`, as USB's does. For a page of devices, add
-   `#define APP_BTDEV` to app.h and use lib/btdev.h (the template's REC does).
-4. With devices there are two links, the computer's and the device's. `TO_BLE` goes to both; `TO_BLE_HOST` or
-   `TO_BLE_DEV` goes to one, each with its own queue, so a slow device never holds up the computer. Both come in on
-   `PORT_BLE`, and `plat_midi_in_from()` says which. MIDI thru, with nothing sent back where it came from (a keyboard
-   played through to a phone): after each `plat_midi_in`,
-   `plat_midi_send(pkt, (TO_USB | TO_BLE) & ~plat_midi_in_from())`.
+## The engines
 
-Bluetooth starts at every power-on, as on M-VAVE's firmware, unless the last Bluetooth run crashed. A firmware
-that lets the player turn it off keeps that as a setting, calls `plat_ble_enable(0)` / `plat_ble_enable(1)` when it
-changes, and tells the platform whether to start it at power-on with `APP_BLE_AT_BOOT` in app.h (an expression,
-e.g. `(set.bluetooth != 0)`). Off ends every link and stops advertising and scanning: the radio is quiet. Its manual
-should say where the setting is (the template's: for details, see template/docs/MANUAL.md).
-`tools/build.py --no-ble` builds the same firmware without Bluetooth (NAME-usb.fwsc).
+K1 TIMBRE, K2 MORPH, K3 HARMONICS; in PRESET's order (Plaits' own):
 
-### Turning WiFi on
+| # | Engine | TIMBRE | MORPH | HARMONICS |
+| --- | --- | --- | --- | --- |
+| 1 | ANALOG | Pulse to square to sync | Triangle to saw to notch | Detune |
+| 2 | WAVESHAPE | Folding | Asymmetry | Shaper curve |
+| 3 | FM 2-OP | Index | Feedback | Ratio |
+| 4 | GRAIN | Formant | Formant width | Formant ratio |
+| 5 | ADDITIVE | Strongest harmonic | Bump shape | Number of bumps |
+| 6 | WAVETABLE | Row | Column | Bank |
+| 7 | CHORDS | Inversion | Waveform | Chord |
+| 8 | SPEECH | Species | Phoneme or word part | Vowels, then words |
+| 9 | SWARM | Density | Grain length | Pitch randomness |
+| 10 | NOISE | Clock | Resonance | Low, band, high-pass |
+| 11 | PARTICLE | Density | Reverb to band-pass | Randomness |
+| 12 | STRING | Excitation | Decay | Material |
+| 13 | MODAL | Excitation | Decay | Material |
+| 14 | BASS DRUM | Brightness | Decay | Attack, overdrive |
+| 15 | SNARE | Drum modes | Decay | Tone against noise |
+| 16 | HI-HAT | High-pass | Decay | Metal against noise |
+| 17 | VA VCF | Cutoff | Waveform, sub | Resonance |
+| 18 | PHASE DIST | Amount | Asymmetry | Frequency |
+| 19 | 6-OP FM 1 | Brightness | Envelope stretch | Patch: basses, synths |
+| 20 | 6-OP FM 2 | Brightness | Envelope stretch | Patch: keys, plucks, percussion |
+| 21 | 6-OP FM 3 | Brightness | Envelope stretch | Patch: organs, pads, strings, brass |
+| 22 | TERRAIN | Path radius | Path offset | Terrain |
+| 23 | STRING MCH | Chorus, filter | Waveform | Chord |
+| 24 | CHIPTUNE | Arpeggio | Pulse width, sync | Chord |
 
-1. In fm1.toml, `wifi = true` (and not `ble`). Leave USB audio out (`usb_audio_in = false`, `usb_audio_out =
-   false`): WiFi needs its RAM.
-2. In app.h, two store objects: `OBJ_BLE` (the radio's address and calibration) and `OBJ_WIFI` (the networks
-   kept), with their offsets in `APP_STORE_MAP`; and a smaller canvas, `#define APP_CANVAS_PX (240u * 48u)` (draw
-   the screen in strips 48 rows high or less).
-3. The app's network code goes in its own files, listed in fm1.toml's `net = [...]`: they're built as the SDK
-   builds code that talks lwIP, and include `lwip/sockets.h`. That code runs in a task of its own
-   (`plat_net_task`): a socket call waits, and the main loop must not.
-4. In the app: `plat_wifi_on(1)` turns it on; it joins the networks it joined before (six, the most recent first).
-   `plat_wifi_scan` and `plat_wifi_found` list the networks around, `plat_wifi_join` joins one (kept once joined),
-   `plat_wifi_state` and `plat_wifi_ip` say how far it got. Passwords come over USB:
-   `tools/fm1_remote.py wifi join SSID PASSWORD` (or typed on the keys: Radio has a page for it).
+A note plays an engine as Plaits' trigger would: most engines sound while the note is held; STRING and MODAL are
+struck, then keep sounding; the drums, the 6-OP FM banks, SPEECH's words and PARTICLE take each note as a gate. The
+manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 
-For a working example, see `examples/wifi`; for a whole firmware, fm1-radio.
+## Install
 
-### What each costs
+1. Build or download the package, `grav_code-VERSION.fwsc`.
+2. Make the site and serve it (or use the published one):
 
-The FM-1 has a 581 KB app slot in the flash, 96 KB of RAM for `.data` and `.bss` (128 KB in a WiFi build), and a
-336 KB pool of RAM for big buffers (304 KB in a WiFi build). Measured on the template (October 2026), in KB:
+   ```bash
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.12.0.fwsc 0.12.0 grav-code/build/site
+   python3 -m http.server 8080 --directory grav-code/build/site
+   ```
 
-| | Flash | RAM | Pool |
-| --- | --- | --- | --- |
-| The template without a radio (`--no-ble`) | 77 | 27 | 68 |
-| Bluetooth MIDI with a computer (`ble`) | + 124 | + 45 | + 24 |
-| Bluetooth MIDI devices too (`ble_central`) | + 8 | + 1 | 0 |
-| WiFi (`wifi`, from fm1-radio's measurements) | + about 300 | + about 100 | + about 276 |
+3. In Chrome or Edge, open `http://localhost:8080/install/`, connect the FM-1 by USB and press Install.
 
-- Bluetooth: JieLi's BT controller and stack (the flash), its 24 KB heap and their tables (the RAM), three task
-  stacks of 8 KB (the pool). The template with Bluetooth and devices is 210 KB of flash, 74 of 96 KB of RAM: room
-  for a big app (CTL-1, with a General MIDI synth, is 491 KB).
-- WiFi: JieLi's driver (146 KB), the WPA supplicant (77 KB), lwIP (51 KB), the radio layer, crypto and the shim
-  (25 KB) in the flash; the driver's buffers, lwIP, the shim's task table and 24 KB of the heap (about 100 KB) in
-  the RAM; the rest of the heap (248 KB) and lwIP's packet buffers (28 KB) in the pool. The heap, 272 KB, holds the
-  WiFi library's own buffers (about 60 KB) and its tasks' stacks (4 to 8 KB each, by task, as a task starts: about
-  6), and what is left is the app's (`malloc`; fm1-radio's HE-AAC player and HTTPS stream peak at 256 KB of it).
-  That leaves an app about 170 KB of flash and a few KB of RAM.
-  WiFi calibrates its radio at every start (a kept calibration was Bluetooth's, which the access point could not
-  hear). `examples/wifi` is 420 KB of
-  flash, 119 of 128 KB of RAM and 299 of 304 KB of pool; fm1-radio (MP3 and HE-AAC decoders, HTTPS) is
-  576 KB, 127 KB and 300 KB.
-- In a WiFi build, fm1-base's large font (the splash's name, the panel's screens) can go too:
-  `#define APP_BIG_FONT FONT_M` in app.h saves 20 KB of flash.
-- An app with fonts of its own can give them to fm1-base's screens (crash, safe mode, update, restore,
-  calibration, the splash): `#define APP_SYS_TEXT` in app.h and its `app_sys_h`, `app_sys_w`, `app_sys_text`
-  (`device/sys_text.c`); fm1-base's faces are then left out (LOOM-8: 18 KB).
+The same page writes M-VAVE's stock firmware back. Installing is at your own risk.
 
-## Development over USB
+## Build
 
-`tools/fm1_remote.py` drives an FM-1 running any fm1-base firmware as a player would: buttons, keys, encoders,
-MASTER, and reads back what the screen says (the screen reader's channel), the last crash and the radio's log; with
-WiFi, it turns it on and off, joins networks and reads its state (`wifi ...`).
-For example, `tools/fm1_remote.py listen tap REC wait 3000 screen log`.
+GRAV CODE builds with fm1-base's `tools/build.py`: JieLi's toolchain (Linux x86-64; on macOS it runs in Docker) and
+JieLi's AC79 SDK.
 
-The site's installer page (`tools/make_site.py`, from `web/installer.html`) reads the same crash record and log in
-Chrome or Edge: "Report a problem" shows them, ready to copy, so a player can send them without Python. The record
-survives a restart, not switching off.
+```bash
+export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
+python3 tools/build.py grav-code --release 0.12.0      # grav-code/build/grav_code-0.12.0.fwsc
+python3 tools/build.py grav-code --host                # the simulator, for the tests:
+grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
+python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
+```
 
-## Moving a Felucca-based firmware here
+The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
+`voices.txt` (polyphony, MONO, velocity), `screens.txt` (the screenshots). More in
+[grav-code/README.md](grav-code/README.md).
 
-A Felucca-based firmware (GPL-3.0) can move onto fm1-base and felucca-bsp and keep its licence: their MPL-2.0 files
-may be part of a GPL work, and stay MPL-2.0 file by file. It then has the platform's parts and fixes with every other
-firmware, instead of its own copy of Felucca. `skill/felucca-to-fm1-base/` is a Claude skill that walks through the
-move: the inventory (what is platform, what is the app), what fm1-base needs, the port, the checks (the app's
-scenarios compared byte for byte with the old simulator's, then the FM-1), and the licensing files. It never changes
-the firmware's licence: it asks. Relicensing to MPL-2.0 is needed only to link JieLi's Bluetooth or WiFi libraries;
-`skill/felucca-to-fm1-base/RULES.md` has what it takes (`tools/provenance.py` finds Felucca's lines and whose they
-are). To move a firmware with Claude Code, run this from inside its repository (Node.js's `npx` fetches the skill
-into the project):
+## The repository
 
-    npx degit --force charlesvestal/fm1-base/skill/felucca-to-fm1-base .claude/skills/felucca-to-fm1-base && claude "Move this firmware onto fm1-base with the felucca-to-fm1-base skill"
+| Path | What |
+| --- | --- |
+| `grav-code/` | GRAV CODE: the app (`app.c`), its DSP (`dsp/`: Plaits' engines per voice, the mixer), its voices and modulation (`synth/`), Plaits and the other vendored code (`vendor/`), tests, docs, the site's page |
+| `device/`, `include/`, `lib/`, `host/`, `web/`, `tools/` | fm1-base: the FM-1 platform, the simulator, the emulator, the installer, the build ([FM1-BASE.md](FM1-BASE.md)) |
+| `bsp/` | felucca-bsp: the FM-1's chip and board support |
+| `template/`, `tests/`, `ble/` | fm1-base's reference app and its platform tests, its Bluetooth stack (not built into GRAV CODE) |
 
-Claude starts with the inventory and shows it before changing anything. To have the skill in every project instead,
-fetch it to `~/.claude/skills/felucca-to-fm1-base`. It reads as plain instructions too, without Claude.
+## Credits and licences
+
+- Built on **fm1-base** by Charles Vestal and **felucca-bsp** by Leo Kuroshita (Hügelton Instruments), MPL-2.0;
+  see [CREDITS.md](CREDITS.md) and [LICENSING.md](LICENSING.md).
+- Sound engines: **Mutable Instruments Plaits** and **stmlib** by Émilie Gillet, MIT License
+  ([grav-code/vendor/plaits/LICENSE](grav-code/vendor/plaits/LICENSE)); what else is vendored and under which licence:
+  [grav-code/vendor/README.md](grav-code/vendor/README.md).
+- GRAV CODE's own code: MPL-2.0.
+
+M-VAVE and FM-1 are trademarks of their owners. GRAV CODE is not affiliated with M-VAVE or Mutable Instruments.

@@ -1,49 +1,54 @@
-# The template
+# grav-code: the firmware
 
-The smallest complete fm1-base firmware. Copy this directory to start your own: it builds, installs, updates, runs
-in the host simulator and in the browser, speaks to a screen reader, and publishes a site with an installer and a
-manual.
+GRAV CODE's app, on fm1-base (the repository's root). What it is and does: the root [README.md](../README.md) and
+the manual, [docs/MANUAL.md](docs/MANUAL.md).
 
 | File | What |
 | --- | --- |
-| `app.h` | The app's settings (name, block size, the store's objects) and its half of the contract with the platform |
-| `app.c` | The app: input, sound, screen, saving |
-| `fm1.toml` | Build and site settings: name, package identity, USB names, tagline, source, licence |
-| `words.tsv` | The screen reader's words (fm1-reader): the screen's text and how to say it |
-| `tests/basic.txt` | Host simulator checks: keys, MIDI, settings across a reboot, the sound, the screen reader |
-| `tests/screens.txt` | The manual's screenshots |
-| `docs/MANUAL.md` | The manual (an example to rewrite) |
+| `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
+| `app.c` | The app: the keys and MIDI into the voices, the pages (OSC, MOD, ENV, GLO), the screen, the settings and SAVE |
+| `synth/` | The voices (`synth.c`: POLY up to four, MONO with legato, the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
+| `dsp/grav_engine.c` | The render: each voice through its engine and envelope, MASTER, the soft limiter, sleeping voices |
+| `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), built in each voice, rendered 12 samples at a time |
+| `dsp/grav_libc.c` | The C library functions the FM-1's link lacks (`fabsf`, `sqrtf`, `memmove`) |
+| `vendor/` | Plaits, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
+| `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
+| `words.tsv` | The screen reader's words |
+| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, and `screens.txt` (the manual's pictures) |
+| `docs/` | The manual and its pictures (`docs/img/compose.py` makes the README's from them) |
 | `site/landing.md` | The site's front page |
 
 ## Build, test, install
 
-From the fm1-base directory:
+From the repository's root:
 
-    tools/build.py template                     # template/build/template.fwsc (JieLi toolchain, AC79 SDK)
-    tools/build.py template --host              # the host simulator, then:
-    template/build/host/template_host template/tests/basic.txt template/build/host
-    tools/build.py template --web               # the browser emulator: template/build/emu/
-    python3 tools/fm1_install.py template/build/template.fwsc
+    export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
+    python3 tools/build.py grav-code                     # grav-code/build/grav_code.fwsc (no radio: no Bluetooth, WiFi)
+    python3 tools/build.py grav-code --host              # the simulator, then each script:
+    grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/engines.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/voices.txt grav-code/build/host
+    python3 tools/build.py grav-code --web               # the browser emulator: grav-code/build/emu/
+    python3 tools/fm1_install.py grav-code/build/grav_code.fwsc
 
-For the toolchain, the SDK and the container the build runs in, see fm1-base's README.
+The JieLi toolchain is Linux x86-64: on macOS each tool runs in Docker (Docker Desktop running). The build needs
+Python with Pillow (the fonts).
 
 ## Release and site
 
-    tools/build.py template --release 0.1       # template/build/template-0.1.fwsc, identity FM-1_11000100
-    tools/publish_site.sh template 0.1          # builds the release, the emulator and the site; pushes gh-pages
+    python3 tools/build.py grav-code --release 0.12.0    # grav-code/build/grav_code-0.12.0.fwsc, identity FM-1_73001200
+    python3 tools/build.py grav-code --web
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.12.0.fwsc 0.12.0 grav-code/build/site
 
-The site has the front page, the installer, the emulator, the manual and the screen reader's words. To build it
-without publishing, run `tools/make_site.py template template/build/template-0.1.fwsc 0.1 OUT_DIR`.
+## The pictures
 
-## Make it your own
+    python3 tools/build.py grav-code --host --release 0.12.0   # (so GLO shows the version and identity)
+    grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
+    python3 grav-code/docs/img/compose.py
 
-1. Copy `template/` to your firmware's repository, with fm1-base beside it as a git submodule.
-2. In `app.h`, set `APP_NAME`, and the store's objects and their flash offsets (`APP_STORE_MAP`).
-3. In `fm1.toml`, set the name, an `id_prefix` of your own (`FM-1_` and digits; each firmware has its own), the USB
-   names, and the site's tagline, source and credits.
-4. In `words.tsv`, set the `# url:` line to where your site publishes its words.
-5. Write your app in `app.c`: `app_render` for the sound, `app_frame` for the screen and the controls, and the rest
-   of the contract in `app.h`.
-6. Rewrite `docs/MANUAL.md` and `site/landing.md`, and the tests.
+## Notes
 
-fm1-base is MPL-2.0: changes to its files are published under MPL-2.0, and your own files may use any licence.
+- The FM-1 runs no C++ static constructors: a C++ object with a vtable can't be a static; `dsp/grav_plaits.cpp`
+  builds the engines in place (placement new). Constant tables are fine.
+- Plaits' engines run 12 samples at a time, always (the 6-op FM depends on it), through a FIFO per voice.
+- The engines' RAM and each voice's slot are in the pool (`.pool`, PLAT_POOL): about 98 KB for four voices.
