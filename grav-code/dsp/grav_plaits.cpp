@@ -224,6 +224,14 @@ extern "C" void grav_plaits_engine(uint32_t engine) {
   }
 }
 
+extern "C" void grav_plaits_reset_voice(uint32_t voice) {
+  if (!initialized || voice >= GRAV_VOICES) return;
+  Voice& v = voices[voice];
+  v.engine->Reset();
+  v.fifo_read = plaits::kBlockSize;
+  v.fifo_enveloped = info[current].own_envelope;
+}
+
 extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in, float* out, float* aux,
                                   uint32_t size) {
   if (!initialized) {

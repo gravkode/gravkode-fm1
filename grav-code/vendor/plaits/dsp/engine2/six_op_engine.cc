@@ -88,7 +88,15 @@ void SixOpEngine::Init(BufferAllocator* allocator) {
 }
 
 void SixOpEngine::Reset() {
-  
+  // GRAV CODE: after the outer ENV reaches zero, discard the held DX gates and staggered tail.
+  // Keep the allocated patch bank; restarting a silent voice must not unpack all 32 patches again.
+  for (int i = 0; i < kNumSixOpVoices; ++i) {
+    voice_[i].Init(&algorithms_, kCorrectedSampleRate);
+  }
+  fill(temp_buffer_, temp_buffer_ + kMaxBlockSize * 4, 0.0f);
+  fill(acc_buffer_, acc_buffer_ + kMaxBlockSize * kNumSixOpVoices, 0.0f);
+  active_voice_ = kNumSixOpVoices - 1;
+  rendered_voice_ = 0;
 }
 
 void SixOpEngine::LoadUserData(const uint8_t* user_data) {

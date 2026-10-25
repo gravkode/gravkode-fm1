@@ -130,10 +130,18 @@ Each voice's envelope, which shapes its level:
 
 It starts at ATTACK 10 (0.2 s), DECAY 50 (1 s) and RELEASE 30 (1.2 s).
 
+A repeated note restarts the attack from zero even if the previous release is still running. A short
+2 ms fade removes the old level before a nonzero attack. Changing RELEASE during a release updates
+its remaining fade rate without a level jump.
+
 > The engines with an envelope of their own play through it, as Plaits' low-pass gate lets them: BASS DRUM, SNARE,
 > HI-HAT and SPEECH while it speaks a word. The three 6-OP FM banks keep their DX operator envelopes,
 > with the app's ENV applied to their final volume. ENV cannot extend a patch that has already decayed
 > to silence. Sustain is fixed at 70%; this page exposes attack, decay and release.
+
+On 6-OP FM the DX gate stays high while the app's release fades the output. The voice is reset at zero
+amplitude before sleeping, so its old gate/release cannot reappear on the next note. A patch's natural
+decay while held still exists; extending RELEASE cannot restore a carrier that has already gone silent.
 
 ### GLO (GLO)
 

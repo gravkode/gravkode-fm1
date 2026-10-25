@@ -87,7 +87,8 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
 
 // Audio regressions: changing ENV must change 6-op output, not just its hidden app envelope.
 static std::vector<int32_t> six_op_audio(unsigned engine, float attack, float decay, float release,
-                                       unsigned destination = 0, bool modulate = false) {
+                                       unsigned destination = 0, bool modulate = false, bool held = false,
+                                       int retrigger_block = -1, float retrigger_attack = 0.0f) {
     stmlib::Random::Seed(0x21);
     synth_t synth;
     grav_engine_t dsp;
@@ -101,7 +102,11 @@ static std::vector<int32_t> six_op_audio(unsigned engine, float attack, float de
     synth_note_on(&synth, 60, 100);
     std::vector<int32_t> result;
     for (unsigned b = 0; b < 100; ++b) {
-        if (b == 60) synth_note_off(&synth, 60);
+        if (b == 60 && !held) synth_note_off(&synth, 60);
+        if ((int)b == retrigger_block) {
+            synth_envelopes(&synth, retrigger_attack, decay, 0.7f, release, 44100.0f);
+            synth_note_on(&synth, 60, 100);
+        }
         const float lfo = modulate ? 0.8f * std::sin(float(b) * 0.17f) : 0.0f;
         float timbre = 0.5f + (destination == 0 ? lfo * 0.5f : 0.0f);
         float morph = 0.5f + (destination == 1 ? lfo * 0.5f : 0.0f);
@@ -140,6 +145,21 @@ static bool six_op_controls() {
                          e, attack_ratio, decay_ratio, short_release, long_release);
             return false;
         }
+        const auto held_note = six_op_audio(e, 0.0f, 0.0f, 4.0f, 0, false, true);
+        const auto long_tail = six_op_audio(e, 0.0f, 0.0f, 4.0f);
+        const double tail_ratio = energy(long_tail, 70 * 256, 100 * 256) /
+                                  energy(held_note, 70 * 256, 100 * 256);
+        const auto repeat_fast = six_op_audio(e, 0.0f, 0.0f, 4.0f, 0, false, false, 70, 0.0f);
+        const auto repeat_slow = six_op_audio(e, 0.0f, 0.0f, 4.0f, 0, false, false, 70, 2.0f);
+        const double repeat_ratio = energy(repeat_slow, 71 * 256, 80 * 256) /
+                                    energy(repeat_fast, 71 * 256, 80 * 256);
+        if (!(tail_ratio > 0.8 && repeat_ratio < 0.02)) {
+            std::fprintf(stderr, "Six-op repeated ENV failure engine=%u: long-release ratio=%g repeat-attack ratio=%g\n",
+                         e, tail_ratio, repeat_ratio);
+            return false;
+        }
+        std::printf("Six-op bank %u: release/held energy %.3f, slow/fast repeated-attack energy %.6f\n",
+                    e - GRAV_ENGINE_SIX_OP_1 + 1, tail_ratio, repeat_ratio);
         for (unsigned destination = 0; destination < 3; ++destination) {
             const auto modulated = six_op_audio(e, 0.0f, 0.0f, 0.15f, destination, true);
             if (modulated == fast) {
@@ -153,6 +173,22 @@ static bool six_op_controls() {
 }
 
 int main() {
+    // Retrigger a still-audible envelope, then shorten a release which is already in progress.
+    envelope_t envelope;
+    envelope_init(&envelope);
+    envelope_set(&envelope, 0.0f, 0.0f, 0.7f, 1.0f, 1000.0f);
+    envelope_note_on(&envelope);
+    envelope_process(&envelope); envelope_process(&envelope);
+    envelope_set(&envelope, 2.0f, 0.0f, 0.7f, 1.0f, 1000.0f);
+    envelope_note_on(&envelope);
+    for (unsigned i = 0; i < 4; ++i) envelope_process(&envelope);
+    assert(envelope.level < 0.002f);
+    for (unsigned i = 0; i < 100; ++i) envelope_process(&envelope);
+    envelope_note_off(&envelope);
+    for (unsigned i = 0; i < 10; ++i) envelope_process(&envelope);
+    assert(envelope.level > 0.0f);
+    envelope_set(&envelope, 2.0f, 0.0f, 0.7f, 0.0f, 1000.0f);
+    assert(envelope_process(&envelope) == 0.0f && envelope.stage == ENV_IDLE);
     if (!six_op_controls()) return 1;
     unsigned comparisons = 0;
     for (unsigned e = 0; e < GRAV_ENGINE_COUNT; ++e) {

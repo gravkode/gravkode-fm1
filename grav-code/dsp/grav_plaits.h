@@ -51,6 +51,8 @@ void grav_plaits_init(void);
 /* the engine every voice plays (GRAV_ENGINE_*): a change builds it anew in each voice, as Plaits starts an engine
  * it switches to afresh */
 void grav_plaits_engine(uint32_t engine);
+/* At zero outer amplitude, discard a six-op voice's held gate/FIFO before it sleeps. Joined worker only. */
+void grav_plaits_reset_voice(uint32_t voice);
 /* size samples of voice (12 or more, so that a strike is never lost: GRAV_PLAITS_BLOCK chunks), the engine's
  * 12-sample blocks through the voice's FIFO; 1 when the engine shaped them with an envelope of its own (a drum, the
  * a spoken word: GRAV CODE's envelope leaves them, as Plaits' low-pass gate does). The six-op FM banks keep

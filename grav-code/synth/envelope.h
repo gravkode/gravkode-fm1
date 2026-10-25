@@ -6,7 +6,8 @@ typedef enum {
     ENV_ATTACK,
     ENV_DECAY,
     ENV_SUSTAIN,
-    ENV_RELEASE
+    ENV_RELEASE,
+    ENV_RETRIGGER
 } envelope_stage_t;
 
 typedef struct {
@@ -17,6 +18,8 @@ typedef struct {
     float attack_step;
     float decay_step;
     float sustain;
+    float retrigger_samples;
+    float retrigger_step;
 } envelope_t;
 
 void envelope_init(envelope_t *env);

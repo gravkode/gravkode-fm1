@@ -106,6 +106,7 @@ void grav_engine_render(
     const grav_beads_params_t *fx
 ) {
     const float gain = (float)master_q12 / 4096.0f * GRAV_OUT_FULL;
+    const int six_op = engine >= GRAV_ENGINE_SIX_OP_1 && engine <= GRAV_ENGINE_SIX_OP_3;
     if (grav_debug_reset) {
         memset(&grav_debug, 0, sizeof grav_debug);
         synth->steals = synth->shed_count = 0;
@@ -133,14 +134,19 @@ void grav_engine_render(
         e->strikes_seen[v] = voice->strikes;
         if (strike)
             e->asleep[v] = 0;
-        if (voice->shed || v >= synth->voices)
+        if (voice->shed || v >= synth->voices) {
+            if (six_op && !e->asleep[v])
+                grav_plaits_reset_voice(v);
             e->asleep[v] = 1;
+        }
         work.p[v].note = (float)voice->note + pitch_offset;
         work.p[v].timbre = timbre;
         work.p[v].morph = morph;
         work.p[v].harmonics = harmonics;
         work.p[v].accent = voice->velocity;
-        work.p[v].gate = voice->gate;
+        /* Let the outer ENV own the six-op note's release. Releasing the DX gate here would
+         * also start its short patch release and cut off the app's longer release. */
+        work.p[v].gate = voice->gate || (six_op && voice->env.stage != ENV_IDLE);
         work.p[v].strike = (uint8_t)strike;
         work.peak[v] = 0.0f;
         work.own_envelope[v] = 0;
@@ -213,7 +219,10 @@ void grav_engine_render(
         synth_voice_t *voice = &synth->voice[v];
         if (e->asleep[v] || voice->gate)
             continue;
-        if (work.own_envelope[v] ? work.peak[v] < GRAV_ASLEEP_PEAK : voice->env.stage == ENV_IDLE)
+        if (work.own_envelope[v] ? work.peak[v] < GRAV_ASLEEP_PEAK : voice->env.stage == ENV_IDLE) {
+            if (six_op)
+                grav_plaits_reset_voice(v);   /* no deferred old DX release on the next note */
             e->asleep[v] = 1;
+        }
     }
 }
