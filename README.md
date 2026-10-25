@@ -13,8 +13,8 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.17.0** — four drum tracks beside the four synth tracks: a kick, a snare and two hi-hats of
-Plaits', each in a voice of its own, on the black keys in step mode and MIDI channels 5–8.
+Current version: **0.18.0** — sixteen patterns, picked with HOME and a white key, K4 or a MIDI program change, and
+switched at the pattern's end without a gap; each saved by itself into the flash. The tempo shows at the top.
 
 ## What it does
 
@@ -27,8 +27,9 @@ Plaits', each in a voice of its own, on the black keys in step mode and MIDI cha
 - **A sequencer of eight tracks:** four synth tracks (S1–S4), each its own engine and sound, voices (the four shared
   out: MONO, POLY or none), and four drum tracks (D1–D4), each a bass drum, snare or hi-hat of Plaits' in a voice of
   its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
-  (polymeters), notes and chords with their velocity and length; tempo and swing, step recording, MIDI clock out
-  and in (it follows one); each track's notes on its MIDI channel (1–8).
+  (polymeters), notes and chords with their velocity and length; sixteen patterns, switched at the pattern's end;
+  the song's tempo, each pattern's swing; step recording, MIDI clock out and in (it follows one); each track's notes
+  on its MIDI channel (1–8).
 - **Polyphony:** up to four voices (POLY), or one with legato (MONO).
 - **Velocity** from the FM-1's keys (or a fixed one), pressure sent as polyphonic aftertouch.
 - **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
@@ -56,8 +57,9 @@ Plaits', each in a voice of its own, on the black keys in step mode and MIDI cha
 SELECT picks the track (S1–S4, D1–D4) the keys, PRESET, OSC, VOICES and the steps are for; PRESET picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
 stores it all. SEQ turns step mode on (the white keys are the steps; hold one and turn K1..K3 for its note,
-velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length), PLAY starts and stops, REC (stopped) records notes and chords step by
-step. The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
+velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length), PLAY
+starts and stops, REC (stopped) records notes and chords step by step. HOME held and a white key, or K4, picks the
+pattern (playing: at the pattern's end). The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
 the effect's recording (FREEZE); SEL seeds a grain by hand, and held 2 s lets the grains come on their own again
 (SEED). The effect is off with DRY/WET and REVERB at 0, and costs nothing then.
 
@@ -106,7 +108,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.17.0.fwsc 0.17.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.18.0.fwsc 0.18.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -121,7 +123,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.17.0      # grav-code/build/grav_code-0.17.0.fwsc
+python3 tools/build.py grav-code --release 0.18.0      # grav-code/build/grav_code-0.18.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -129,8 +131,8 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `seq_test.c` (its timing, to the sample:
-`run_seq_test.py`), `screens.txt` (the screenshots). More in
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `seq_test.c` (its timing, to the sample, and
+`bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 
 ## The repository

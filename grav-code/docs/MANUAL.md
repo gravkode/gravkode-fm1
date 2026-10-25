@@ -4,7 +4,7 @@ GRAV CODE turns the M-VAVE FM-1 into a polyphonic synthesizer on all 24 sound en
 Plaits, through the granular processor, delay and reverb of Mutable Instruments' Beads: up to four voices, each its
 own engine, played from the keys with velocity or over MIDI, shaped by an envelope and moved by an LFO, and a
 sequencer of eight tracks of 64 steps, four synth tracks (each its own engine) and four drum tracks (Plaits' bass
-drum, snare and hi-hat), with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings
+drum, snare and hi-hat), in sixteen patterns, with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings
 and the pattern stay across a power cycle.
 
 ![GRAV CODE playing a chord on CHORDS: three keys held, each filled to its velocity (amber) and its pressure (white), TIMBRE 65, MORPH 50, HARMONICS 75](img/screen-playing.png "A chord on CHORDS")
@@ -77,7 +77,8 @@ From the top:
 | PRESET (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: BASS DRUM, SNARE, HI-HAT |
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
-| HOME | SEQ, the sequencer's page; again OSC: TIMBRE, MORPH, HARMONICS; again SEQ. From another page, the one of the two shown last |
+| K4 | The pattern: the next one (section 5) |
+| HOME | SEQ, the sequencer's page; again OSC: TIMBRE, MORPH, HARMONICS; again SEQ. From another page, the one of the two shown last. Held, with a white key: a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, the version; again DEBUG (section 11) |
@@ -159,7 +160,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.17.0, ID FM-1_73001700, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.18.0, ID FM-1_73001800, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -204,10 +205,12 @@ and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 - **Under them** the four pages (amber: the one shown; white: the one playing), the eight tracks (S1 to S4, then D1
   to D4; the selected one framed; each flashes as it plays a note) and the step playing, of the selected track's
   LENGTH.
-- **K1 TEMPO** (30 to 300 BPM, a step is a 16th), **K2 SWING** (50 % straight to 75 %), **K3 LENGTH** (the selected
+- **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's), **K2 SWING** (50 % straight to 75 %,
+  the pattern's), **K3 LENGTH** (the selected
   track's, 1 to 64 steps).
   A step held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead.
-- **Below:** PLAY or STOP, MIDI CLOCK while following one, STEP in step mode, REC and the step while recording.
+- **Below:** PLAY or STOP, MIDI CLOCK while following one, STEP in step mode, REC and the step while recording; at
+  the right the pattern (P1 to P16) and, blinking, the next one (>3).
 - **SELECT** picks the track (recording: moves the step).
 
 ### Step mode (SEQ)
@@ -241,6 +244,28 @@ PLAY starts from step 1; PLAY again stops, and every note it holds ends. PLAY's 
 longer on the first of each bar. A step's note lasts its length in steps, ending an eighth of a step before the
 next. SWING delays every second step: 50 % is straight, about 67 % a triplet feel, 75 % the most.
 
+### Patterns (HOME held, K4)
+
+![HOME held: the sixteen patterns, pattern 1 playing (lit), pattern 2 next (blinking), pattern 3 with steps (underlined), the others empty (dim)](img/screen-patterns.png "The patterns")
+
+There are sixteen patterns. Each has its own steps, LENGTH for each track, and SWING. The sound of the tracks (their
+engines, knobs and voices) and the TEMPO are the song's: the same whichever pattern plays.
+
+- **HOME held** shows the sixteen for as long as it is held, and the white keys light them: the one playing lit,
+  the next one blinking, one with steps mid, an empty one dim. A white key picks that pattern. (HOME tapped still
+  changes the page, on its release.)
+- **K4** picks the pattern after the one playing (or the one queued), or before it, and shows the sixteen for a
+  moment.
+- **A MIDI program change** 0 to 15 (any channel, USB or TRS) picks pattern 1 to 16.
+
+Stopped, the pattern changes at once. Playing, the one picked is queued (NEXT, blinking) and comes in at the end
+of the pattern playing: when its longest track with steps comes round (a pattern with no steps: every 16 steps).
+Every track then starts from its first step. Picking the one playing again takes the queued one back.
+
+A pattern you leave is saved by itself, edits and all; while playing it is written into the flash a little at a
+time, without a gap in the sound, and the next one comes in once it is (a moment, at most a pattern later). An
+empty pattern starts with every track 16 steps long.
+
 ### Timing and MIDI
 
 The sequencer's notes land within half a millisecond (a 24-sample grid), not on the 5.8 ms audio blocks. Over USB
@@ -249,8 +274,8 @@ selected) and, while it plays, Start, 24 clocks a quarter note and Stop.
 A MIDI clock coming in (USB or TRS) leads it: Start, Continue and Stop start and stop it, its tempo shows on SEQ
 (MIDI CLOCK), swing still applies; half a second without a clock, the sequencer's own TEMPO takes over again.
 
-SAVE keeps the pattern: every track's steps and LENGTH, TEMPO and SWING (section 9). A pattern saved by 0.15 (one
-track) comes back as S1's; one saved by 0.16, with the drum tracks empty.
+SAVE keeps the pattern playing too (section 9). The pattern 0.17 and before saved becomes pattern 1, with its
+tempo (0.15's, of one track, as S1's; 0.16's with the drum tracks empty).
 
 ---
 
@@ -416,9 +441,12 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 ## 9. Saving
 
 SAVE stores the octave, each track's engine (a drum track's drum) and OSC values, the synth tracks' VOICES, the MOD
-and ENV values, VELOCITY, the effect's eight knobs and QUALITY, and the sequencer's pattern (every track's steps and
-LENGTH, TEMPO and SWING); GRAV CODE starts with them at the next power-on (settings saved before 0.16 give S1 their
-sound, the other tracks start fresh, one voice each; settings saved by 0.16 load with the kit as it comes). Writing to the flash stops the sound for a moment: save while the sequencer is stopped. FREEZE and SEED's way are not kept: the effect starts
+and ENV values, VELOCITY, the effect's eight knobs and QUALITY, the TEMPO and the pattern you are on, and that
+pattern's steps; GRAV CODE starts with them at the next power-on (settings saved before 0.16 give S1 their sound,
+the other tracks start fresh, one voice each; settings saved by 0.16 load with the kit as it comes). Writing the
+settings stops the sound for a moment, so SAVE writes them only when they changed: save them while the sequencer is
+stopped. A pattern is written without a gap (section 5), and saved by itself when you leave it; edits to the one
+you are on that neither SAVE nor leaving it saved are lost at power-off. FREEZE and SEED's way are not kept: the effect starts
 unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A firmware update
 keeps them (settings saved by 0.12 load with the effect at rest).
 
@@ -427,7 +455,7 @@ keeps them (settings saved by 0.12 load with the effect at rest).
 ## 10. MIDI and USB audio
 
 **MIDI in,** over USB and the TRS jack, any channel: notes play the selected track (a drum track too), with their
-velocity. The last message
+velocity; a program change 0 to 15 picks pattern 1 to 16 (section 5). The last message
 shows at the bottom of the screen.
 
 **MIDI out,** over USB, on each track's channel (S1 to S4 on 1 to 4, D1 to D4 on 5 to 8): the keys' notes (the
