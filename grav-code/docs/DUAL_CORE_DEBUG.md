@@ -26,7 +26,8 @@ Engine construction clears the slot and its scratch RAM, including the six-op FM
 
 ## Controls
 
-- **REC** opens DEBUG; REC again returns to OSC. HOME, GLO, ENV, LFO and FX keep their usual actions.
+- **GLO twice** opens DEBUG (since 0.15; REC opened it before, and now records); GLO again returns to GLO. HOME,
+  ENV, LFO and FX keep their usual actions.
 - **K1 left** selects one-core processing; **K1 right** selects two-core processing.
   CPU1 remains booted and idle in one-core mode, so it can be used again without restarting.
   The selection is temporary and is not written by SAVE. Every boot selects two-core mode.
@@ -99,7 +100,7 @@ Device output: `grav-code/build/grav_code-0.14.1.fwsc`. The original hardware co
 
 ## Check on the FM-1
 
-1. Open DEBUG with REC. Confirm CORES 2 and CPU1 ON. Hold four notes with the effect off: VOICES should
+1. Open DEBUG with GLO twice. Confirm CORES 2 and CPU1 ON. Hold four notes with the effect off: VOICES should
    reach 4, MASK0 / MASK1 normally show 5 / 10, SYN1 becomes nonzero and JOBS increases. Turn REVERB up:
    FX1 shows Beads on CPU1, JOBS climbs about 12 a block, and the voices settle where there is room.
 2. Select the engine, envelope/release and reverb settings that produced the clicks.

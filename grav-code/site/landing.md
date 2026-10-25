@@ -4,8 +4,9 @@ GRAV CODE turns the M-VAVE FM-1 into a synthesizer on all of Mutable Instruments
 analog, waveshaping, FM and 6-operator FM, grains, additive, wavetables, chords, speech, swarms, noise, particles,
 strings and modal resonators, drums, wave terrains, a string machine and chiptune, up to four voices at once (or
 one, MONO). The keys play it with velocity (or a fixed one); an envelope shapes it and an LFO moves its timbre,
-morph or pitch; Mutable Instruments Beads, its granular processor, delay, tape and reverb, is its effect; the
-settings save; MIDI goes out and comes in over USB and TRS.
+morph or pitch; Mutable Instruments Beads, its granular processor, delay, tape and reverb, is its effect; a sequencer
+of 64 steps on the white keys plays it, with swing and MIDI clock; the settings and the pattern save; MIDI goes out
+and comes in over USB and TRS.
 
 ![GRAV CODE on the FM-1's screen: a chord on CHORDS, three keys held, each filled to its velocity and its pressure](manual/img/screen-playing.png "A chord on CHORDS")
 
@@ -13,7 +14,7 @@ Version {{VERSION}}. Installing is at your own risk; the installer can put M-VAV
 
 - [Try it in the browser](emu/): the same code the FM-1 runs, with sound. No FM-1 needed.
 - [Install](install/): from Chrome or Edge, with the FM-1 connected by USB.
-- [Manual](manual/): the screen, the controls, the pages, all 24 engines, the effect, voices, MIDI.
+- [Manual](manual/): the screen, the controls, the pages, the sequencer, all 24 engines, the effect, voices, MIDI.
 - [Download {{PKG}}](firmware/{{PKG}}): for the command-line installer, `python3 tools/fm1_install.py {{PKG}}`.
 - [Source](https://github.com/gravkode/gravkode-fm1): MPL-2.0. Built on fm1-base by Charles Vestal and felucca-bsp,
   from Felucca by Leo Kuroshita, Hügelton Instruments.

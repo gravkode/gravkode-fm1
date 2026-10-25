@@ -3,9 +3,9 @@
 **A polyphonic synthesizer firmware for the M-VAVE FM-1, on all 24 sound engines of Mutable Instruments' Plaits,
 through Mutable Instruments' Beads.**
 
-Up to four voices, each its own engine, played from the FM-1's keys with velocity or over MIDI, shaped by an
-envelope, moved by an LFO and played through Beads' grains, delay and reverb, all on the FM-1's own panel and
-screen.
+Up to four voices, each its own engine, played from the FM-1's keys with velocity, over MIDI or by a 64-step
+sequencer, shaped by an envelope, moved by an LFO and played through Beads' grains, delay and reverb, all on the
+FM-1's own panel and screen.
 
 <p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE on the FM-1's screen: a chord on CHORDS, three keys held, each filled to its velocity and pressure"></p>
 
@@ -13,8 +13,8 @@ screen.
 
 ---
 
-Current version: **0.14.1** — voices and the Beads effect on two cores, with a DEBUG page for load and audio
-diagnostics; the overload protection fades a voice out and never takes the last one.
+Current version: **0.15.0** — the sequencer: 64 steps in 4 pages of 16 on the white keys, a length of 1 to 64,
+chords, swing, step recording, MIDI clock in and out; SEQ is the main page.
 
 ## What it does
 
@@ -24,6 +24,8 @@ diagnostics; the overload protection fades a voice out and never takes the last 
   patches), wave terrains, a string machine and chiptune. Each with Plaits' own TIMBRE, MORPH and HARMONICS.
 - **An effect from Beads:** its granular processor (DENSITY, TIME, SIZE, SHAPE, PITCH, FEEDBACK), its delay, its four
   recording qualities (digital to dirty tape) and its reverb, with FREEZE and SEED on the panel's buttons.
+- **A sequencer:** 64 steps in four pages of 16, played on the white keys like a TR, a length of 1 to 64, notes and
+  chords with their velocity and length, tempo and swing, step recording, MIDI clock out and in (it follows one).
 - **Polyphony:** up to four voices (POLY), or one with legato (MONO).
 - **Velocity** from the FM-1's keys (or a fixed one), pressure sent as polyphonic aftertouch.
 - **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
@@ -34,20 +36,24 @@ diagnostics; the overload protection fades a voice out and never takes the last 
 
 ## The screen and its pages
 
-<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Six pages: OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), GLO (VOICES, VELOCITY, the version), FX GRAIN (DENSITY, TIME, SIZE, frozen) and FX MIX (DRY/WET, REVERB, QUALITY)"></p>
+<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), FX GRAIN (DENSITY, TIME, SIZE, frozen), FX MIX (DRY/WET, REVERB, QUALITY), GLO (VOICES, VELOCITY, the version) and DEBUG"></p>
 
 | Button | Page | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
-| HOME | OSC | TIMBRE | MORPH | HARMONICS |
+| HOME | SEQ | TEMPO (30 to 300 BPM) | SWING (50 to 75 %) | LENGTH (1 to 64 steps) |
+| HOME again | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
 | GLO | GLO | VOICES (MONO, 2, 3, 4) | VELOCITY (ON, OFF) | the version |
 | FX | FX GRAIN | DENSITY (none at the middle: clocked left, random right) | TIME (how far back) | SIZE (backwards, forwards, at the end the delay) |
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
 | FX again | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
-| REC | DEBUG | one/two cores | reset peaks/counters | — |
+| GLO again | DEBUG | one/two cores | reset peaks/counters | — |
 
-PRESET picks the engine, OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE stores it all. EDIT freezes
+PRESET picks the engine, OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE stores it all. SEQ turns step
+mode on (the white keys are the steps; hold one and turn K1..K3 for its note, velocity, length; OCT- / OCT+ the
+pages; SEQ held and a step: the length), PLAY starts and stops, REC (stopped) records notes and chords step by
+step. The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
 the effect's recording (FREEZE); SEL seeds a grain by hand, and held 2 s lets the grains come on their own again
 (SEED). The effect is off with DRY/WET and REVERB at 0, and costs nothing then.
 
@@ -96,7 +102,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.1.fwsc 0.14.1 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.15.0.fwsc 0.15.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -111,7 +117,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.14.1      # grav-code/build/grav_code-0.14.1.fwsc
+python3 tools/build.py grav-code --release 0.15.0      # grav-code/build/grav_code-0.15.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -119,14 +125,15 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `screens.txt` (the screenshots). More in
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `seq_test.c` (its timing, to the sample:
+`run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 
 ## The repository
 
 | Path | What |
 | --- | --- |
-| `grav-code/` | GRAV CODE: the app (`app.c`), its DSP (`dsp/`: Plaits' engines per voice, Beads, the mixer), its voices and modulation (`synth/`), Plaits, Beads and the other vendored code (`vendor/`), tests, docs, the site's page |
+| `grav-code/` | GRAV CODE: the app (`app.c`), its DSP (`dsp/`: Plaits' engines per voice, Beads, the mixer), its voices and modulation (`synth/`), the sequencer (`seq/`), Plaits, Beads and the other vendored code (`vendor/`), tests, docs, the site's page |
 | `device/`, `include/`, `lib/`, `host/`, `web/`, `tools/` | fm1-base: the FM-1 platform, the simulator, the emulator, the installer, the build ([FM1-BASE.md](FM1-BASE.md)) |
 | `bsp/` | felucca-bsp: the FM-1's chip and board support |
 | `template/`, `tests/`, `ble/` | fm1-base's reference app and its platform tests, its Bluetooth stack (not built into GRAV CODE) |

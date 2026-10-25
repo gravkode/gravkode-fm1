@@ -2,8 +2,9 @@
 
 GRAV CODE turns the M-VAVE FM-1 into a polyphonic synthesizer on all 24 sound engines of Mutable Instruments'
 Plaits, through the granular processor, delay and reverb of Mutable Instruments' Beads: up to four voices, each its
-own engine, played from the keys with velocity or over MIDI, shaped by an envelope and moved by an LFO. Everything
-is on the FM-1's own panel and screen; the settings stay across a power cycle.
+own engine, played from the keys with velocity or over MIDI, shaped by an envelope and moved by an LFO, and a
+sequencer of 64 steps with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings and
+the pattern stay across a power cycle.
 
 ![GRAV CODE playing a chord on CHORDS: three keys held, each filled to its velocity (amber) and its pressure (white), TIMBRE 65, MORPH 50, HARMONICS 75](img/screen-playing.png "A chord on CHORDS")
 
@@ -15,14 +16,15 @@ is on the FM-1's own panel and screen; the settings stay across a power cycle.
 2. The screen
 3. Controls
 4. The pages
-5. The engines
-6. The effect (FX)
-7. Voices and velocity
-8. Saving
-9. MIDI and USB audio
-10. CPU and its limits
-11. Troubleshooting
-12. Credits and licences
+5. The sequencer
+6. The engines
+7. The effect (FX)
+8. Voices and velocity
+9. Saving
+10. MIDI and USB audio
+11. CPU and its limits
+12. Troubleshooting
+13. Credits and licences
 
 ---
 
@@ -50,8 +52,9 @@ your own risk.
 
 From the top:
 
-- **The header:** GRAV CODE, the page you are on (OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE, FX MIX or DEBUG), and the
-  battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
+- **The header:** GRAV CODE, the page you are on (SEQ, OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE, FX MIX or DEBUG), and
+  the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
+  GRAV CODE starts on SEQ, the sequencer's page (section 5).
 - **The engine** that plays, by its name; beside it FREEZE, lit, while the effect is frozen.
 - **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
   starts from a mark in the middle (DENSITY, PITCH) has its rest there.
@@ -67,21 +70,25 @@ From the top:
 | Control | What it does |
 | --- | --- |
 | Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0 |
-| OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go |
+| OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go. In step mode: the pages |
 | PRESET (knob) | The engine: all 24 in Plaits' order, round from the last to the first |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
-| HOME | The OSC page: TIMBRE, MORPH, HARMONICS |
+| HOME | SEQ, the sequencer's page; again OSC: TIMBRE, MORPH, HARMONICS; again SEQ. From another page, the one of the two shown last |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
-| GLO | The GLO page: VOICES, VELOCITY, the version |
+| GLO | The GLO page: VOICES, VELOCITY, the version; again DEBUG (section 11) |
 | FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
 | SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
-| REC | DEBUG: K1 selects one/two-core processing; K2 resets peaks and counters |
+| SEQ | Step mode: the white keys are the sequencer's steps (section 5). Lit while on |
+| PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
+| REC | Stopped: step recording (section 5) |
+| SELECT (knob) | On SEQ: the page of steps shown; recording: the step |
 | MASTER | The volume, glided: no step in the sound |
-| SAVE | Stores the settings; lit while there are changes not stored |
+| SAVE | Stores the settings and the pattern; lit while there are changes not stored |
 
-The other buttons (ARP, SEQ, PLAY) and knobs (SELECT, ALGO, K4) only say their name or count for now: they are
+The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: GRAIN, SHAPE,
+MIX; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP and the knobs ALGO and K4 only say their name or count for now: they are
 free for what comes next.
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
@@ -91,10 +98,14 @@ chip's update mode, a way to install when GRAV CODE starts but its USB can't be 
 
 ## 4. The pages
 
-### OSC (HOME)
+### SEQ (HOME)
+
+The sequencer's page, GRAV CODE's main one: section 5.
+
+### OSC (HOME again)
 
 The engine's own three parameters, as on Plaits: **TIMBRE** (K1), **MORPH** (K2) and **HARMONICS** (K3). What each
-does depends on the engine: section 5. They start at 65, 50 and 75.
+does depends on the engine: section 6. They start at 65, 50 and 75.
 
 ### MOD (LFO)
 
@@ -145,7 +156,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: VOICES 4, VELOCITY ON, version 0.14.1, ID FM-1_73001401, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: VOICES 4, VELOCITY ON, version 0.15.0, ID FM-1_73001500, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -155,15 +166,76 @@ The firmware and its global settings:
 | K2 | VELOCITY | ON (right: the keys play as they land), OFF (left: at a fixed 100) |
 | K3 | VERSION | the firmware's version, said aloud |
 
-Under them, the package's identity (the installer's) and the number of engines. Section 7 has more on both settings.
+Under them, the package's identity (the installer's) and the number of engines. Section 8 has more on both settings.
+GLO again opens DEBUG, the two cores' timings (section 11).
 
 ### FX GRAIN, FX SHAPE, FX MIX (FX)
 
-The effect's three pages: section 6.
+The effect's three pages: section 7.
 
 ---
 
-## 5. The engines
+## 5. The sequencer
+
+![The SEQ page playing: 16 steps, four on with their velocity and note, a chord marked by its dots, the step playing on a light ground (6 of 16); TEMPO 120, SWING 58 %, LENGTH 16; PLAY](img/screen-seq.png "The SEQ page")
+
+One track for now: it plays the engine and the voices the keys play, with their envelope, LFO and effect, and the
+keys play along with it. 64 steps in four pages of 16, as many as its LENGTH (1 to 64); a step holds a note or a
+chord of up to four, its velocity and its length.
+
+### The SEQ page (HOME)
+
+- **The steps** of the page shown: a step on is a bar as tall as its velocity, with an amber tick at its note's height
+  among the pattern's notes and a dot for each further note of a chord; an empty step is a line, a step past the
+  LENGTH a dot. The step playing stands on a light ground.
+- **Under them** the four pages (amber: the one shown; white: the one playing) and the step playing, of the LENGTH.
+- **K1 TEMPO** (30 to 300 BPM, a step is a 16th), **K2 SWING** (50 % straight to 75 %), **K3 LENGTH** (1 to 64 steps).
+  A step held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead.
+- **Below:** PLAY or STOP, MIDI CLOCK while following one, STEP in step mode, REC and the step while recording.
+- **SELECT** turns the page shown (recording: moves the step).
+
+### Step mode (SEQ)
+
+SEQ turns step mode on (SEQ lit): the 16 white keys are the steps of the page shown, and the keys no longer play.
+SEQ again turns it off.
+
+| Do | What happens |
+| --- | --- |
+| Tap a white key | Its step on (with the last note or chord you played: C4 before any), or off |
+| Hold a white key, turn K1 | Its notes up or down, a semitone a detent |
+| Hold a white key, turn K2 / K3 | Its velocity / its length in steps (1 to 64) |
+| The first four black keys | Page 1, 2, 3, 4 |
+| OCT- / OCT+ | The page before / after |
+| Hold SEQ, tap a white key | That step is the last: the LENGTH (step mode stays on) |
+
+The keys' lights show the steps: a step on lit, an empty one mid, one past the LENGTH dim, the step playing the
+other way round (an empty one lights, one on goes out); the black keys show the pages the same way.
+
+### Step recording (REC)
+
+Stopped, REC starts step recording (PLAY red, REC blinking): the notes you play go into the steps one after the
+other, from the first step of the page shown. A chord (keys held together, up to four) or a single note fills one
+step, at its velocity. SELECT moves to another step (to leave one as it is). REC again, or PLAY, ends it. Recording
+while the sequencer plays comes in a later version.
+
+### Playing (PLAY)
+
+PLAY starts from step 1; PLAY again stops, and every note it holds ends. PLAY's green LED flashes on each beat,
+longer on the first of each bar. A step's note lasts its length in steps, ending an eighth of a step before the
+next. SWING delays every second step: 50 % is straight, about 67 % a triplet feel, 75 % the most.
+
+### Timing and MIDI
+
+The sequencer's notes land within half a millisecond (a 24-sample grid), not on the 5.8 ms audio blocks. Over USB
+MIDI it sends its notes (channel 1, as the keys) and, while it plays, Start, 24 clocks a quarter note and Stop.
+A MIDI clock coming in (USB or TRS) leads it: Start, Continue and Stop start and stop it, its tempo shows on SEQ
+(MIDI CLOCK), swing still applies; half a second without a clock, the sequencer's own TEMPO takes over again.
+
+SAVE keeps the pattern: its steps, LENGTH, TEMPO and SWING (section 9).
+
+---
+
+## 6. The engines
 
 PRESET steps through all 24 engines of Plaits, in Plaits' own order: its first sixteen, then the eight its firmware
 1.2 added. K1 is TIMBRE, K2 MORPH, K3 HARMONICS; what they do, engine by engine:
@@ -218,7 +290,7 @@ the next.
 
 ---
 
-## 6. The effect (FX)
+## 7. The effect (FX)
 
 ![The FX MIX page: DRY/WET 40, REVERB 25, QUALITY VINTAGE (the second of four); SEED AUTO, FX ON](img/screen-fx-mix.png "The FX MIX page")
 
@@ -296,7 +368,7 @@ it loops a slice of the recording: TIME picks which, SHAPE its envelope.
 
 ---
 
-## 7. Voices and velocity
+## 8. Voices and velocity
 
 ![A chord on CHORDS: three keys, three voices](img/screen-playing.png "Three keys held, three voices")
 
@@ -317,21 +389,25 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 
 ---
 
-## 8. Saving
+## 9. Saving
 
-SAVE stores the octave, the engine, the OSC, MOD and ENV values, VOICES and VELOCITY, and the effect's eight knobs
-and QUALITY; GRAV CODE starts with them at the next power-on. FREEZE and SEED's way are not kept: the effect starts
+SAVE stores the octave, the engine, the OSC, MOD and ENV values, VOICES and VELOCITY, the effect's eight knobs and
+QUALITY, and the sequencer's pattern (its steps, LENGTH, TEMPO and SWING); GRAV CODE starts with them at the next
+power-on. Writing to the flash stops the sound for a moment: save while the sequencer is stopped. FREEZE and SEED's way are not kept: the effect starts
 unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A firmware update
 keeps them (settings saved by 0.12 load with the effect at rest).
 
 ---
 
-## 9. MIDI and USB audio
+## 10. MIDI and USB audio
 
 **MIDI in,** over USB and the TRS jack, any channel: notes play the voices, with their velocity. The last message
 shows at the bottom of the screen.
 
-**MIDI out,** over USB, channel 1: the keys' notes, their velocity and their pressure (polyphonic aftertouch).
+**MIDI out,** over USB, channel 1: the keys' notes, their velocity and their pressure (polyphonic aftertouch), and
+the sequencer's notes; while it plays, MIDI Start, clock (24 a quarter note) and Stop.
+
+**MIDI clock in** (USB or TRS) leads the sequencer: section 5.
 
 **USB audio:** the FM-1 is also a USB sound card: a computer can record GRAV CODE, and play its own sound through
 the FM-1's speaker and headphones, at MASTER.
@@ -340,13 +416,13 @@ GRAV CODE has no Bluetooth or WiFi.
 
 ---
 
-## 10. CPU and its limits
+## 11. CPU and its limits
 
 CPU (bottom right) is the smoothed share of each audio block's time used by rendering. GRAV CODE uses both of
 the FM-1's cores. With the effect off, the sounding Plaits voices are split between them. With the effect on,
 Beads (more than half a block's time by itself on the FM-1) runs on the second core, a 24-sample chunk behind the
 voices, while the first renders them; the voices go to whichever core has room. Nothing is added to the latency,
-and the sound is the same on one core or two. REC opens DEBUG, where K1 selects one/two-core processing and K2
+and the sound is the same on one core or two. GLO twice opens DEBUG, where K1 selects one/two-core processing and K2
 resets peaks and counters. These debug choices are temporary.
 
 Off (DRY/WET and REVERB at 0, not frozen), Beads is bypassed and costs nothing. If a block takes over 90% of its
@@ -364,12 +440,12 @@ See [DEBUG controls and fields](https://github.com/gravkode/gravkode-fm1/blob/ma
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 **No sound:** turn MASTER up; some engines are quiet by their settings (MODAL and SWARM with TIMBRE low, NOISE and
 PARTICLE thin); a drum or a 6-OP FM patch may simply have decayed.
 
-**A crackle:** see section 10.
+**A crackle:** see section 11.
 
 **The sound goes on after the keys are let go:** the effect: FREEZE (EDIT lit: press it), a long REVERB, or FEEDBACK
 building up. DRY/WET and REVERB at 0 turn it off.
@@ -380,11 +456,16 @@ or hold it 2 s for AUTO. Or the recording holds nothing yet: play.
 **The installer doesn't find the FM-1:** a data cable, other MIDI apps and browser tabs closed, Chrome or Edge.
 Started but out of reach over USB: hold REC while switching on (update mode), then install.
 
+**The keys play no notes:** step mode is on (SEQ lit): press SEQ.
+
+**The sequencer plays nothing:** the steps past the LENGTH don't play (they show as dots); a MIDI clock coming in
+leads it (MIDI CLOCK on SEQ): start it from there.
+
 **The knobs or keys read wrong:** hold OCT- and OCT+ while switching on, for the panel's setup.
 
 ---
 
-## 12. Credits and licences
+## 13. Credits and licences
 
 - GRAV CODE is built on **fm1-base** (Charles Vestal) and **felucca-bsp** (Leo Kuroshita, Hügelton Instruments),
   MPL-2.0.

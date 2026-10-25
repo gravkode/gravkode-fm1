@@ -8,6 +8,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
 | `app.c` | The app: the keys and MIDI into the voices, the pages (OSC, MOD, ENV, GLO, the three FX pages), FREEZE and SEED, the screen, the settings and SAVE |
 | `synth/` | The voices (`synth.c`: POLY up to four, MONO with legato, the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
+| `seq/` | The sequencer (`seq.c`): 64 steps, length, chords, tempo, swing, MIDI clock out and in; each block's events at their sample offsets, on a 24-sample grid (`app.c` renders between them) |
 | `dsp/grav_engine.c` | The render: each voice through its engine and envelope, the mix through the effect, MASTER, the soft limiter, sleeping voices |
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), built in each voice, rendered 12 samples at a time |
 | `dsp/grav_beads.cpp` | Beads' processor, the effect: built in place, run in mono 12 samples at a time, off (and free) at DRY/WET and REVERB 0, faded in and out |
@@ -15,13 +16,13 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `vendor/` | Plaits, Beads, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
 | `words.tsv` | The screen reader's words |
-| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, and `screens.txt` (the manual's pictures) |
+| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, and `screens.txt` (the manual's pictures); `seq_test.c` (the sequencer's timing, `run_seq_test.py`) and `dual_core_test.cpp` (`run_dual_core_test.py`) |
 | `docs/` | The manual and its pictures (`docs/img/compose.py` makes the README's from them) |
 | `site/landing.md` | The site's front page |
 
 ## Build, test, install
 
-Version 0.14 renders on both cores, with the DEBUG page (REC); since 0.14.1 Beads runs on the second core,
+Version 0.14 renders on both cores, with the DEBUG page (GLO twice); since 0.14.1 Beads runs on the second core,
 a chunk behind the voices.
 K1 switches one/two-core processing; K2 clears peaks and counters. See
 [the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
@@ -35,6 +36,8 @@ From the repository's root:
     grav-code/build/host/grav_code_host grav-code/tests/engines.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/voices.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/fx.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/seq.txt grav-code/build/host
+    python3 grav-code/tests/run_seq_test.py
     python3 tools/build.py grav-code --web               # the browser emulator: grav-code/build/emu/
     python3 tools/fm1_install.py grav-code/build/grav_code.fwsc
 
@@ -43,13 +46,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.14.1    # grav-code/build/grav_code-0.14.1.fwsc, identity FM-1_73001401
+    python3 tools/build.py grav-code --release 0.15.0    # grav-code/build/grav_code-0.15.0.fwsc, identity FM-1_73001500
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.14.1.fwsc 0.14.1 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.15.0.fwsc 0.15.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.14.1   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.15.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 
