@@ -109,16 +109,18 @@ void seq_init(seq_t *s)
 {
     memset(s, 0, sizeof *s);
     seq_defaults(&s->pat);
+    s->bpm = 120;
+    s->next = SEQ_NO_PATTERN;
     for (uint32_t k = 0; k < SEQ_TRACKS; k++)
         s->step[k] = -1;
     s->due_q8 = SEQ_FAR;
     s->ext_step_q8 = (int32_t)(SEQ_STEP_Q8_BPM / 120u);
 }
 
-/* a straight step, by the pattern's tempo or the clock in's */
+/* a straight step, by the song's tempo or the clock in's */
 static int32_t straight_q8(const seq_t *s)
 {
-    return s->ext ? s->ext_step_q8 : (int32_t)(SEQ_STEP_Q8_BPM / s->pat.bpm);
+    return s->ext ? s->ext_step_q8 : (int32_t)(SEQ_STEP_Q8_BPM / s->bpm);
 }
 
 /* the step played count-th since the start: the first of each pair takes swing % of the pair (at most 2 x 5644800 x
@@ -160,6 +162,41 @@ static void steps_reset(seq_t *s)
 {
     for (uint32_t k = 0; k < SEQ_TRACKS; k++)
         s->step[k] = -1;
+    s->pat_steps = 0;
+}
+
+static int track_has_steps(const seq_track_t *tr)
+{
+    for (uint32_t i = 0; i < tr->length && i < SEQ_STEPS; i++)
+        if (tr->step[i].on)
+            return 1;
+    return 0;
+}
+
+int seq_has_steps(const seq_pattern_t *p)
+{
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+        if (track_has_steps(&p->track[k]))
+            return 1;
+    return 0;
+}
+
+uint32_t seq_length(const seq_pattern_t *p)
+{
+    uint32_t n = 0;
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+        if (p->track[k].length > n && track_has_steps(&p->track[k]))
+            n = p->track[k].length;
+    return n ? n : SEQ_PAGE;
+}
+
+void seq_load(seq_t *s, const seq_pattern_t *src)
+{
+    if (src)
+        memcpy(&s->pat, src, sizeof s->pat);
+    else
+        seq_defaults(&s->pat);
+    steps_reset(s);
 }
 
 /* the next step of every track, at at_q8 (each round its own length): its notes start (one already sounding on
@@ -167,6 +204,16 @@ static void steps_reset(seq_t *s)
 static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_t max)
 {
     const uint32_t count = s->count++;
+    if (s->pat_steps >= seq_length(&s->pat)) {   /* the pattern's end: the next one in, if it is ready */
+        s->pat_steps = 0;
+        if (s->next_ready && s->next != SEQ_NO_PATTERN && s->edits == s->saved) {
+            seq_load(s, s->next_src);
+            s->pattern = s->next;
+            s->next = SEQ_NO_PATTERN;
+            s->next_ready = 0;
+        }
+    }
+    s->pat_steps++;
     for (uint32_t track = 0; track < SEQ_TRACKS; track++) {
         const seq_track_t *tr = &s->pat.track[track];
         const uint32_t length = tr->length ? tr->length : 1u;

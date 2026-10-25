@@ -39,7 +39,8 @@ typedef struct {
 
 typedef struct {
     uint32_t magic;                      /* SEQ_MAGIC */
-    uint16_t bpm;                        /* SEQ_BPM_MIN..SEQ_BPM_MAX, quarter notes a minute; a step is a 16th */
+    uint16_t bpm;                        /* the tempo it was saved with (SEQ_BPM_MIN..MAX); since 0.18 the song's
+                                          * tempo is seq_t's, every pattern's */
     uint8_t swing;                       /* SEQ_SWING_MIN..MAX: the first of each pair of steps' share, in % */
     uint8_t rsv;
     seq_track_t track[SEQ_TRACKS];
@@ -76,9 +77,22 @@ typedef struct {
 
 /* the UI's requests (and MIDI in's stop), taken by the audio interrupt at its next block */
 enum { SEQ_WANT_NONE, SEQ_WANT_PLAY, SEQ_WANT_STOP };
+#define SEQ_NO_PATTERN 0xFFu
 
+/* The patterns (0.18): pat is the one playing and edited; another is queued (next), and once the one playing is saved
+ * (edits == saved: the UI counts its edits under plat_lock, and the saves that caught up with them) and the main
+ * loop has found the next one's steps (next_src, in the flash; 0: an empty pattern) and set next_ready, the audio
+ * interrupt copies it in at the pattern's end: when its longest track (of those with a step on) comes round. */
 typedef struct {
     seq_pattern_t pat;
+    uint16_t bpm;                        /* the song's tempo: SEQ_BPM_MIN..SEQ_BPM_MAX, quarter notes a minute; a
+                                          * step is a 16th */
+    volatile uint8_t pattern;            /* the pattern playing: 0..15 */
+    volatile uint8_t next;               /* the one queued, SEQ_NO_PATTERN: none */
+    const seq_pattern_t *volatile next_src;
+    volatile uint8_t next_ready;
+    volatile uint32_t edits, saved;
+    uint32_t pat_steps;                  /* steps since the pattern began */
     volatile uint8_t want;               /* SEQ_WANT_* */
     volatile uint8_t playing;
     volatile uint8_t ext;                /* following MIDI clock in (one came in the last half second) */
@@ -103,7 +117,13 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max);
 void seq_midi_clock(seq_t *s);           /* audio interrupt, MIDI in: a clock (F8) */
 void seq_midi_start(seq_t *s, int cont); /* audio interrupt, MIDI in: start (FA) or continue (FB); stop (FC) is
                                           * want = SEQ_WANT_STOP */
-uint32_t seq_bpm(const seq_t *s);        /* the tempo playing: the pattern's, or the clock in's */
+uint32_t seq_bpm(const seq_t *s);        /* the tempo playing: the song's, or the clock in's */
+/* a pattern's length: its longest track's of those with a step on (SEQ_PAGE if none has) */
+uint32_t seq_length(const seq_pattern_t *p);
+int seq_has_steps(const seq_pattern_t *p);
+/* a pattern copied in to play (src: 0, an empty one), from its first step (the audio interrupt at a pattern's end;
+ * the main loop, under plat_lock, while stopped) */
+void seq_load(seq_t *s, const seq_pattern_t *src);
 int seq_valid(const seq_pattern_t *p);   /* a loaded record that can be played */
 /* 0.15's record, read into S1 of a pattern (the others empty); 0 if it is no such record */
 int seq_from_v1(const seq_pattern_v1_t *v1, seq_pattern_t *p);

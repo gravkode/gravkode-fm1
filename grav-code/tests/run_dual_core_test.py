@@ -8,7 +8,7 @@ import sys
 app = Path(__file__).resolve().parents[1]
 root = app.parent
 out = app / "build" / "host"
-objects = sorted((out / "o2").glob("*.o"))
+objects = sorted(o for o in (out / "o2").glob("*.o") if o.name != "seq_bank.o")   # (the flash: not the sound)
 if not objects:
     raise SystemExit("Run tools/build.py grav-code --host first")
 exe = out / "dual_core_test"

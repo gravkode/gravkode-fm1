@@ -62,3 +62,4 @@ void synth_envelopes(synth_t *s, float attack, float decay, float sustain, float
 void synth_shed(synth_t *s);             /* the render ran too long: the oldest voice sounding fades out (a synth
                                           * track's first, a drum's last) */
 uint32_t synth_voices_held(const synth_t *s);   /* voices whose note is held (the tests) */
+int synth_quiet(const synth_t *s);       /* no voice sounding (held, or its envelope still going) */

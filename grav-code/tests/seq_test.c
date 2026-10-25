@@ -223,6 +223,56 @@ int main(void)
               s.hits[5] == 6, "after 13 steps: S1 at %d, S2 at %d, D2 at %d", s.step[0], s.step[1], s.step[5]);
     }
 
+    /* 0.18, the patterns: one queued comes in at the pattern's end (its longest track with steps: S1's 4 here; D1's
+     * 64, all off, don't count), once the one playing is saved (edits == saved); until then it plays on */
+    {
+        static seq_pattern_t next;
+        seq_defaults(&next);
+        CHECK(seq_length(&next) == SEQ_PAGE && !seq_has_steps(&next), "an empty pattern: 16 steps long");
+        next.track[0].length = 2;
+        next.track[0].step[0].on = next.track[0].step[1].on = 1;
+        next.track[0].step[0].note[0] = next.track[0].step[1].note[0] = 70;
+        fresh(&s);
+        s.pat.track[0].length = 4;
+        s.pat.track[4].length = 64;
+        CHECK(seq_length(&s.pat) == 4, "the pattern's length: its longest track with steps, %u", seq_length(&s.pat));
+        s.next = 3;
+        s.next_src = &next;
+        s.edits = 1;                     /* unsaved: it waits */
+        s.next_ready = 1;
+        s.want = SEQ_WANT_PLAY;
+        run(&s, 140);                    /* 35840 samples: 7 steps */
+        CHECK(s.pattern == 0 && s.next == 3 && count(SEQ_EV_ON) == 7, "unsaved: no switch at its end (%u, %u notes)",
+              s.pattern, count(SEQ_EV_ON));
+        s.saved = s.edits;               /* saved: in at the next end, step 9 */
+        run(&s, 120);                    /* to 66560 samples: 13 steps */
+        {
+            uint32_t k = 0;
+            for (uint32_t i = 0; i < nlog; i++)
+                if (log_[i].e.type == SEQ_EV_ON) {
+                    CHECK(log_[i].e.note == (k < 8 ? 60 : 70), "step %u: note %u", k, log_[i].e.note);
+                    CHECK(k != 8 || log_[i].t == grid(8 * step), "the switch on step 9's time: %u", log_[i].t);
+                    k++;
+                }
+            CHECK(k == 13, "13 steps: %u", k);
+        }
+        CHECK(s.pattern == 3 && s.next == SEQ_NO_PATTERN && !s.next_ready && s.pat.track[0].length == 2,
+              "pattern 3 playing: %u", s.pattern);
+        /* polymeter: the end when the longest track with steps comes round (S2's 6 beside S1's 4) */
+        s.pat.track[1].length = 6;
+        s.pat.track[1].step[2].on = 1;
+        CHECK(seq_length(&s.pat) == 6, "S1 4, S2 6: 6 steps, %u", seq_length(&s.pat));
+        seq_load(&s, 0);
+        CHECK(!seq_has_steps(&s.pat) && s.step[0] == -1 && s.pat_steps == 0, "an empty pattern loaded");
+        /* the tempo is the song's, whichever pattern plays */
+        fresh(&s);
+        s.bpm = 60;
+        s.pat.bpm = 200;
+        s.want = SEQ_WANT_PLAY;
+        run(&s, 100);
+        CHECK(find(SEQ_EV_ON, 1) == grid(2.0 * step), "the song's tempo, not the pattern's: %u", find(SEQ_EV_ON, 1));
+    }
+
     /* a record saved, read back; 0.15's (one track) read into S1 */
     {
         seq_pattern_t p;
@@ -277,6 +327,6 @@ int main(void)
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records)\n");
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns)\n");
     return 0;
 }

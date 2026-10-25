@@ -12,6 +12,7 @@
 #include "synth/synth.h"
 #include "synth/event_queue.h"
 #include "seq/seq.h"
+#include "seq/bank.h"
 
 _Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
 
@@ -47,13 +48,19 @@ typedef struct {
     /* 0.17: the drum tracks' sounds (D1..D4): a drum engine (BASS DRUM, SNARE, HI-HAT), OSC's three knobs */
     uint8_t drum_engine[SYNTH_D_TRACKS];
     uint8_t drum_osc[SYNTH_D_TRACKS][3];
+    /* 0.18: the song's tempo (every pattern's), and the pattern it was on */
+    uint16_t bpm;                        /* SEQ_BPM_MIN..SEQ_BPM_MAX */
+    uint8_t pattern;                     /* 0..BANK_PATTERNS - 1 */
+    uint8_t rsv18;
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
 #define SET_SIZE_016 56                  /* as 0.16 saved it: up to trk_reserved[] (no drums) */
-_Static_assert(sizeof(settings_t) == 72 && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
+#define SET_SIZE_017 72                  /* as 0.17 saved it: up to drum_osc[] (the tempo the pattern's) */
+_Static_assert(sizeof(settings_t) == 76 && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
                SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine) &&
-               SET_SIZE_016 == __builtin_offsetof(settings_t, drum_engine), "the settings record's layout");
+               SET_SIZE_016 == __builtin_offsetof(settings_t, drum_engine) &&
+               SET_SIZE_017 == __builtin_offsetof(settings_t, bpm), "the settings record's layout");
 /* a fresh FM-1's tracks: a lead, a bass, chords, a pluck; each one voice (MONO), so each plays at once */
 static const uint8_t TRACK_ENGINE[SYNTH_S_TRACKS] = {GRAV_ENGINE_WAVESHAPING, GRAV_ENGINE_VA_VCF, GRAV_ENGINE_CHORDS,
                                                      GRAV_ENGINE_STRING};
@@ -66,7 +73,10 @@ static const uint8_t DRUM_NOTE[SYNTH_D_TRACKS] = {36, 55, 60, 60};
 #define VOICES_DEFAULT SYNTH_POLY_VOICES
 #define FIXED_VELOCITY 100u              /* the keys' velocity with VELOCITY off */
 static settings_t set;
-static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
+static settings_t set_stored;            /* as the flash has it: SAVE writes the settings only when they differ */
+static uint8_t set_dirty;                /* changed since the last save: SAVE is lit (or the pattern unsaved) */
+static bank_t bank;                      /* the patterns in the flash (seq/bank.h) */
+static uint32_t used_mask, used_seq;     /* the bank's patterns with a step on, as of its save used_seq (patterns_used) */
 
 
 /* Parameter pages: UI state only, independent of DSP. */
@@ -170,6 +180,7 @@ static int32_t clamp_percent(int32_t value)
 
 
 static volatile uint32_t midi_last, midi_last_port, midi_count;   /* the last message in (shown), and how many */
+static volatile uint32_t midi_program;       /* a program change in, + 1 (0: none): the pattern (patterns()) */
 static void midi_in(void)                    /* audio interrupt: the packets that came in */
 {
     uint32_t pkt;
@@ -193,6 +204,8 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             seq_midi_start(&seq, st == 0xFBu);
         else if (st == 0xFCu)
             seq.want = SEQ_WANT_STOP;
+        else if ((st & 0xF0u) == 0xC0u)      /* program change, any channel: 0..15 a pattern */
+            midi_program = d1 + 1u;
     }
 }
 
@@ -413,6 +426,9 @@ static void settings_defaults(void)
     fx_defaults(&set);
     track_defaults(&set);
     drum_defaults(&set);
+    set.bpm = 120;
+    set.pattern = 0;
+    set.rsv18 = 0;
 }
 
 /* the knobs' parameters as they are now, into the settings record (SAVE writes the record) */
@@ -434,6 +450,8 @@ static void settings_capture(void)
     for (int i = 0; i < FX_N; ++i)
         set.fx[i] = (uint8_t)fx_params[i];
     set.fx_quality = (uint8_t)fx_quality;
+    set.bpm = seq.bpm;
+    set.pattern = seq.pattern;
 }
 
 void app_init(void)
@@ -447,11 +465,13 @@ void app_init(void)
     settings_defaults();
     set_dirty = 0;
 
+    int tempo_old = 1;                       /* (no tempo of its own in the settings: the 0.17 pattern's) */
     if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == SET_SIZE_013 || loaded == SET_SIZE_016 ||
-         loaded == (int)sizeof loaded_settings) && loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
+         loaded == SET_SIZE_017 || loaded == (int)sizeof loaded_settings) &&
+        loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
-        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_016 || loaded == SET_SIZE_013 ||
-             loaded == SET_SIZE_012) &&
+        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_017 || loaded == SET_SIZE_016 ||
+             loaded == SET_SIZE_013 || loaded == SET_SIZE_012) &&
             loaded_settings.magic == SET_MAGIC &&
             loaded_settings.engine_id < GRAV_ENGINE_COUNT) {
             int valid = 1;
@@ -462,6 +482,14 @@ void app_init(void)
                 track_defaults(&loaded_settings);
             if (loaded <= SET_SIZE_016)      /* (saved before 0.17: the drums' kit as it comes) */
                 drum_defaults(&loaded_settings);
+            if (loaded <= SET_SIZE_017) {    /* (saved before 0.18: the tempo the pattern's, on pattern 1) */
+                loaded_settings.bpm = 120;
+                loaded_settings.pattern = 0;
+                loaded_settings.rsv18 = 0;
+            }
+            if (loaded_settings.bpm < SEQ_BPM_MIN || loaded_settings.bpm > SEQ_BPM_MAX ||
+                loaded_settings.pattern >= BANK_PATTERNS)
+                valid = 0;
             for (uint32_t d = 0; d < SYNTH_D_TRACKS; d++) {
                 if (!grav_engine_is_drum(loaded_settings.drum_engine[d]))
                     valid = 0;
@@ -495,6 +523,7 @@ void app_init(void)
                 set = loaded_settings;
                 if (set.voices == 0)         /* (saved before 0.12, the byte reserved: the default) */
                     set.voices = VOICES_DEFAULT;
+                tempo_old = loaded <= SET_SIZE_017;
             }
         } else if (loaded == 8 &&
                    loaded_settings.magic == PREV_SET_MAGIC &&
@@ -524,17 +553,38 @@ void app_init(void)
     fx_quality = set.fx_quality;
     synth_set_tracks(&synth, set.trk_voices);   /* (before the audio starts: no queue needed) */
 
-    seq_init(&seq);                          /* the pattern saved (0.15's: its one track S1's), or an empty one */
-    {
+    seq_init(&seq);
+    seq.bpm = set.bpm;
+    bank_init(&bank);                        /* the patterns; their stale copies erased now, before the sound */
+    while (bank_tidy(&bank))
+        ;
+    if (bank_count(&bank, BANK_LIVE) == 0) { /* none yet: 0.17's pattern and before (OBJ_SEQ, OBJ_DRUMS) is pattern 1 */
         union { seq_record_t r; seq_pattern_v1_t v1; seq_drum_record_t d; } rec;
         const int n = plat_store_load(OBJ_SEQ, &rec, sizeof rec);
+        int found = 0;
         if (n == (int)sizeof rec.r)
-            seq_from_record(&rec.r, &seq.pat);
+            found = seq_from_record(&rec.r, &seq.pat);
         else if (n == (int)sizeof rec.v1)
-            seq_from_v1(&rec.v1, &seq.pat);
+            found = seq_from_v1(&rec.v1, &seq.pat);
         if (plat_store_load(OBJ_DRUMS, &rec, sizeof rec) == (int)sizeof rec.d)
-            seq_from_drum_record(&rec.d, &seq.pat);
+            found |= seq_from_drum_record(&rec.d, &seq.pat);
+        if (found) {
+            if (tempo_old)
+                seq.bpm = set.bpm = seq.pat.bpm;
+            if (bank_begin(&bank, 0) == 0)
+                while (bank_step(&bank, &seq.pat, BANK_SLOT / BANK_PAGE) == 0)
+                    ;
+            set.pattern = 0;
+            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0)   /* (the tempo with it, at once) */
+                loaded = (int)sizeof set;
+        }
     }
+    used_seq = ~bank.seq;                    /* (patterns_used: read the bank afresh) */
+    seq.pattern = set.pattern;               /* the pattern it was on */
+    seq_load(&seq, bank_pattern(&bank, set.pattern));
+    set_stored = set;
+    if (loaded != (int)sizeof set)           /* (an older record, or none: SAVE writes this one) */
+        memset(&set_stored, 0, sizeof set_stored);
 #if FM1B_CPU2
     plat_cpu2_set(1);                     /* boot only, before audio/timers start */
 #endif
@@ -575,6 +625,16 @@ static struct {
     uint8_t key_track[NKEYS];            /* the track each held key plays (its note-off goes there) */
     uint32_t tracks_until;               /* SELECT turned: the tracks' list shown until then */
     uint32_t shown_hits[SEQ_TRACKS], hit_at[SEQ_TRACKS];   /* each track's last note begun: its light flashes */
+    /* the patterns (0.18) */
+    uint8_t home_down, home_used, home_shown;   /* HOME held; a pattern picked meanwhile (no page change); the grid shown */
+    uint32_t home_at;                    /* when HOME went down */
+    uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
+    uint32_t patterns_until;             /* K4 turned: the patterns' grid shown until then */
+    uint8_t save_req;                    /* SAVE: the pattern too, then SAVED */
+    uint8_t full_said;                   /* (no free slot while playing: said once) */
+    uint8_t shown_pattern;               /* the pattern announced, + 1 (0: none yet) */
+    uint32_t save_gen;                   /* the edits the save under way holds */
+    uint32_t quiet_at, tidy_at, blink_at;   /* the last sound (stale copies erased 3 s after), an erase, a blink */
 } ui;
 
 static void text_cat(char *d, const char *s)
@@ -838,9 +898,17 @@ static void step_write(uint32_t s, const seq_step_t *t)   /* a step changed (the
 {
     uint32_t f = plat_lock();
     TRK.step[s] = *t;
+    seq.edits++;                             /* (unsaved: counted with the change, so no switch comes between) */
     plat_unlock(f);
-    set_dirty = 1;
     ui.redraw = 1;
+}
+
+static void length_set(int32_t length)       /* the selected track's LENGTH */
+{
+    uint32_t f = plat_lock();
+    TRK.length = (uint8_t)clamp(length, 1, (int32_t)SEQ_STEPS);
+    seq.edits++;
+    plat_unlock(f);
 }
 
 static void chord_text(const seq_step_t *t, char *b)   /* "C4", or "C4+2" for a chord of three */
@@ -876,9 +944,8 @@ static void step_key(uint32_t i, int down)
     char t[8];
     if (down) {
         if (ui.seq_down) {
-            TRK.length = (uint8_t)(s + 1u);
+            length_set((int32_t)s + 1);
             ui.seq_used = 1;
-            set_dirty = 1;
             int_text((int32_t)s + 1, t);
             app_say("LENGTH", t);
             return;
@@ -936,21 +1003,135 @@ static void step_turn(uint32_t index, int32_t e)
 static void seq_turn(uint32_t index, int32_t e)
 {
     char t[12];
-    if (index == 0u) {
-        seq.pat.bpm = (uint16_t)clamp((int32_t)seq.pat.bpm + e, SEQ_BPM_MIN, SEQ_BPM_MAX);
-        int_text(seq.pat.bpm, t);
+    if (index == 0u) {                       /* the song's (a setting) */
+        seq.bpm = (uint16_t)clamp((int32_t)seq.bpm + e, SEQ_BPM_MIN, SEQ_BPM_MAX);
+        int_text(seq.bpm, t);
         app_say("TEMPO", t);
-    } else if (index == 1u) {
+        set_dirty = 1;
+    } else if (index == 1u) {                /* the pattern's */
+        uint32_t f = plat_lock();
         seq.pat.swing = (uint8_t)clamp((int32_t)seq.pat.swing + e, SEQ_SWING_MIN, SEQ_SWING_MAX);
+        seq.edits++;
+        plat_unlock(f);
         int_text(seq.pat.swing, t);
         text_cat(t, "%");
         app_say("SWING", t);
     } else {
-        TRK.length = (uint8_t)clamp((int32_t)TRK.length + e, 1, (int32_t)SEQ_STEPS);
+        length_set((int32_t)TRK.length + e);
         int_text(TRK.length, t);
         app_say("LENGTH", t);
     }
-    set_dirty = 1;
+}
+
+/* HOME held and a white key, K4, MIDI program change: the pattern to play next (stopped: at once, patterns()); the
+ * one playing again: the queue undone */
+static void pattern_pick(int32_t n)
+{
+    char t[8];
+    n = clamp(n, 0, (int32_t)BANK_PATTERNS - 1);
+    uint32_t f = plat_lock();
+    seq.next = (uint32_t)n == seq.pattern ? SEQ_NO_PATTERN : (uint8_t)n;
+    seq.next_ready = 0;
+    plat_unlock(f);
+    ui.patterns_until = plat_ms() + 1500u;
+    ui.redraw = 1;
+    int_text(n + 1, t);
+    if (seq.playing)
+        app_say(seq.next != SEQ_NO_PATTERN ? "NEXT PATTERN" : "PATTERN", t);
+}
+
+static uint32_t patterns_used(void)          /* a bit for each pattern with a step on (the one playing: as it is) */
+{
+    if (used_seq != bank.seq) {              /* (the flash's, again after each save) */
+        used_seq = bank.seq;
+        used_mask = 0;
+        for (uint32_t n = 0; n < BANK_PATTERNS; n++) {
+            const seq_pattern_t *p = bank_pattern(&bank, n);
+            if (p && seq_has_steps(p))
+                used_mask |= 1u << n;
+        }
+    }
+    return (used_mask & ~(1u << seq.pattern)) | (seq_has_steps(&seq.pat) ? 1u << seq.pattern : 0u);
+}
+
+/* the patterns, each frame: the one playing saved when it is left (or on SAVE), a few pages a frame (the sound goes
+ * on); the next one readied for the audio interrupt (stopped: in at once); the stale copies erased once nothing has
+ * sounded for 3 s (an erase stops the sound for a moment) */
+static void patterns(void)
+{
+    const uint32_t now = plat_ms();
+    const int dirty = seq.edits != seq.saved;
+    char t[8];
+    if (midi_program) {                      /* a program change in: 1..16 the patterns */
+        const uint32_t program = midi_program - 1u;
+        midi_program = 0;
+        if (program < BANK_PATTERNS)
+            pattern_pick((int32_t)program);
+    }
+    if (bank_busy(&bank)) {
+        const int r = bank_step(&bank, &seq.pat, 8u);   /* (each page a moment with interrupts off) */
+        if (r > 0) {
+            seq.saved = ui.save_gen;
+            ui.redraw = 1;
+        } else if (r < 0) {
+            ui.save_req = 0;
+            app_say("SAVE", "FAILED");
+        }
+    } else if (dirty && (ui.save_req || seq.next != SEQ_NO_PATTERN)) {
+        if (bank_begin(&bank, seq.pattern) == 0) {
+            ui.save_gen = seq.edits;
+            ui.full_said = 0;
+        } else if (!seq.playing) {
+            bank_tidy(&bank);                /* stopped: room made now */
+        } else if (!ui.full_said) {
+            ui.full_said = 1;
+            app_say("PATTERN", "STOP TO SAVE");
+        }
+    } else if (!dirty) {
+        if (ui.save_req) {
+            ui.save_req = 0;
+            app_say("SAVED", "");
+        }
+        if (seq.next != SEQ_NO_PATTERN && !seq.playing) {   /* stopped: the next one in now */
+            uint32_t f = plat_lock();
+            seq_load(&seq, bank_pattern(&bank, seq.next));
+            seq.pattern = seq.next;
+            seq.next = SEQ_NO_PATTERN;
+            seq.next_ready = 0;
+            plat_unlock(f);
+        } else if (seq.next != SEQ_NO_PATTERN && !seq.next_ready) {   /* playing: in at the pattern's end */
+            seq.next_src = bank_pattern(&bank, seq.next);
+            seq.next_ready = 1;
+        }
+    }
+    if (seq.pattern + 1u != ui.shown_pattern) {   /* switched: said, shown */
+        if (ui.shown_pattern) {
+            int_text(seq.pattern + 1, t);
+            app_say("PATTERN", t);
+        }
+        ui.shown_pattern = (uint8_t)(seq.pattern + 1u);
+        ui.step_held = -1;
+        ui.redraw = 1;
+    }
+    if (seq.next != SEQ_NO_PATTERN && now - ui.blink_at >= 250u) {   /* the next one blinks */
+        ui.blink_at = now;
+        ui.redraw = 1;
+    }
+    if (ui.patterns_until && now >= ui.patterns_until) {
+        ui.patterns_until = 0;
+        ui.redraw = 1;
+    }
+    if (ui.home_down && !ui.home_shown && now - ui.home_at >= 300u) {   /* HOME held: the patterns' grid */
+        ui.home_shown = 1;
+        ui.redraw = 1;
+    }
+    if (seq.playing || ui.keys || !synth_quiet(&synth))
+        ui.quiet_at = now;
+    else if (!bank_busy(&bank) && bank_count(&bank, BANK_STALE) && now - ui.quiet_at >= 3000u &&
+             now - ui.tidy_at >= 250u) {
+        ui.tidy_at = now;
+        bank_tidy(&bank);
+    }
 }
 
 /* SELECT, or a black key in step mode: the track the keys, MIDI in, PRESET, OSC, VOICES and the steps are for */
@@ -1020,7 +1201,8 @@ static void lights(uint32_t btn, uint32_t keys)
             ui.shown_hits[t] = seq.hits[t];
             ui.hit_at[t] = now;
         }
-    uint32_t lit = (btn & ~play) | (set_dirty ? 1u << B_SAVE : 0u) | (fx_freeze ? 1u << B_EDIT : 0u) |
+    uint32_t lit = (btn & ~play) | (set_dirty || seq.edits != seq.saved ? 1u << B_SAVE : 0u) |
+                   (fx_freeze ? 1u << B_EDIT : 0u) |
                    (ui.step_mode ? 1u << B_SEQ : 0u);
     uint32_t mid = 0, lit_keys = keys, mid_keys = 0, dim_keys = 0;
     if (grav_beads_on()) {
@@ -1081,6 +1263,20 @@ static void lights(uint32_t btn, uint32_t keys)
                 dim_keys |= bit;
         }
     }
+    if (ui.home_down) {                      /* HOME held: the patterns on the white keys: the one playing lit, the
+                                              * next blinking, one with steps mid, an empty one dim */
+        const uint32_t used = patterns_used();
+        lit_keys = mid_keys = dim_keys = 0;
+        for (uint32_t n = 0; n < BANK_PATTERNS; n++) {
+            const uint32_t bit = 1u << WHITE_KEYS[n];
+            if (n == seq.pattern || (n == seq.next && (now / 125u) & 1u))
+                lit_keys |= bit;
+            else if (used & 1u << n || n == seq.next)
+                mid_keys |= bit;
+            else
+                dim_keys |= bit;
+        }
+    }
     {
         uint32_t dim = ((1u << NB) - 1u) & ~lit & ~mid;
         if (!(lit & LED_PLAY_GREEN) && !(lit & play))
@@ -1090,6 +1286,22 @@ static void lights(uint32_t btn, uint32_t keys)
         plat_lights(lit, lit_keys, dim, dim_keys, 2);
         plat_lights_mid(mid, mid_keys);
     }
+}
+
+static void page_open(uint32_t k)            /* a page's button: its page (HOME, GLO, FX again: the next one) */
+{
+    if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
+        fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
+    if (k == B_HOME)                         /* HOME: SEQ, again OSC (the sound), and back */
+        home_page = active_page == PAGE_SEQ ? PAGE_OSC : active_page == PAGE_OSC ? PAGE_SEQ : home_page;
+    if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
+        glo_page = active_page == PAGE_GLO ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
+    active_page = k == B_HOME ? home_page :
+                  k == B_LFO  ? PAGE_MOD :
+                  k == B_ENV  ? PAGE_ENV :
+                  k == B_GLO  ? glo_page : fx_page;
+    app_say("PAGE", PAGE_NAME[active_page]);
+    ui.redraw = 1;
 }
 
 static void input(void)
@@ -1102,6 +1314,14 @@ static void input(void)
         uint32_t bit = 1u << k, v;
         int32_t note = 53 + (int32_t)k + 12 * set.octave;
         if ((keys & bit) && !(ui.keys & bit)) {
+            if (ui.home_down) {              /* HOME held: a white key is a pattern (1..16) */
+                const int w = key_index(WHITE_KEYS, 16, k);
+                ui.key_pat |= bit;
+                ui.home_used = 1;
+                if (w >= 0)
+                    pattern_pick(w);
+                continue;
+            }
             if (ui.step_mode) {              /* step mode: a white key is a step, black 1..8 the tracks */
                 int w = key_index(WHITE_KEYS, 16, k), b = key_index(BLACK_KEYS, 11, k);
                 ui.key_step |= bit;
@@ -1127,6 +1347,10 @@ static void input(void)
             if (ui.chord_n < SEQ_NOTES)
                 ui.chord[ui.chord_n++] = (uint8_t)clamp(note, 0, 127);
         } else if (!(keys & bit) && (ui.keys & bit)) {
+            if (ui.key_pat & bit) {          /* (pressed as a pattern) */
+                ui.key_pat &= ~bit;
+                continue;
+            }
             if (ui.key_step & bit) {         /* (pressed as a step: let go as one, whatever the mode now) */
                 int w = key_index(WHITE_KEYS, 16, k);
                 ui.key_step &= ~bit;
@@ -1138,7 +1362,7 @@ static void input(void)
             ui.prs[k] = 0;
             queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0, ui.key_track[k]);
             plat_midi_send(0x08u | (0x80u | ui.key_track[k]) << 8 | (uint32_t)note << 16, TO_USB);
-        } else if ((keys & bit) && !(ui.key_step & bit) && touch_pressure(k) != ui.prs[k]) {   /* poly aftertouch */
+        } else if ((keys & bit) && !((ui.key_step | ui.key_pat) & bit) && touch_pressure(k) != ui.prs[k]) {
             note = ui.note[k];
             ui.prs[k] = touch_pressure(k);
             ui.redraw = 1;
@@ -1154,19 +1378,12 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
-        if (k == B_HOME || k == B_LFO || k == B_ENV || k == B_GLO || k == B_FX) {
-            if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
-                fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
-            if (k == B_HOME)                 /* HOME: SEQ, again OSC (the sound), and back */
-                home_page = active_page == PAGE_SEQ ? PAGE_OSC : active_page == PAGE_OSC ? PAGE_SEQ : home_page;
-            if (k == B_GLO)                  /* GLO: GLO, again DEBUG, and back */
-                glo_page = active_page == PAGE_GLO ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
-            active_page = k == B_HOME ? home_page :
-                          k == B_LFO  ? PAGE_MOD :
-                          k == B_ENV  ? PAGE_ENV :
-                          k == B_GLO  ? glo_page : fx_page;
-            app_say("PAGE", PAGE_NAME[active_page]);
-            ui.redraw = 1;
+        if (k == B_HOME) {                   /* HOME: on its release (held, a white key is a pattern) */
+            ui.home_down = 1;
+            ui.home_used = ui.home_shown = 0;
+            ui.home_at = plat_ms();
+        } else if (k == B_LFO || k == B_ENV || k == B_GLO || k == B_FX) {
+            page_open(k);
         } else if (k == B_PLAY) {            /* the sequencer: start, stop */
             if (seq.playing) {
                 seq.want = SEQ_WANT_STOP;
@@ -1215,19 +1432,26 @@ static void input(void)
             octave_step(-1);
         else if (k == B_OCTUP)
             octave_step(1);
-        else if (k == B_SAVE) {
+        else if (k == B_SAVE) {              /* the settings when they changed (an erase: a gap in the sound), and
+                                              * the pattern (patterns(): a few pages a frame, then SAVED) */
             settings_capture();
-            if (plat_store_save(OBJ_SETTINGS, &set, sizeof set) == 0 &&   /* (the pattern's records as they lie) */
-                plat_store_save(OBJ_SEQ, seq_record_of(&seq.pat), sizeof(seq_record_t)) == 0 &&
-                plat_store_save(OBJ_DRUMS, seq_drum_record_of(&seq.pat), sizeof(seq_drum_record_t)) == 0) {
-                set_dirty = 0;
-                app_say("SAVED", "");
-            } else {
+            if (memcmp(&set, &set_stored, sizeof set) && plat_store_save(OBJ_SETTINGS, &set, sizeof set) != 0) {
                 app_say("SAVE", "FAILED");
+            } else {
+                set_stored = set;
+                set_dirty = 0;
+                ui.save_req = 1;
             }
         } else {
             app_say("BUTTON", BTN_NAME[k]);
         }
+    }
+    if (ui.home_down && !(btn & 1u << B_HOME)) {   /* HOME let go: its page, unless it picked a pattern */
+        ui.home_down = 0;
+        if (ui.home_shown)
+            ui.redraw = 1;
+        if (!ui.home_used)
+            page_open(B_HOME);
     }
     if (ui.seq_down && !(btn & 1u << B_SEQ)) {   /* SEQ let go: step mode on or off, unless it set the length */
         ui.seq_down = 0;
@@ -1298,6 +1522,8 @@ static void input(void)
                 set_dirty = 1;
             param_text(active_page, index, *value, t);
             app_say(PARAM_NAME[active_page][index], t);
+        } else if (k == EN_K4) {             /* the pattern: the next (or the one queued) and on */
+            pattern_pick((int32_t)(seq.next != SEQ_NO_PATTERN ? seq.next : seq.pattern) + e);
         } else if (k == EN_PRESET) {
             uint8_t *engine = track_engine(track_sel);   /* Plaits' order; a drum track: its three drums */
             *engine = (uint8_t)(SYNTH_IS_DRUM(track_sel) ? grav_drum_step(*engine, e) : grav_engine_step(*engine, e));
@@ -1482,6 +1708,46 @@ static void draw_seq(void)
         cv_text(170, 128, &FONT_XS, t, C_WHITE);
     } else if (ui.step_mode)
         cv_text(140, 128, &FONT_XS, "STEP", C_HI);
+    t[0] = 'P';                              /* the pattern; the next one, blinking */
+    int_text(seq.pattern + 1, t + 1);
+    cv_text(200, 128, &FONT_XS, t, C_WHITE);
+    if (seq.next != SEQ_NO_PATTERN && (plat_ms() / 250u) & 1u) {
+        t[0] = '>';
+        int_text(seq.next + 1, t + 1);
+        cv_text(218, 128, &FONT_XS, t, C_HI);
+    }
+}
+
+/* HOME held, K4 turned: the 16 patterns for a moment, over the page: the one playing lit, the next one framed
+ * (blinking), one with steps white, an empty one dim */
+static void draw_patterns(void)
+{
+    const uint32_t used = patterns_used(), blink = (plat_ms() / 250u) & 1u;
+    char t[8];
+    cv_rect(4, 20, 232, 118, C_LINE);
+    cv_rect(5, 21, 230, 116, C_BLACK);
+    cv_text(12, 24, &FONT_XS, "PATTERN", C_GRAY);
+    if (seq.next != SEQ_NO_PATTERN) {
+        cv_text(150, 24, &FONT_XS, "NEXT", C_GRAY);
+        int_text(seq.next + 1, t);
+        cv_text(184, 24, &FONT_XS, t, C_HI);
+    }
+    for (uint32_t n = 0; n < BANK_PATTERNS; n++) {
+        const int32_t x = 9 + (int32_t)(n % 4u) * 57, y = 42 + (int32_t)(n / 4u) * 23;
+        const int cur = n == seq.pattern, nxt = n == seq.next;
+        if (cur)
+            cv_rect(x, y, 53, 20, C_HI);
+        else if (nxt && blink)
+            cv_rect(x, y, 53, 20, C_WHITE);
+        else if (nxt) {
+            cv_rect(x, y, 53, 20, C_WHITE);
+            cv_rect(x + 1, y + 1, 51, 18, C_BLACK);
+        } else
+            cv_rect(x, y + 18, 53, 2, used & 1u << n ? C_LINE : C_BLACK);
+        int_text((int32_t)n + 1, t);
+        cv_text(x + 26 - text_w(&FONT_S, t) / 2, y + 2, &FONT_S, t,
+                cur || (nxt && blink) ? C_BLACK : used & 1u << n || nxt ? C_WHITE : C_DIM);
+    }
 }
 
 /* SELECT turned: the four tracks for a moment, over the page; the selected one lit */
@@ -1654,6 +1920,8 @@ static void draw(void)
         draw_knobs();
     if (ui.tracks_until)
         draw_tracks();
+    if (ui.patterns_until || ui.home_shown)
+        draw_patterns();
 
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
@@ -1722,6 +1990,7 @@ void app_frame(void)
         ui.redraw = 1;
     }
     input();
+    patterns();
     speak();
     for (i = 0; i < NE; i++)                 /* an encoder's light goes out */
         if (ui.turned_at[i] && now - ui.turned_at[i] < 400u && now > lit_until)
@@ -1778,7 +2047,8 @@ void app_frame(void)
         ui.shown_playing = seq.playing;
         ui.redraw_grid = 1;
     }
-    if (ui.redraw_grid && ui.tracks_until)   /* (the tracks' list over the steps: the whole page, not the strip) */
+    if (ui.redraw_grid && (ui.tracks_until || ui.patterns_until || ui.home_shown))   /* (a list over the steps: the
+                                                                                         * whole page, not the strip) */
         ui.redraw = 1;
     if (ui.redraw) {
         ui.redraw = 0;
@@ -1854,6 +2124,17 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         app_overload();
         return 1;
     }
+    if (!strcmp(cmd, "save017")) {           /* the flash as 0.17 left it: the pattern in OBJ_SEQ and OBJ_DRUMS (with the
+                                              * tempo), the settings without one, no bank */
+        settings_capture();
+        seq.pat.bpm = seq.bpm;
+        plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_017);
+        plat_store_save(OBJ_SEQ, seq_record_of(&seq.pat), sizeof(seq_record_t));
+        plat_store_save(OBJ_DRUMS, seq_drum_record_of(&seq.pat), sizeof(seq_drum_record_t));
+        for (uint32_t off = BANK_LO; off < BANK_HI; off += 0x1000u)
+            plat_data_erase(off);
+        return 1;
+    }
     if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016")) {   /* the settings as 0.12 / 0.16 saved them */
         settings_capture();
         plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 : SET_SIZE_016);
@@ -1878,6 +2159,20 @@ int app_expect(const char *what, int *got)
         *got = (int)ui.shown_bpm;
     else if (!strcmp(what, "header_ext"))
         *got = ui.shown_ext;
+    else if (!strcmp(what, "pattern"))       /* the pattern playing, 0..15; the next (-1: none); unsaved edits */
+        *got = seq.pattern;
+    else if (!strcmp(what, "pattern_next"))
+        *got = seq.next == SEQ_NO_PATTERN ? -1 : (int)seq.next;
+    else if (!strcmp(what, "pattern_dirty"))
+        *got = seq.edits != seq.saved;
+    else if (!strcmp(what, "patterns_used"))  /* a bit for each pattern with a step on */
+        *got = (int)patterns_used();
+    else if (!strcmp(what, "bank_live"))     /* the bank's slots: patterns saved, free, to erase */
+        *got = (int)bank_count(&bank, BANK_LIVE);
+    else if (!strcmp(what, "bank_free"))
+        *got = (int)bank_count(&bank, BANK_FREE);
+    else if (!strcmp(what, "bank_stale"))
+        *got = (int)bank_count(&bank, BANK_STALE);
     else if (!strncmp(what, "vgate", 5))     /* vgateN: voice N's note held (0..3 the synth tracks', 4..7 the drums') */
         *got = synth.voice[atoi(what + 5) % SYNTH_VOICES_MAX].gate;
     else if (!strcmp(what, "render_voices"))
@@ -1950,8 +2245,8 @@ int app_expect(const char *what, int *got)
         *got = fx_params[atoi(what + 2) % FX_N];
     else if (!strcmp(what, "note"))
         *got = synth.note;
-    else if (!strcmp(what, "dirty"))
-        *got = set_dirty;
+    else if (!strcmp(what, "dirty"))         /* SAVE lit: the settings changed, or the pattern */
+        *got = set_dirty || seq.edits != seq.saved;
     else if (!strcmp(what, "vel"))           /* the last key's velocity and pressure */
         *got = ui.vel[ui.last_key];
     else if (!strcmp(what, "prs"))

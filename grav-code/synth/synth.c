@@ -215,6 +215,16 @@ void synth_shed(synth_t *s)
     oldest->gate = 0;                        /* the render fades it out (dsp/grav_engine.c), then its envelope rests */
 }
 
+int synth_quiet(const synth_t *s)
+{
+    for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++) {
+        const synth_voice_t *v = &s->voice[i];
+        if (s->voice_track[i] != SYNTH_NO_TRACK && !v->shed && (v->gate || v->env.stage != ENV_IDLE))
+            return 0;
+    }
+    return 1;
+}
+
 uint32_t synth_voices_held(const synth_t *s)
 {
     uint32_t n = 0;
