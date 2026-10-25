@@ -10,6 +10,8 @@
 #define APP_SPLASH_RGB RGB(242, 120, 72)
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
+#define APP_OVERLOAD                     /* app_overload: the render ran long, a voice falls silent */
+void app_overload(void);
 
 /* the store: the app's objects (the panel calibration is the platform's), and their flash offsets. No radio, so no
  * OBJ_BLE (it was object 2: a radio added again would take it back) */

@@ -17,3 +17,4 @@ OSC	oscillator
 MOD	modulation
 ENV	envelope
 LFO DEST	L F O destination
+GLO	global settings

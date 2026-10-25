@@ -6,7 +6,8 @@
 typedef enum {
     SYNTH_EVENT_NOTE_ON = 1,
     SYNTH_EVENT_NOTE_OFF,
-    SYNTH_EVENT_PANIC
+    SYNTH_EVENT_PANIC,
+    SYNTH_EVENT_VOICES                   /* the voices in use (MONO 1, POLY 2..4): in .note */
 } synth_event_type_t;
 
 typedef struct {

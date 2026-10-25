@@ -24,8 +24,12 @@ typedef struct {
     uint8_t osc[3];
     uint8_t mod[3];
     uint8_t env[3];
-    uint8_t reserved[3];
+    uint8_t voices;                      /* 1 MONO, 2..4 POLY (GLO); 0, in a record saved before 0.12: the default */
+    uint8_t velocity_off;                /* the FM-1's keys play at a fixed velocity (GLO); MIDI in keeps its own */
+    uint8_t reserved[1];
 } settings_t;
+#define VOICES_DEFAULT SYNTH_VOICES_MAX
+#define FIXED_VELOCITY 100u              /* the keys' velocity with VELOCITY off */
 static settings_t set;
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit */
 
@@ -34,19 +38,20 @@ static uint8_t set_dirty;                /* changed since the last save: SAVE is
 enum {
     PAGE_OSC = 0,
     PAGE_MOD,
-    PAGE_ENV
+    PAGE_ENV,
+    PAGE_GLO                             /* the firmware and its global settings: VOICES, VELOCITY */
 };
 
 static uint8_t active_page = PAGE_OSC;
-static const char *const PAGE_NAME[] = {"OSC", "MOD", "ENV"};
+static const char *const PAGE_NAME[] = {"OSC", "MOD", "ENV", "GLO"};
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                          "PLAY", "REC", "OCT-", "OCT+"};
 static const char *const ENC_NAME[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2", "K3", "K4"};
 
-/* ------------------------------------------------------------------ voice --- */
-/* one voice, the last note wins; the main loop and MIDI in set it, the audio interrupt plays it */
+/* ----------------------------------------------------------------- voices --- */
+/* the voices (MONO or POLY, synth/synth.h); the main loop and MIDI in set them, the audio interrupt plays them */
 static synth_t synth;
 static synth_event_queue_t synth_queue;
 static volatile uint32_t synth_queue_overflows;
@@ -118,8 +123,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float lfo_depth = (float)mod_params[1] * 0.01f;
     lfo_set(&synth.mod_lfo, lfo_rate, lfo_depth);
 
-    envelope_set(
-        &synth.amp_env,
+    synth_envelopes(
+        &synth,
         (float)env_params[0] * 0.02f,
         (float)env_params[1] * 0.02f,
         0.7f,
@@ -139,6 +144,9 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         case SYNTH_EVENT_PANIC:
             synth_audio_mute = 1u;
             synth_panic(&synth);
+            break;
+        case SYNTH_EVENT_VOICES:             /* GLO: MONO or POLY (every voice let go) */
+            synth_set_voices(&synth, (uint32_t)event.note);
             break;
         default:
             break;
@@ -191,6 +199,13 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     }
 }
 
+/* the render took over 90 % of its time (device/main_fm1.c, APP_OVERLOAD): the oldest voice sounding falls silent
+ * rather than the sound breaking up; in the audio interrupt, after the render */
+void app_overload(void)
+{
+    synth_shed(&synth);
+}
+
 void app_ota_mute(int active)
 {
     synth_ota_mute = active ? 1u : 0u;
@@ -213,7 +228,9 @@ static void settings_defaults(void)
     set.osc[0] = 65; set.osc[1] = 50; set.osc[2] = 75;
     set.mod[0] = 50; set.mod[1] = 0; set.mod[2] = 0;
     set.env[0] = 10; set.env[1] = 50; set.env[2] = 30;
-    for (int i = 0; i < 3; ++i) set.reserved[i] = 0;
+    set.voices = VOICES_DEFAULT;
+    set.velocity_off = 0;
+    set.reserved[0] = 0;
 }
 
 /* the knobs' parameters as they are now, into the settings record (SAVE writes the record) */
@@ -252,8 +269,13 @@ void app_init(void)
                     loaded_settings.env[i] > 100u)
                     valid = 0;
             }
-            if (valid)
+            if (loaded_settings.voices > SYNTH_VOICES_MAX || loaded_settings.velocity_off > 1u)
+                valid = 0;
+            if (valid) {
                 set = loaded_settings;
+                if (set.voices == 0)         /* (saved before 0.12, the byte reserved: the default) */
+                    set.voices = VOICES_DEFAULT;
+            }
         } else if (loaded == 8 &&
                    loaded_settings.magic == PREV_SET_MAGIC &&
                    loaded_settings.engine_id <= 2u) {
@@ -277,6 +299,7 @@ void app_init(void)
         mod_params[i] = set.mod[i];
         env_params[i] = set.env[i];
     }
+    synth_set_voices(&synth, set.voices);   /* (before the audio starts: no queue needed) */
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -402,6 +425,39 @@ static void octave_step(int32_t d)
     app_say("OCTAVE", t);
 }
 
+#ifndef FELUCCA_ID
+#define FELUCCA_ID "HOST"                /* (the host simulator: no package identity) */
+#endif
+
+static const char *voices_text(uint32_t voices)   /* GLO VOICES: MONO, or how many */
+{
+    static const char *const T[] = {"MONO", "MONO", "2", "3", "4"};
+    return T[voices <= SYNTH_VOICES_MAX ? voices : 1];
+}
+
+/* GLO's knobs: K1 VOICES (MONO, 2, 3, 4), K2 VELOCITY (right: on, the keys' own; left: off, fixed), K3 the version */
+static void glo_turn(uint32_t index, int32_t e)
+{
+    if (index == 0u) {
+        int32_t v = clamp((int32_t)set.voices + e, 1, (int32_t)SYNTH_VOICES_MAX);
+        if (v != (int32_t)set.voices) {
+            set.voices = (uint8_t)v;
+            set_dirty = 1;
+            queue_key_event(SYNTH_EVENT_VOICES, v, 0);   /* (the audio interrupt's to change) */
+        }
+        app_say("VOICES", voices_text(set.voices));
+    } else if (index == 1u) {
+        uint8_t off = e < 0;
+        if (off != set.velocity_off) {
+            set.velocity_off = off;
+            set_dirty = 1;
+        }
+        app_say("VELOCITY", set.velocity_off ? "OFF" : "ON");
+    } else {
+        app_say("VERSION", APP_VERSION);
+    }
+}
+
 static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k;
@@ -412,7 +468,7 @@ static void input(void)
         uint32_t bit = 1u << k, v;
         int32_t note = 53 + (int32_t)k + 12 * set.octave;
         if ((keys & bit) && !(ui.keys & bit)) {
-            v = touch_vel(k);
+            v = set.velocity_off ? FIXED_VELOCITY : touch_vel(k);   /* GLO VELOCITY: the keys' own, or fixed */
             ui.vel[k] = (uint8_t)v;
             ui.prs[k] = 0;
             ui.note[k] = (uint8_t)note;
@@ -435,9 +491,10 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
-        if (k == B_HOME || k == B_LFO || k == B_ENV) {
+        if (k == B_HOME || k == B_LFO || k == B_ENV || k == B_GLO) {
             active_page = k == B_HOME ? PAGE_OSC :
-                          k == B_LFO  ? PAGE_MOD : PAGE_ENV;
+                          k == B_LFO  ? PAGE_MOD :
+                          k == B_ENV  ? PAGE_ENV : PAGE_GLO;
             app_say("PAGE", PAGE_NAME[active_page]);
             ui.redraw = 1;
         } else if (k == B_OCTDN)
@@ -463,7 +520,9 @@ static void input(void)
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
         ui.redraw = 1;
-        if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
+        if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_GLO) {
+            glo_turn((uint32_t)(k - EN_K1), e);
+        } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
             uint32_t index = (uint32_t)(k - EN_K1);
             volatile int32_t *value;
 
@@ -524,6 +583,28 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
         cv_rect(x + 2, y + h - p, w - 4, p, C_WHITE);
 }
 
+/* GLO: VOICES and VELOCITY as the other pages' knobs are drawn, the version beside them, the identity below */
+static void draw_glo(void)
+{
+    static const char *const LABEL[3] = {"VOICES", "VELOCITY", "VERSION"};
+    for (uint32_t i = 0; i < 3u; i++) {
+        int32_t x = 8 + (int32_t)i * 78;
+        cv_text(x, 42, &FONT_XS, LABEL[i], C_GRAY);
+        if (i == 2u) {                       /* (the small font: a version has dots) */
+            cv_text(x, 66, &FONT_S, APP_VERSION, C_WHITE);
+            continue;
+        }
+        int32_t fill = i == 0u ? (int32_t)set.voices * 68 / (int32_t)SYNTH_VOICES_MAX : set.velocity_off ? 0 : 68;
+        cv_text(x, 62, &FONT_M, i == 0u ? voices_text(set.voices) : set.velocity_off ? "OFF" : "ON", C_WHITE);
+        cv_rect(x, 100, 68, 3, C_LINE);
+        if (fill > 0)
+            cv_rect(x, 100, fill, 3, C_HI);
+    }
+    cv_text(8, 116, &FONT_XS, "ID", C_GRAY);
+    cv_text(26, 116, &FONT_XS, FELUCCA_ID, C_WHITE);
+    cv_text(140, 116, &FONT_XS, "24 ENGINES", C_GRAY);
+}
+
 static void draw(void)
 {
     char t[24];
@@ -579,7 +660,9 @@ static void draw(void)
 
     cv_text(8, 4, &FONT_S, grav_engine_name(set.engine_id), C_HI);
 
-    for (i = 0; i < 3u; i++) {
+    if (active_page == PAGE_GLO)
+        draw_glo();
+    for (i = 0; i < 3u && active_page != PAGE_GLO; i++) {
         int32_t value;
         int32_t x = 8 + (int32_t)i * 78;
 
@@ -699,8 +782,14 @@ int app_expect(const char *what, int *got)
         *got = set.octave;
     else if (!strcmp(what, "wave"))
         *got = set.engine_id;
-    else if (!strcmp(what, "engine_ram"))    /* bytes of the pool the engines' Init took */
+    else if (!strcmp(what, "engine_ram"))    /* bytes of its voice's RAM the engine's Init took */
         *got = (int)grav_plaits_ram_used();
+    else if (!strcmp(what, "voices"))        /* GLO VOICES: 1 MONO, 2..4 POLY */
+        *got = set.voices;
+    else if (!strcmp(what, "voices_held"))   /* voices whose note is held */
+        *got = (int)synth_voices_held(&synth);
+    else if (!strcmp(what, "velocity_off"))  /* GLO VELOCITY off: the keys at a fixed velocity */
+        *got = set.velocity_off;
     else if (!strcmp(what, "note"))
         *got = synth.note;
     else if (!strcmp(what, "dirty"))

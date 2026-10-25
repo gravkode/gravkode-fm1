@@ -96,112 +96,128 @@ const uint8_t order[] = {
 };
 static_assert(sizeof(order) == GRAV_ENGINE_COUNT, "each engine once in PRESET's order");
 
-// Room for one engine. The FM-1 runs no C++ static constructors (its link keeps no .init_array), so a static
-// engine object would stay zeroed, its vtable pointer too, and the first virtual call (an Init calling Reset)
-// would jump to nowhere. grav_plaits_init builds each engine in its slot instead (placement new).
+constexpr size_t Larger(size_t a, size_t b) { return a > b ? a : b; }
+
 template<typename T>
-struct Slot {
-  alignas(T) unsigned char bytes[sizeof(T)];
+constexpr size_t LargestSize() { return sizeof(T); }
+template<typename T, typename U, typename... Rest>
+constexpr size_t LargestSize() { return Larger(sizeof(T), LargestSize<U, Rest...>()); }
+
+template<typename T>
+constexpr size_t LargestAlign() { return alignof(T); }
+template<typename T, typename U, typename... Rest>
+constexpr size_t LargestAlign() { return Larger(alignof(T), LargestAlign<U, Rest...>()); }
+
+#define GRAV_ENGINE_TYPES plaits::WaveshapingEngine, plaits::FMEngine, plaits::VirtualAnalogEngine, \
+  plaits::ModalEngine, plaits::GrainEngine, plaits::AdditiveEngine, plaits::WavetableEngine, plaits::ChordEngine, \
+  plaits::SpeechEngine, plaits::SwarmEngine, plaits::NoiseEngine, plaits::ParticleEngine, plaits::StringEngine, \
+  plaits::BassDrumEngine, plaits::SnareDrumEngine, plaits::HiHatEngine, plaits::VirtualAnalogVCFEngine, \
+  plaits::PhaseDistortionEngine, plaits::SixOpEngine, plaits::WaveTerrainEngine, plaits::StringMachineEngine, \
+  plaits::ChiptuneEngine
+const size_t kSlotSize = LargestSize<GRAV_ENGINE_TYPES>();    // the 6-op FM's, 4.3 KB on the FM-1
+const size_t kSlotAlign = LargestAlign<GRAV_ENGINE_TYPES>();
+
+// Each voice's RAM for its engine's Init: Particle takes the most, 16 KB (on the host: String 15, Speech 14, the
+// 6-op FM 5, the string machine 4); tests/engines.txt checks every engine's share.
+const size_t kVoiceRam = 20 * 1024;
+
+// A voice's engine. The FM-1 runs no C++ static constructors (its link keeps no .init_array), so an engine can't
+// be a static object (its vtable pointer would stay zero, and the first virtual call jump to nowhere): it is built
+// in the voice's slot (placement new) whenever the voice takes up an engine.
+//
+// The engines run as on Plaits: kBlockSize (12) samples at a time, always. Some count on it: the 6-op FM renders
+// its two voices staggered over blocks of one size, in a scratch buffer six blocks long (24 overran it: the voice
+// after a bank change was silent). The FM-1's blocks (256) are no multiple of 12, so the engine's blocks go
+// through a FIFO, each sample at most 11 late (0.25 ms).
+struct Voice {
+  alignas(kSlotAlign) unsigned char slot[kSlotSize];
+  plaits::Engine* engine;
+  float fifo_out[plaits::kBlockSize];
+  float fifo_aux[plaits::kBlockSize];
+  uint32_t fifo_read;                // kBlockSize: all read, the next sample wants a new block
+  bool fifo_enveloped;
 };
 
-Slot<plaits::WaveshapingEngine> waveshaping_slot;
-Slot<plaits::FMEngine> fm_slot;
-Slot<plaits::VirtualAnalogEngine> virtual_analog_slot;
-Slot<plaits::ModalEngine> modal_slot;
-Slot<plaits::GrainEngine> grain_slot;
-Slot<plaits::AdditiveEngine> additive_slot;
-Slot<plaits::WavetableEngine> wavetable_slot;
-Slot<plaits::ChordEngine> chord_slot;
-Slot<plaits::SpeechEngine> speech_slot;
-Slot<plaits::SwarmEngine> swarm_slot;
-Slot<plaits::NoiseEngine> noise_slot;
-Slot<plaits::ParticleEngine> particle_slot;
-Slot<plaits::StringEngine> string_slot;
-Slot<plaits::BassDrumEngine> bass_drum_slot;
-Slot<plaits::SnareDrumEngine> snare_drum_slot;
-Slot<plaits::HiHatEngine> hi_hat_slot;
-Slot<plaits::VirtualAnalogVCFEngine> va_vcf_slot;
-Slot<plaits::PhaseDistortionEngine> phase_distortion_slot;
-Slot<plaits::SixOpEngine> six_op_slot;      // one engine for the three banks, as on Plaits
-Slot<plaits::WaveTerrainEngine> wave_terrain_slot;
-Slot<plaits::StringMachineEngine> string_machine_slot;
-Slot<plaits::ChiptuneEngine> chiptune_slot;
-
-plaits::Engine* engines[GRAV_ENGINE_COUNT];
-
-// The engines' RAM: each its own part (Plaits shares one buffer and makes the engine chosen start over; here
-// switching leaves nothing behind for the next to find). Init takes 58 KB on the host (59348 B: Particle 16 KB,
-// String 15, Speech 14, the 6-op FM 5, the string machine 4; less on the FM-1, its pointers half as wide);
-// tests/engines.txt checks the room left.
-char engine_ram[72 * 1024] __attribute__((aligned(8))) GRAV_POOL;
+// In the FM-1's pool (zeroed at boot; all plain data, nothing to construct): 4 x 24 KB.
+Voice voices[GRAV_VOICES] GRAV_POOL;
+char voice_ram[GRAV_VOICES][kVoiceRam] __attribute__((aligned(8))) GRAV_POOL;
 uint32_t ram_used;
 
 uint32_t current = GRAV_ENGINE_COUNT;
 bool initialized;
 
-// The engines run as on Plaits: kBlockSize (12) samples at a time, always. Some count on it: the 6-op FM renders
-// its two voices staggered over blocks of one size, in a scratch buffer six blocks long (24 overran it: the voice
-// after a bank change was silent). The FM-1's blocks (256) are no multiple of 12, so the engine's blocks go through
-// this FIFO, each sample at most 11 late (0.25 ms).
-float fifo_out[plaits::kBlockSize];
-float fifo_aux[plaits::kBlockSize];
-uint32_t fifo_read = plaits::kBlockSize;   // all read: the next sample wants a new block
-bool fifo_enveloped;
+// An engine built in a slot (the 6-op FM's three banks are one engine with three sets of user data, as on Plaits).
+plaits::Engine* Build(uint32_t engine, void* slot) {
+  switch (engine) {
+    case GRAV_ENGINE_FM: return new (slot) plaits::FMEngine();
+    case GRAV_ENGINE_VIRTUAL_ANALOG: return new (slot) plaits::VirtualAnalogEngine();
+    case GRAV_ENGINE_MODAL: return new (slot) plaits::ModalEngine();
+    case GRAV_ENGINE_GRAIN: return new (slot) plaits::GrainEngine();
+    case GRAV_ENGINE_ADDITIVE: return new (slot) plaits::AdditiveEngine();
+    case GRAV_ENGINE_WAVETABLE: return new (slot) plaits::WavetableEngine();
+    case GRAV_ENGINE_CHORDS: return new (slot) plaits::ChordEngine();
+    case GRAV_ENGINE_SPEECH: return new (slot) plaits::SpeechEngine();
+    case GRAV_ENGINE_SWARM: return new (slot) plaits::SwarmEngine();
+    case GRAV_ENGINE_NOISE: return new (slot) plaits::NoiseEngine();
+    case GRAV_ENGINE_PARTICLE: return new (slot) plaits::ParticleEngine();
+    case GRAV_ENGINE_STRING: return new (slot) plaits::StringEngine();
+    case GRAV_ENGINE_BASS_DRUM: return new (slot) plaits::BassDrumEngine();
+    case GRAV_ENGINE_SNARE_DRUM: return new (slot) plaits::SnareDrumEngine();
+    case GRAV_ENGINE_HI_HAT: return new (slot) plaits::HiHatEngine();
+    case GRAV_ENGINE_VA_VCF: return new (slot) plaits::VirtualAnalogVCFEngine();
+    case GRAV_ENGINE_PHASE_DISTORTION: return new (slot) plaits::PhaseDistortionEngine();
+    case GRAV_ENGINE_SIX_OP_1:
+    case GRAV_ENGINE_SIX_OP_2:
+    case GRAV_ENGINE_SIX_OP_3: return new (slot) plaits::SixOpEngine();
+    case GRAV_ENGINE_WAVE_TERRAIN: return new (slot) plaits::WaveTerrainEngine();
+    case GRAV_ENGINE_STRING_MACHINE: return new (slot) plaits::StringMachineEngine();
+    case GRAV_ENGINE_CHIPTUNE: return new (slot) plaits::ChiptuneEngine();
+    default: return new (slot) plaits::WaveshapingEngine();
+  }
+}
 
-// An engine chosen: its user data (the 6-op FM's bank) and a fresh start, as Plaits' Voice does.
+// An engine chosen: built in every voice, from Init, with its user data (the 6-op FM's bank) and a fresh start,
+// as Plaits' Voice starts an engine it switches to. (The engines' destructors do nothing: a slot is just reused.)
 void choose(uint32_t engine) {
-  engines[engine]->LoadUserData(info[engine].user_data);
-  engines[engine]->Reset();
+  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
+    Voice& v = voices[i];
+    v.engine = Build(engine, v.slot);
+    stmlib::BufferAllocator allocator(voice_ram[i], kVoiceRam);
+    v.engine->Init(&allocator);
+    ram_used = kVoiceRam - allocator.free();
+    v.engine->LoadUserData(info[engine].user_data);
+    v.engine->Reset();
+    v.fifo_read = plaits::kBlockSize;
+    v.fifo_enveloped = info[engine].own_envelope;
+  }
   current = engine;
 }
 
 }  // namespace
 
 extern "C" void grav_plaits_init(void) {
-  plaits::Engine** e = engines;
-  e[GRAV_ENGINE_WAVESHAPING] = new (waveshaping_slot.bytes) plaits::WaveshapingEngine();
-  e[GRAV_ENGINE_FM] = new (fm_slot.bytes) plaits::FMEngine();
-  e[GRAV_ENGINE_VIRTUAL_ANALOG] = new (virtual_analog_slot.bytes) plaits::VirtualAnalogEngine();
-  e[GRAV_ENGINE_MODAL] = new (modal_slot.bytes) plaits::ModalEngine();
-  e[GRAV_ENGINE_GRAIN] = new (grain_slot.bytes) plaits::GrainEngine();
-  e[GRAV_ENGINE_ADDITIVE] = new (additive_slot.bytes) plaits::AdditiveEngine();
-  e[GRAV_ENGINE_WAVETABLE] = new (wavetable_slot.bytes) plaits::WavetableEngine();
-  e[GRAV_ENGINE_CHORDS] = new (chord_slot.bytes) plaits::ChordEngine();
-  e[GRAV_ENGINE_SPEECH] = new (speech_slot.bytes) plaits::SpeechEngine();
-  e[GRAV_ENGINE_SWARM] = new (swarm_slot.bytes) plaits::SwarmEngine();
-  e[GRAV_ENGINE_NOISE] = new (noise_slot.bytes) plaits::NoiseEngine();
-  e[GRAV_ENGINE_PARTICLE] = new (particle_slot.bytes) plaits::ParticleEngine();
-  e[GRAV_ENGINE_STRING] = new (string_slot.bytes) plaits::StringEngine();
-  e[GRAV_ENGINE_BASS_DRUM] = new (bass_drum_slot.bytes) plaits::BassDrumEngine();
-  e[GRAV_ENGINE_SNARE_DRUM] = new (snare_drum_slot.bytes) plaits::SnareDrumEngine();
-  e[GRAV_ENGINE_HI_HAT] = new (hi_hat_slot.bytes) plaits::HiHatEngine();
-  e[GRAV_ENGINE_VA_VCF] = new (va_vcf_slot.bytes) plaits::VirtualAnalogVCFEngine();
-  e[GRAV_ENGINE_PHASE_DISTORTION] = new (phase_distortion_slot.bytes) plaits::PhaseDistortionEngine();
-  e[GRAV_ENGINE_SIX_OP_1] = e[GRAV_ENGINE_SIX_OP_2] = e[GRAV_ENGINE_SIX_OP_3] =
-      new (six_op_slot.bytes) plaits::SixOpEngine();
-  e[GRAV_ENGINE_WAVE_TERRAIN] = new (wave_terrain_slot.bytes) plaits::WaveTerrainEngine();
-  e[GRAV_ENGINE_STRING_MACHINE] = new (string_machine_slot.bytes) plaits::StringMachineEngine();
-  e[GRAV_ENGINE_CHIPTUNE] = new (chiptune_slot.bytes) plaits::ChiptuneEngine();
-
-  stmlib::BufferAllocator allocator(engine_ram, sizeof(engine_ram));
-  for (uint32_t i = 0; i < GRAV_ENGINE_COUNT; ++i) {
-    if (i != GRAV_ENGINE_SIX_OP_2 && i != GRAV_ENGINE_SIX_OP_3) {   // (the same engine as SIX_OP_1)
-      e[i]->Init(&allocator);
-    }
-  }
-  ram_used = sizeof(engine_ram) - allocator.free();
   choose(GRAV_ENGINE_WAVESHAPING);
   initialized = true;
 }
 
-extern "C" int grav_plaits_render(const grav_plaits_params_t* in, float* out, float* aux, uint32_t size) {
+extern "C" void grav_plaits_engine(uint32_t engine) {
   if (!initialized) {
     grav_plaits_init();
   }
-  uint32_t engine = in->engine < GRAV_ENGINE_COUNT ? in->engine : GRAV_ENGINE_WAVESHAPING;
+  if (engine >= GRAV_ENGINE_COUNT) {
+    engine = GRAV_ENGINE_WAVESHAPING;
+  }
   if (engine != current) {
     choose(engine);
   }
+}
+
+extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in, float* out, float* aux,
+                                  uint32_t size) {
+  if (!initialized) {
+    grav_plaits_init();
+  }
+  Voice& v = voices[voice < GRAV_VOICES ? voice : 0];
   const Info& e = info[current];
 
   int first, held;                   // the trigger in the first block, and in the blocks after it
@@ -228,24 +244,24 @@ extern "C" int grav_plaits_render(const grav_plaits_params_t* in, float* out, fl
   p.accent = in->accent;
 
   for (uint32_t i = 0; i < size; ++i) {
-    if (fifo_read == plaits::kBlockSize) {
+    if (v.fifo_read == plaits::kBlockSize) {
       bool already_enveloped = e.own_envelope;   // an engine may say otherwise (Speech: a word, or a vowel)
-      engines[current]->Render(p, fifo_out, fifo_aux, plaits::kBlockSize, &already_enveloped);
+      v.engine->Render(p, v.fifo_out, v.fifo_aux, plaits::kBlockSize, &already_enveloped);
       if (e.gain != 1.0f) {
         for (size_t j = 0; j < plaits::kBlockSize; ++j) {
-          fifo_out[j] *= e.gain;
-          fifo_aux[j] *= e.gain;
+          v.fifo_out[j] *= e.gain;
+          v.fifo_aux[j] *= e.gain;
         }
       }
-      fifo_enveloped = already_enveloped;
+      v.fifo_enveloped = already_enveloped;
       p.trigger = held;
-      fifo_read = 0;
+      v.fifo_read = 0;
     }
-    out[i] = fifo_out[fifo_read];
-    aux[i] = fifo_aux[fifo_read];
-    ++fifo_read;
+    out[i] = v.fifo_out[v.fifo_read];
+    aux[i] = v.fifo_aux[v.fifo_read];
+    ++v.fifo_read;
   }
-  return fifo_enveloped ? 1 : 0;
+  return v.fifo_enveloped ? 1 : 0;
 }
 
 extern "C" const char* grav_engine_name(uint32_t engine) {

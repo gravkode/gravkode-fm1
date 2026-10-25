@@ -3,20 +3,19 @@
 #include "../synth/synth.h"
 
 typedef struct {
-    int32_t last_note;                   /* the note played last: it sounds on through the release */
-    float level;                         /* the envelope's level, at the last sample */
     float gain;                          /* MASTER, glided */
-    float velocity;                      /* the last note's velocity, 0..1 */
-    uint32_t strikes_seen;               /* the voice's strikes count at the last render */
+    uint32_t strikes_seen[SYNTH_VOICES_MAX];   /* each voice's strikes count at the last render */
+    uint8_t asleep[SYNTH_VOICES_MAX];    /* quiet and let go: not rendered until its next note (the CPU, the battery) */
 } grav_engine_t;
 
 void grav_engine_init(grav_engine_t *e);
-/* n stereo frames of the voice (its note, velocity, strikes and envelope) on engine (GRAV_ENGINE_*), 24-bit */
+/* n stereo frames, 24-bit: the synth's voices (their notes, velocities, strikes and envelopes) on engine
+ * (GRAV_ENGINE_*), mixed */
 void grav_engine_render(
     grav_engine_t *e,
     int32_t *lr,
     uint32_t n,
-    synth_t *voice,
+    synth_t *synth,
     uint32_t engine,
     uint32_t master_q12,
     float timbre,

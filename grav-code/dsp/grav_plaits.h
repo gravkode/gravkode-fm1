@@ -37,24 +37,28 @@ enum {                                   /* the engines, by the settings' engine
     GRAV_ENGINE_COUNT
 };
 
+#define GRAV_VOICES 4u                  /* engines run side by side: one per voice (synth/synth.h SYNTH_VOICES_MAX) */
+
 typedef struct {
-    uint32_t engine;                     /* GRAV_ENGINE_* */
     float note;                          /* a MIDI note; a fraction for the LFO's pitch */
     float timbre, morph, harmonics;      /* 0..1 */
     float accent;                        /* 0..1, the note's velocity: how hard an engine that strikes strikes */
-    uint8_t gate;                        /* a note is held */
-    uint8_t strike;                      /* a new note began */
+    uint8_t gate;                        /* the voice's note is held */
+    uint8_t strike;                      /* a new note began on it */
 } grav_plaits_params_t;
 
 void grav_plaits_init(void);
-/* size samples (12 or more, so that a strike is never lost: GRAV_PLAITS_BLOCK chunks), the engine's 12-sample blocks
- * through a FIFO; 1 when the engine shaped them with an envelope of its own (a drum, the 6-op FM, a spoken word:
- * GRAV CODE's envelope leaves them, as Plaits' low-pass gate does) */
-int grav_plaits_render(const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
+/* the engine every voice plays (GRAV_ENGINE_*): a change builds it anew in each voice, as Plaits starts an engine
+ * it switches to afresh */
+void grav_plaits_engine(uint32_t engine);
+/* size samples of voice (12 or more, so that a strike is never lost: GRAV_PLAITS_BLOCK chunks), the engine's
+ * 12-sample blocks through the voice's FIFO; 1 when the engine shaped them with an envelope of its own (a drum, the
+ * 6-op FM, a spoken word: GRAV CODE's envelope leaves them, as Plaits' low-pass gate does) */
+int grav_plaits_render(uint32_t voice, const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
 
 const char *grav_engine_name(uint32_t engine);           /* on the screen: 10 characters at most */
 uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* PRESET: steps away in Plaits' order, round */
-uint32_t grav_plaits_ram_used(void);     /* bytes of the engines' RAM their Init took (the pool's share) */
+uint32_t grav_plaits_ram_used(void);     /* bytes of its voice's RAM the engine's Init took (each voice the same) */
 
 #ifdef __cplusplus
 }

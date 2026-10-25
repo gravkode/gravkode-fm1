@@ -2,11 +2,10 @@
 # each is chosen, named, and sounds for a held C4. tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/engines.txt grav-code/build/host
 wait 600
-# the engines' RAM (the pool's 72 KB): what their Init took, with room to spare (host pointers are 8 bytes, the
-# FM-1's 4: it takes less there)
-expect engine_ram >50000
-expect engine_ram <69632
+# each engine's RAM in a voice (20 KB each, dsp/grav_plaits.cpp kVoiceRam) is checked once it is chosen: what its
+# Init took, with 2 KB to spare (host pointers are 8 bytes, the FM-1's 4: it takes less there)
 expect wave 0
+expect engine_ram <18433
 listen
 # WAVESHAPE
 midi 90 3C 64
@@ -20,6 +19,7 @@ turn PRESET 1
 wait 30
 expect wave 1
 said WAVE FM 2-OP
+expect engine_ram <18433
 # FM 2-OP
 midi 90 3C 64
 wait 10
@@ -32,6 +32,7 @@ turn PRESET 1
 wait 30
 expect wave 4
 said WAVE GRAIN
+expect engine_ram <18433
 # GRAIN
 midi 90 3C 64
 wait 10
@@ -44,6 +45,7 @@ turn PRESET 1
 wait 30
 expect wave 5
 said WAVE ADDITIVE
+expect engine_ram <18433
 # ADDITIVE
 midi 90 3C 64
 wait 10
@@ -56,6 +58,7 @@ turn PRESET 1
 wait 30
 expect wave 6
 said WAVE WAVETABLE
+expect engine_ram <18433
 # WAVETABLE
 midi 90 3C 64
 wait 10
@@ -68,6 +71,7 @@ turn PRESET 1
 wait 30
 expect wave 7
 said WAVE CHORDS
+expect engine_ram <18433
 # CHORDS
 midi 90 3C 64
 wait 10
@@ -80,6 +84,7 @@ turn PRESET 1
 wait 30
 expect wave 8
 said WAVE SPEECH
+expect engine_ram <18433
 # SPEECH
 midi 90 3C 64
 wait 10
@@ -92,6 +97,7 @@ turn PRESET 1
 wait 30
 expect wave 9
 said WAVE SWARM
+expect engine_ram <18433
 # SWARM
 midi 90 3C 64
 wait 10
@@ -104,6 +110,7 @@ turn PRESET 1
 wait 30
 expect wave 10
 said WAVE NOISE
+expect engine_ram <18433
 # NOISE
 midi 90 3C 64
 wait 10
@@ -116,6 +123,8 @@ turn PRESET 1
 wait 30
 expect wave 11
 said WAVE PARTICLE
+expect engine_ram <18433
+expect engine_ram >16000
 # PARTICLE
 midi 90 3C 64
 wait 10
@@ -128,6 +137,7 @@ turn PRESET 1
 wait 30
 expect wave 12
 said WAVE STRING
+expect engine_ram <18433
 # STRING
 midi 90 3C 64
 wait 10
@@ -140,6 +150,7 @@ turn PRESET 1
 wait 30
 expect wave 3
 said WAVE MODAL
+expect engine_ram <18433
 # MODAL
 midi 90 3C 64
 wait 10
@@ -152,6 +163,7 @@ turn PRESET 1
 wait 30
 expect wave 13
 said WAVE BASS DRUM
+expect engine_ram <18433
 # BASS DRUM
 midi 90 3C 64
 wait 10
@@ -164,6 +176,7 @@ turn PRESET 1
 wait 30
 expect wave 14
 said WAVE SNARE
+expect engine_ram <18433
 # SNARE
 midi 90 3C 64
 wait 10
@@ -176,6 +189,7 @@ turn PRESET 1
 wait 30
 expect wave 15
 said WAVE HI-HAT
+expect engine_ram <18433
 # HI-HAT
 midi 90 3C 64
 wait 10
@@ -188,6 +202,7 @@ turn PRESET 1
 wait 30
 expect wave 16
 said WAVE VA VCF
+expect engine_ram <18433
 # VA VCF
 midi 90 3C 64
 wait 10
@@ -200,6 +215,7 @@ turn PRESET 1
 wait 30
 expect wave 17
 said WAVE PHASE DIST
+expect engine_ram <18433
 # PHASE DIST
 midi 90 3C 64
 wait 10
@@ -212,6 +228,7 @@ turn PRESET 1
 wait 30
 expect wave 18
 said WAVE 6-OP FM 1
+expect engine_ram <18433
 # 6-OP FM 1
 midi 90 3C 64
 wait 10
@@ -224,6 +241,7 @@ turn PRESET 1
 wait 30
 expect wave 19
 said WAVE 6-OP FM 2
+expect engine_ram <18433
 # 6-OP FM 2
 midi 90 3C 64
 wait 10
@@ -236,6 +254,7 @@ turn PRESET 1
 wait 30
 expect wave 20
 said WAVE 6-OP FM 3
+expect engine_ram <18433
 # 6-OP FM 3
 midi 90 3C 64
 wait 10
@@ -248,6 +267,7 @@ turn PRESET 1
 wait 30
 expect wave 21
 said WAVE TERRAIN
+expect engine_ram <18433
 # TERRAIN
 midi 90 3C 64
 wait 10
@@ -260,6 +280,7 @@ turn PRESET 1
 wait 30
 expect wave 22
 said WAVE STRING MCH
+expect engine_ram <18433
 # STRING MCH
 midi 90 3C 64
 wait 10
@@ -272,6 +293,7 @@ turn PRESET 1
 wait 30
 expect wave 23
 said WAVE CHIPTUNE
+expect engine_ram <18433
 # CHIPTUNE
 midi 90 3C 64
 wait 10
@@ -284,6 +306,7 @@ turn PRESET 1
 wait 30
 expect wave 2
 said WAVE ANALOG
+expect engine_ram <18433
 # ANALOG
 midi 90 3C 64
 wait 10
@@ -297,6 +320,7 @@ turn PRESET -1
 wait 30
 expect wave 23
 said WAVE CHIPTUNE
+expect engine_ram <18433
 turn PRESET 1
 wait 30
 expect wave 2
