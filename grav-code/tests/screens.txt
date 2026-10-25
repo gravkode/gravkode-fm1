@@ -102,12 +102,13 @@ key 11 up
 wait 30
 tap REC
 wait 30
-# S2 (the black key 6 in step mode): steps 2, 4, 7, 10, 14; then S1 again (the black key 5)
+# S2 (the black key 2 in step mode): steps 2, 4, 7, 10, 14; D1 (black 5) a kick on 1, 5, 9, 13; D3 (black 7) a
+# hi-hat on 3, 7, 11, 15; then S1 again (black 1)
 tap SEQ
 wait 30
-key 13 down 100 0
+key 3 down 100 0
 wait 30
-key 13 up
+key 3 up
 wait 30
 key 2 down 100 0
 wait 30
@@ -129,6 +130,40 @@ key 10 down 100 0
 wait 30
 key 10 up
 wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+key 7 down 100 0
+wait 30
+key 7 up
+key 14 down 100 0
+wait 30
+key 14 up
+key 21 down 100 0
+wait 30
+key 21 up
+wait 30
+key 15 down 100 0
+wait 30
+key 15 up
+wait 30
+key 4 down 100 0
+wait 30
+key 4 up
+key 11 down 100 0
+wait 30
+key 11 up
+key 18 down 100 0
+wait 30
+key 18 up
+key 24 down 100 0
+wait 30
+key 24 up
+wait 30
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
 tap SEQ
 wait 1600
 turn K2 8
@@ -137,7 +172,7 @@ wait 640
 shot screen-seq.png
 tap PLAY
 wait 30
-# SELECT: the tracks' list
+# SELECT: the tracks' list, all eight
 turn SELECT 1
 wait 300
 shot screen-tracks.png

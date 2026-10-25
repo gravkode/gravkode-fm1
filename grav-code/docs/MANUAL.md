@@ -3,8 +3,9 @@
 GRAV CODE turns the M-VAVE FM-1 into a polyphonic synthesizer on all 24 sound engines of Mutable Instruments'
 Plaits, through the granular processor, delay and reverb of Mutable Instruments' Beads: up to four voices, each its
 own engine, played from the keys with velocity or over MIDI, shaped by an envelope and moved by an LFO, and a
-sequencer of four tracks of 64 steps, each track its own engine, with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings and
-the pattern stay across a power cycle.
+sequencer of eight tracks of 64 steps, four synth tracks (each its own engine) and four drum tracks (Plaits' bass
+drum, snare and hi-hat), with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings
+and the pattern stay across a power cycle.
 
 ![GRAV CODE playing a chord on CHORDS: three keys held, each filled to its velocity (amber) and its pressure (white), TIMBRE 65, MORPH 50, HARMONICS 75](img/screen-playing.png "A chord on CHORDS")
 
@@ -55,8 +56,8 @@ From the top:
 - **The header:** GRAV CODE, the page you are on (SEQ, OSC, MOD, ENV, GLO, FX GRAIN, FX SHAPE, FX MIX or DEBUG), and
   the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1 runs on USB power.
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
-- **The track selected** (S1 to S4) and its engine, by its name; beside them FREEZE, lit, while the effect is frozen.
-  Turning SELECT shows the four tracks for a moment, the selected one lit, each with its engine and voices.
+- **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
+  is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine and voices.
 - **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
   starts from a mark in the middle (DENSITY, PITCH) has its rest there.
 - **The keyboard:** a key held fills to its velocity (amber) and, pressed further, to its pressure (white).
@@ -72,8 +73,8 @@ From the top:
 | --- | --- |
 | Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0 |
 | OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go. In step mode: the pages |
-| PRESET (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first |
-| SELECT (knob) | The track: S1 to S4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
+| PRESET (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: BASS DRUM, SNARE, HI-HAT |
+| SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | HOME | SEQ, the sequencer's page; again OSC: TIMBRE, MORPH, HARMONICS; again SEQ. From another page, the one of the two shown last |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
@@ -157,13 +158,13 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.16.0, ID FM-1_73001600, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.17.0, ID FM-1_73001700, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
 | Knob | Setting | Values |
 | --- | --- | --- |
-| K1 | VOICES | The selected track's: OFF, MONO (each track's at first), 2, 3, 4; four in all (section 8) |
+| K1 | VOICES | The selected synth track's: OFF, MONO (each track's at first), 2, 3, 4; four in all (section 8). A drum track's: DRUM, its own |
 | K2 | VELOCITY | ON (right: the keys play as they land), OFF (left: at a fixed 100) |
 | K3 | VERSION | the firmware's version, said aloud |
 
@@ -178,25 +179,30 @@ The effect's three pages: section 7.
 
 ## 5. The sequencer
 
-![The SEQ page playing S1 (CHORDS): its steps with their velocity and note, chords marked by their dots, the step playing on a light ground (6 of 16), the four tracks' lights; TEMPO 120, SWING 58 %, LENGTH 16; PLAY](img/screen-seq.png "The SEQ page")
+![The SEQ page playing S1 (CHORDS): its steps with their velocity and note, chords marked by their dots, the step playing on a light ground (6 of 16), the eight tracks' lights; TEMPO 120, SWING 58 %, LENGTH 16; PLAY](img/screen-seq.png "The SEQ page")
 
-![SELECT turned: the four tracks, S2 (VA VCF) selected, each with its engine and voices](img/screen-tracks.png "The tracks' list")
+![SELECT turned: the eight tracks, S2 (VA VCF) selected, each with its engine and voices (DRUM: a drum track's own)](img/screen-tracks.png "The tracks' list")
 
-Four tracks, S1 to S4, play together: each its own engine, OSC knobs and voices (sections 6 and 8), its own steps
-and LENGTH, all at one TEMPO and SWING, through the one envelope, LFO and effect. SELECT picks the track the page,
-the keys and step mode are for; the keys play along with the sequencer. A track has 64 steps in four pages of 16, as
-many as its LENGTH (1 to 64): tracks of different lengths drift against each other and meet again (a polymeter). A
-step holds a note or a chord of up to four, its velocity and its length.
+Eight tracks play together. The four synth tracks, S1 to S4, each have their own engine, OSC knobs and voices
+(sections 6 and 8). The four drum tracks, D1 to D4, each play one of Plaits' drums (BASS DRUM, SNARE or HI-HAT) with
+their own OSC knobs, in a voice of their own: they never take the synth tracks' four. Every track has its own steps
+and LENGTH, all at one TEMPO and SWING, through the one effect; the envelope and the LFO are the synth tracks' (a drum
+decays on its own, by its MORPH). SELECT picks the track the page, the keys and step mode are for; the keys play
+along with the sequencer. A track has 64 steps in four pages of 16, as many as its LENGTH (1 to 64): tracks of
+different lengths drift against each other and meet again (a polymeter). A step holds a note or a chord of up to
+four, its velocity and its length.
 
-A fresh FM-1's tracks are a lead (WAVESHAPE), a bass (VA VCF), chords (CHORDS) and a pluck (STRING), one voice each.
+A fresh FM-1's tracks are a lead (WAVESHAPE), a bass (VA VCF), chords (CHORDS) and a pluck (STRING), one voice each,
+and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 
 ### The SEQ page (HOME)
 
 - **The steps** of the page shown: a step on is a bar as tall as its velocity, with an amber tick at its note's height
   among the pattern's notes and a dot for each further note of a chord; an empty step is a line, a step past the
   LENGTH a dot. The step playing stands on a light ground.
-- **Under them** the four pages (amber: the one shown; white: the one playing), the four tracks (the selected one
-  framed; each flashes as it plays a note) and the step playing, of the selected track's LENGTH.
+- **Under them** the four pages (amber: the one shown; white: the one playing), the eight tracks (S1 to S4, then D1
+  to D4; the selected one framed; each flashes as it plays a note) and the step playing, of the selected track's
+  LENGTH.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th), **K2 SWING** (50 % straight to 75 %), **K3 LENGTH** (the selected
   track's, 1 to 64 steps).
   A step held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead.
@@ -210,17 +216,16 @@ SEQ again turns it off.
 
 | Do | What happens |
 | --- | --- |
-| Tap a white key | Its step on (with the last note or chord you played: C4 before any), or off |
+| Tap a white key | Its step on (with the last note or chord you played: C4 before any; on a drum track, the drum's own note), or off |
 | Hold a white key, turn K1 | Its notes up or down, a semitone a detent |
 | Hold a white key, turn K2 / K3 | Its velocity / its length in steps (1 to 64) |
-| The first four black keys | Page 1, 2, 3, 4 |
-| The next four black keys | Track S1, S2, S3, S4 |
+| The first eight black keys | Track S1, S2, S3, S4, D1, D2, D3, D4 |
 | OCT- / OCT+ | The page before / after |
 | Hold SEQ, tap a white key | That step is the last: the LENGTH (step mode stays on) |
 
 The keys' lights show the selected track's steps: a step on lit, an empty one mid, one past the LENGTH dim, the
-step playing the other way round (an empty one lights, one on goes out); the black keys show the pages the same way,
-and the tracks: the selected one lit, one with voices mid, one without dim, each flashing as it plays a note.
+step playing the other way round (an empty one lights, one on goes out); the black keys show the tracks: the
+selected one lit, one with voices mid (a drum track always), one without dim, each flashing as it plays a note.
 
 ### Step recording (REC)
 
@@ -238,20 +243,21 @@ next. SWING delays every second step: 50 % is straight, about 67 % a triplet fee
 ### Timing and MIDI
 
 The sequencer's notes land within half a millisecond (a 24-sample grid), not on the 5.8 ms audio blocks. Over USB
-MIDI it sends each track's notes on its channel (S1 on 1 to S4 on 4, as the keys of the track selected) and, while it
-plays, Start, 24 clocks a quarter note and Stop.
+MIDI it sends each track's notes on its channel (S1 to S4 on 1 to 4, D1 to D4 on 5 to 8, as the keys of the track
+selected) and, while it plays, Start, 24 clocks a quarter note and Stop.
 A MIDI clock coming in (USB or TRS) leads it: Start, Continue and Stop start and stop it, its tempo shows on SEQ
 (MIDI CLOCK), swing still applies; half a second without a clock, the sequencer's own TEMPO takes over again.
 
 SAVE keeps the pattern: every track's steps and LENGTH, TEMPO and SWING (section 9). A pattern saved by 0.15 (one
-track) comes back as S1's.
+track) comes back as S1's; one saved by 0.16, with the drum tracks empty.
 
 ---
 
 ## 6. The engines
 
-PRESET steps the selected track's engine through all 24 engines of Plaits, in Plaits' own order: its first sixteen, then the eight its firmware
-1.2 added. K1 is TIMBRE, K2 MORPH, K3 HARMONICS; what they do, engine by engine:
+PRESET steps the selected track's engine through all 24 engines of Plaits, in Plaits' own order: its first sixteen,
+then the eight its firmware 1.2 added. On a drum track it steps among the three drums alone: BASS DRUM, SNARE and
+HI-HAT (14 to 16 below). K1 is TIMBRE, K2 MORPH, K3 HARMONICS; what they do, engine by engine:
 
 | # | Engine | TIMBRE (K1) | MORPH (K2) | HARMONICS (K3) |
 | --- | --- | --- | --- | --- |
@@ -385,10 +391,11 @@ it loops a slice of the recording: TIME picks which, SHAPE its envelope.
 
 ![Three keys held on CHORDS, each filled to its velocity and pressure](img/screen-playing.png "Three keys held")
 
-**VOICES** (GLO, K1): the FM-1 has four voices, each its own engine, shared out among the four tracks: each track
-none (OFF), one (MONO) or up to four (POLY), four in all. Each track starts with one. Turning a track's VOICES up
-takes a free voice, else one from the track that has the most (the last of them); turning it down leaves the voice
-free. A track without voices plays nothing.
+**VOICES** (GLO, K1): the FM-1 has four voices for the synth tracks, each its own engine, shared out among them:
+each track none (OFF), one (MONO) or up to four (POLY), four in all. Each track starts with one. Turning a track's
+VOICES up takes a free voice, else one from the track that has the most (the last of them); turning it down leaves
+the voice free. A track without voices plays nothing. Each drum track has a voice of its own besides (VOICES shows
+DRUM): a new hit strikes it afresh.
 
 - **POLY:** each note takes one of the track's voices: a free one first, else the one let go longest ago, else the
   oldest held. The same note played again takes its own voice back.
@@ -407,10 +414,10 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 
 ## 9. Saving
 
-SAVE stores the octave, each track's engine, OSC values and VOICES, the MOD and ENV values, VELOCITY, the effect's
-eight knobs and QUALITY, and the sequencer's pattern (every track's steps and LENGTH, TEMPO and SWING); GRAV CODE
-starts with them at the next power-on (settings saved before 0.16 give S1 their sound; the other tracks start
-fresh, one voice each). Writing to the flash stops the sound for a moment: save while the sequencer is stopped. FREEZE and SEED's way are not kept: the effect starts
+SAVE stores the octave, each track's engine (a drum track's drum) and OSC values, the synth tracks' VOICES, the MOD
+and ENV values, VELOCITY, the effect's eight knobs and QUALITY, and the sequencer's pattern (every track's steps and
+LENGTH, TEMPO and SWING); GRAV CODE starts with them at the next power-on (settings saved before 0.16 give S1 their
+sound, the other tracks start fresh, one voice each; settings saved by 0.16 load with the kit as it comes). Writing to the flash stops the sound for a moment: save while the sequencer is stopped. FREEZE and SEED's way are not kept: the effect starts
 unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A firmware update
 keeps them (settings saved by 0.12 load with the effect at rest).
 
@@ -418,10 +425,12 @@ keeps them (settings saved by 0.12 load with the effect at rest).
 
 ## 10. MIDI and USB audio
 
-**MIDI in,** over USB and the TRS jack, any channel: notes play the selected track, with their velocity. The last message
+**MIDI in,** over USB and the TRS jack, any channel: notes play the selected track (a drum track too), with their
+velocity. The last message
 shows at the bottom of the screen.
 
-**MIDI out,** over USB, on each track's channel (S1 on 1 to S4 on 4): the keys' notes (the selected track's),
+**MIDI out,** over USB, on each track's channel (S1 to S4 on 1 to 4, D1 to D4 on 5 to 8): the keys' notes (the
+selected track's),
 their velocity and their pressure (polyphonic aftertouch), and the sequencer's notes; while it plays, MIDI Start,
 clock (24 a quarter note) and Stop.
 
@@ -444,13 +453,14 @@ and the sound is the same on one core or two. GLO twice opens DEBUG, where K1 se
 resets peaks and counters. These debug choices are temporary.
 
 Off (DRY/WET and REVERB at 0, not frozen), Beads is bypassed and costs nothing. If a block takes over 90% of its
-time, GRAV CODE takes a voice: one let go first, else the oldest. It fades out over 3 ms, so there is no click, and
+time, GRAV CODE takes a voice: a synth track's before a drum's; one let go first, else the oldest. It fades out over 3 ms, so there is no click, and
 the last voice sounding is never taken (nor MONO's one voice). The average CPU display can stay below 90% even when
 short peaks trigger protection. A released voice that is silent costs nothing.
 
 DEBUG's PEAK, OVER, SHED and XRUN distinguish peaks, protection cuts and missed audio deadlines. The footer
 CPU turns red once a block is late and remains red until power-on. Fewer VOICES, a lighter engine, or the effect
-off can reduce load. Two cores increase capacity but do not guarantee four voices at every FX setting.
+off can reduce load. Two cores increase capacity but do not guarantee four voices and four drums at every FX
+setting.
 
 See [DEBUG controls and fields](https://github.com/gravkode/gravkode-fm1/blob/main/grav-code/docs/DUAL_CORE_DEBUG.md) and [measured hardware results](https://github.com/gravkode/gravkode-fm1/blob/main/grav-code/docs/DUAL_CORE_RESULTS.md).
 

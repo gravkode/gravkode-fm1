@@ -5,7 +5,8 @@ analog, waveshaping, FM and 6-operator FM, grains, additive, wavetables, chords,
 strings and modal resonators, drums, wave terrains, a string machine and chiptune, up to four voices at once (or
 one, MONO). The keys play it with velocity (or a fixed one); an envelope shapes it and an LFO moves its timbre,
 morph or pitch; Mutable Instruments Beads, its granular processor, delay, tape and reverb, is its effect; a sequencer
-of four tracks, each its own engine, 64 steps on the white keys, plays it, with swing and MIDI clock; the settings and the pattern save; MIDI goes out
+of eight tracks, four synth tracks each its own engine and four drum tracks, 64 steps on the white keys, plays it,
+with swing and MIDI clock; the settings and the pattern save; MIDI goes out
 and comes in over USB and TRS.
 
 ![GRAV CODE on the FM-1's screen: a chord on CHORDS, three keys held, each filled to its velocity and its pressure](manual/img/screen-playing.png "A chord on CHORDS")
