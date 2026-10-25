@@ -1,8 +1,10 @@
-# REC opens DEBUG; a whole block is handed over only with >= 2 active voices.
+# GLO twice opens DEBUG; a whole block is handed over only with >= 2 active voices.
 wait 600
 expect dual_core 1
 expect worker_jobs 0
-tap REC
+tap GLO
+wait 30
+tap GLO
 wait 30
 expect page 7
 midi 90 3C 64
@@ -46,8 +48,9 @@ expect page 6
 turn K2 60
 wait 30
 expect fx_on 1
-tap REC
+tap GLO
 wait 30
+expect page 7
 turn K1 -1
 wait 200
 expect fx_on 1
@@ -71,6 +74,6 @@ expect worker_mask 0
 # DEBUG knobs must not change saved settings or access an FX parameter outside its page.
 turn K3 1
 turn K4 1
-tap REC
+tap HOME
 wait 30
-expect page 0
+expect page 8

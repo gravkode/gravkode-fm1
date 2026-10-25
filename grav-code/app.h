@@ -15,10 +15,11 @@ void app_overload(void);
 #define APP_SYSEX                        /* read-only dual-core debug snapshot over USB-MIDI */
 int app_sysex(const uint8_t *p, uint32_t n);
 
-/* the store: the app's objects (the panel calibration is the platform's), and their flash offsets. No radio, so no
- * OBJ_BLE (it was object 2: a radio added again would take it back) */
-enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_NOBJ };
-#define APP_STORE_MAP {0xFC000u, 0xDC000u}
+/* the store: the app's objects (the panel calibration is the platform's), and their flash offsets. No radio: object
+ * 2 is kept for OBJ_BLE (where its record may still be, from a build that had it), never written. OBJ_SEQ: the
+ * sequencer's pattern (0.15) */
+enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_RSV_BLE, OBJ_SEQ, OBJ_NOBJ };
+#define APP_STORE_MAP {0xFC000u, 0xDC000u, 0xDE000u, 0xDA000u}
 
 /* the contract: the platform calls these */
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */
@@ -36,3 +37,6 @@ int app_expect(const char *what, int *got);
 /* and its own command: save012 (the settings as 0.12 saved them, before the effect: a reboot loads that) */
 #define APP_HOST_CMD
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d);
+/* and its reboot: the UI's state forgotten, as the FM-1's RAM is at a restart */
+#define APP_HOST_REBOOT
+void app_host_reboot(void);

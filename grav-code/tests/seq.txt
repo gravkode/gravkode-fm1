@@ -1,0 +1,175 @@
+# The sequencer (0.15): SEQ (HOME) at power-on; step mode (SEQ): the steps on the white keys, the pages on OCT- / OCT+
+# and the first black keys, SEQ held and a step: the length; a step held and K1..K3: its note, velocity, length;
+# REC (stopped): step recording; PLAY: start, stop, over USB MIDI (notes, clock, start, stop); MIDI clock in; SAVE
+# keeps the pattern. tools/build.py grav-code --host, then
+#   grav-code/build/host/grav_code_host grav-code/tests/seq.txt grav-code/build/host
+wait 600
+expect page 8
+expect seq_playing 0
+expect seq_bpm 120
+expect seq_swing 50
+expect seq_length 16
+# step mode: steps 1 and 3 on, then step 1 off again (a tap on a step that is on)
+listen
+tap SEQ
+wait 30
+expect step_mode 1
+said STEP ON
+key 0 down 100 0
+wait 30
+key 0 up
+key 4 down 100 0
+wait 30
+key 4 up
+wait 30
+expect step0 1
+expect step2 1
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect step0 0
+# a new step plays the last chord played: C4 at 100 before any
+expect stepnote2 60
+expect stepvel2 100
+# the pages: OCT+ shows page 2 (steps 17..32), its first key is step 17; the first black key: page 1 again
+tap OCT+
+wait 30
+expect seq_page 1
+expect octave 0
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect step16 1
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+expect seq_page 0
+# SEQ held and a step: the length (step 12, the 12th white key: key 19); step mode stays on
+press SEQ
+wait 30
+key 19 down 100 0
+wait 30
+key 19 up
+wait 30
+release SEQ
+wait 30
+expect seq_length 12
+expect step_mode 1
+expect step11 0
+# a step held: K1 its note, K2 its velocity, K3 its length; let go, it stays on
+key 4 down 100 0
+wait 30
+turn K1 5
+turn K2 -20
+turn K3 1
+wait 30
+key 4 up
+wait 30
+expect step2 1
+expect stepnote2 65
+expect stepvel2 80
+expect steplen2 2
+leds
+# PLAY: MIDI start and clock, step 3's F4 (41) at 80 (50) over USB; the steps go round
+tap SEQ
+wait 30
+expect step_mode 0
+out
+tap PLAY
+wait 600
+expect seq_playing 1
+expect_out USB FA 00 00
+expect_out USB 90 41 50
+expect clocks_out >20
+expect seq_count >3
+wait 1500
+expect seq_count >15
+# stop: its note ends, MIDI stop
+tap PLAY
+wait 60
+expect seq_playing 0
+expect seq_step -1
+expect voices_held 0
+expect_out USB FC 00 00
+expect_out USB 80 41 00
+# step recording: a chord (keys 0 4 7: F3 A3 C4) to step 1, a note (key 9: D4) to step 2; SELECT skips one
+tap REC
+wait 30
+expect rec 1
+expect rec_pos 0
+key 0 down 90 0
+key 4 down 90 0
+key 7 down 90 0
+wait 50
+key 0 up
+key 4 up
+key 7 up
+wait 30
+expect step0 1
+expect stepn0 3
+expect stepnote0 53
+expect stepvel0 90
+expect rec_pos 1
+key 9 down 70 0
+wait 30
+key 9 up
+wait 30
+expect stepnote1 62
+expect stepn1 1
+expect rec_pos 2
+turn SELECT 1
+wait 30
+expect rec_pos 3
+# PLAY ends the recording and plays
+tap PLAY
+wait 200
+expect rec 0
+expect seq_playing 1
+tap PLAY
+wait 60
+# REC while playing: not yet (live recording comes later)
+tap PLAY
+wait 30
+tap REC
+wait 30
+expect rec 0
+tap PLAY
+wait 60
+# MIDI clock in: start, then 48 clocks 21 ms apart (2 beats at 119 BPM: 8 steps): it follows them
+midi FA
+clock 48 21
+expect seq_ext 1
+expect seq_playing 1
+expect seq_count >6
+expect seq_bpm >112
+expect seq_bpm <126
+midi FC
+wait 60
+expect seq_playing 0
+wait 700
+expect seq_ext 0
+expect seq_bpm 120
+# tempo and swing on SEQ's K1 and K2
+turn K1 -20
+turn K2 10
+wait 30
+expect seq_bpm 100
+expect seq_swing 60
+# SAVE, a restart: the pattern as it was
+tap SAVE
+wait 60
+expect dirty 0
+reboot
+wait 600
+expect page 8
+expect step0 1
+expect stepn0 3
+expect stepnote2 65
+expect stepvel2 80
+expect step16 1
+expect seq_length 12
+expect seq_bpm 100
+expect seq_swing 60

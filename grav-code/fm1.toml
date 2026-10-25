@@ -18,6 +18,7 @@ o2 = [
     "synth/envelope.c",
     "synth/lfo.c",
     "synth/event_queue.c",
+    "seq/seq.c",
     "dsp/grav_plaits.cpp",
     "dsp/grav_beads.cpp",
     "vendor/stmlib/dsp/units.cc",
