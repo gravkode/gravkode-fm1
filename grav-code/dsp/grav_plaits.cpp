@@ -79,9 +79,10 @@ const Info info[] = {
   /* HI_HAT           */ { "HI-HAT",     GATE,  true,  2.2f,  nullptr },
   /* VA_VCF           */ { "VA VCF",     FREE,  false, 0.85f, nullptr },
   /* PHASE_DISTORTION */ { "PHASE DIST", FREE,  false, 0.73f, nullptr },
-  /* SIX_OP_1         */ { "6-OP FM 1",  GATE,  true,  1.8f,  plaits::syx_bank_0 },
-  /* SIX_OP_2         */ { "6-OP FM 2",  GATE,  true,  1.8f,  plaits::syx_bank_1 },
-  /* SIX_OP_3         */ { "6-OP FM 3",  GATE,  true,  1.8f,  plaits::syx_bank_2 },
+  // FM operator envelopes shape the patch's timbre; the app's ENV still shapes its final amplitude.
+  /* SIX_OP_1         */ { "6-OP FM 1",  GATE,  false, 1.8f,  plaits::syx_bank_0 },
+  /* SIX_OP_2         */ { "6-OP FM 2",  GATE,  false, 1.8f,  plaits::syx_bank_1 },
+  /* SIX_OP_3         */ { "6-OP FM 3",  GATE,  false, 1.8f,  plaits::syx_bank_2 },
   /* WAVE_TERRAIN     */ { "TERRAIN",    FREE,  false, 1.65f, nullptr },
   /* STRING_MACHINE   */ { "STRING MCH", FREE,  false, 3.3f,  nullptr },
   /* CHIPTUNE         */ { "CHIPTUNE",   FREE,  false, 1.0f,  nullptr },

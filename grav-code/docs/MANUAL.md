@@ -98,7 +98,7 @@ does depends on the engine: section 5. They start at 65, 50 and 75.
 
 ### MOD (LFO)
 
-![The MOD page: LFO RATE 50, LFO DEPTH 40, LFO DEST 0](img/screen-mod.png "The MOD page, the LFO's depth up")
+![The MOD page: LFO RATE 50, LFO DEPTH 40, LFO DEST TIMBRE](img/screen-mod.png "The MOD page, the LFO's depth up")
 
 One sine LFO for all the voices, free-running (a note doesn't restart it):
 
@@ -106,10 +106,15 @@ One sine LFO for all the voices, free-running (a note doesn't restart it):
 | --- | --- | --- |
 | K1 | LFO RATE | 0.05 Hz to 20 Hz (50: 10 Hz) |
 | K2 | LFO DEPTH | 0 (off) to 100 |
-| K3 | LFO DEST | 0 to 33: TIMBRE; 34 to 67: MORPH; 68 to 100: PITCH |
+| K3 | LFO DEST | TIMBRE, MORPH or PITCH; one step selects the next destination |
 
 At full depth it sweeps TIMBRE or MORPH by half their range either side of the knob, or the pitch by 2 semitones
 either side. It starts at RATE 50, DEPTH 0 (off).
+
+DEST selects what the LFO changes; DEPTH sets how much it changes. Old saved numeric destinations keep
+their meaning (0–33 TIMBRE, 34–67 MORPH, 68–100 PITCH). On 6-OP FM, MORPH changes the DX patch's
+envelope timing, which may be subtle or inaudible once a patch has settled or decayed. TIMBRE and PITCH
+are the useful destinations for continuous brightness or pitch modulation.
 
 ### ENV (ENV)
 
@@ -126,7 +131,9 @@ Each voice's envelope, which shapes its level:
 It starts at ATTACK 10 (0.2 s), DECAY 50 (1 s) and RELEASE 30 (1.2 s).
 
 > The engines with an envelope of their own play through it, as Plaits' low-pass gate lets them: BASS DRUM, SNARE,
-> HI-HAT, the three 6-OP FM banks (each patch's envelopes), and SPEECH while it speaks a word.
+> HI-HAT and SPEECH while it speaks a word. The three 6-OP FM banks keep their DX operator envelopes,
+> with the app's ENV applied to their final volume. ENV cannot extend a patch that has already decayed
+> to silence. Sustain is fixed at 70%; this page exposes attack, decay and release.
 
 ### GLO (GLO)
 

@@ -53,7 +53,8 @@ void grav_plaits_init(void);
 void grav_plaits_engine(uint32_t engine);
 /* size samples of voice (12 or more, so that a strike is never lost: GRAV_PLAITS_BLOCK chunks), the engine's
  * 12-sample blocks through the voice's FIFO; 1 when the engine shaped them with an envelope of its own (a drum, the
- * 6-op FM, a spoken word: GRAV CODE's envelope leaves them, as Plaits' low-pass gate does) */
+ * a spoken word: GRAV CODE's envelope leaves them, as Plaits' low-pass gate does). The six-op FM banks keep
+ * their DX operator envelopes but return 0 so the app's ENV also controls their final amplitude. */
 int grav_plaits_render(uint32_t voice, const grav_plaits_params_t *p, float *out, float *aux, uint32_t size);
 
 const char *grav_engine_name(uint32_t engine);           /* on the screen: 10 characters at most */

@@ -1,0 +1,67 @@
+# Old numeric destination values keep their target, but the UI now names it and steps once per target.
+wait 600
+save_moddest 32
+reboot
+wait 600
+expect mod2 32
+expect lfo_dest 0
+tap LFO
+wait 30
+listen
+turn K3 1
+wait 30
+said LFO DEST MORPH
+expect lfo_dest 1
+expect mod2 34
+turn K3 1
+wait 30
+said LFO DEST PITCH
+expect lfo_dest 2
+turn K3 1
+wait 30
+expect lfo_dest 2
+turn K3 -1
+wait 30
+said LFO DEST MORPH
+expect lfo_dest 1
+tap SAVE
+wait 30
+reboot
+wait 600
+expect lfo_dest 1
+# A saved middle-band/end-band value has the same meaning after loading.
+save_moddest 67
+reboot
+wait 600
+expect lfo_dest 1
+save_moddest 100
+reboot
+wait 600
+expect lfo_dest 2
+tap LFO
+turn K3 -2
+turn K2 40
+wait 300
+shot lfo-destinations.png
+# 6-OP FM 2: a zero outer release must close the output even if the DX patch is still ringing.
+turn PRESET 18
+wait 30
+expect wave 19
+tap ENV
+turn K1 -100
+turn K2 -100
+turn K3 -100
+wait 30
+expect env0 0
+expect env1 0
+expect env2 0
+midi 90 3C 64
+wait 100
+peakreset
+wait 100
+expect peak_db_min -50
+midi 80 3C 00
+wait 40
+peakreset
+wait 100
+expect peak_db_max -170

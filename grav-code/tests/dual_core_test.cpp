@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <thread>
 #include <vector>
 #include "stmlib/utils/random.h"
@@ -84,7 +85,75 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
     return result;
 }
 
+// Audio regressions: changing ENV must change 6-op output, not just its hidden app envelope.
+static std::vector<int32_t> six_op_audio(unsigned engine, float attack, float decay, float release,
+                                       unsigned destination = 0, bool modulate = false) {
+    stmlib::Random::Seed(0x21);
+    synth_t synth;
+    grav_engine_t dsp;
+    synth_init(&synth);
+    synth_envelopes(&synth, attack, decay, 0.7f, release, 44100.0f);
+    grav_engine_init(&dsp);
+    grav_dual_core = 0;
+    enabled = true;
+    accept_job = true;
+    grav_beads_params_t fx = {};
+    synth_note_on(&synth, 60, 100);
+    std::vector<int32_t> result;
+    for (unsigned b = 0; b < 100; ++b) {
+        if (b == 60) synth_note_off(&synth, 60);
+        const float lfo = modulate ? 0.8f * std::sin(float(b) * 0.17f) : 0.0f;
+        float timbre = 0.5f + (destination == 0 ? lfo * 0.5f : 0.0f);
+        float morph = 0.5f + (destination == 1 ? lfo * 0.5f : 0.0f);
+        float pitch = destination == 2 ? lfo * 2.0f : 0.0f;
+        int32_t out[512];
+        grav_engine_render(&dsp, out, 256, &synth, engine, 3200, timbre, morph, 0.75f, pitch, &fx);
+        for (unsigned i = 0; i < 256; ++i) result.push_back(out[2 * i]);
+    }
+    return result;
+}
+
+static double energy(const std::vector<int32_t>& samples, unsigned first, unsigned last) {
+    double sum = 0;
+    for (unsigned i = first; i < last; ++i) {
+        const double sample = double(samples[i]) / 8388608.0;
+        sum += sample * sample;
+    }
+    return sum / (last - first);
+}
+
+static bool six_op_controls() {
+    for (unsigned e = GRAV_ENGINE_SIX_OP_1; e <= GRAV_ENGINE_SIX_OP_3; ++e) {
+        const auto fast = six_op_audio(e, 0.0f, 0.0f, 0.15f);
+        const auto slow_attack = six_op_audio(e, 2.0f, 0.0f, 0.15f);
+        const auto slow_decay = six_op_audio(e, 0.0f, 2.0f, 0.15f);
+        const auto no_release = six_op_audio(e, 0.0f, 0.0f, 0.0f);
+        const double early = energy(fast, 256, 12 * 256);
+        const double attack_ratio = energy(slow_attack, 256, 12 * 256) / early;
+        const double decay_ratio = energy(slow_decay, 5 * 256, 20 * 256) /
+                                   energy(fast, 5 * 256, 20 * 256);
+        const double short_release = energy(no_release, 61 * 256, 64 * 256);
+        const double long_release = energy(fast, 61 * 256, 64 * 256);
+        if (!(early > 1e-12 && attack_ratio < 0.02 && decay_ratio > 1.3 &&
+              short_release == 0.0 && long_release > 1e-12 && energy(fast, 95 * 256, 100 * 256) == 0.0)) {
+            std::fprintf(stderr, "Six-op ENV failure engine=%u: attack ratio=%g decay ratio=%g release=%g/%g\n",
+                         e, attack_ratio, decay_ratio, short_release, long_release);
+            return false;
+        }
+        for (unsigned destination = 0; destination < 3; ++destination) {
+            const auto modulated = six_op_audio(e, 0.0f, 0.0f, 0.15f, destination, true);
+            if (modulated == fast) {
+                std::fprintf(stderr, "Six-op modulation did not affect audio: engine=%u dest=%u\n", e, destination);
+                return false;
+            }
+        }
+    }
+    std::puts("PASS: all three 6-op banks respond to ATTACK, DECAY, RELEASE and TIMBRE/MORPH/PITCH modulation");
+    return true;
+}
+
 int main() {
+    if (!six_op_controls()) return 1;
     unsigned comparisons = 0;
     for (unsigned e = 0; e < GRAV_ENGINE_COUNT; ++e) {
         for (unsigned voices = 1; voices <= 4; ++voices) {

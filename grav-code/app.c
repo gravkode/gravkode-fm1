@@ -106,6 +106,9 @@ static volatile int32_t plaits_harmonics = 75;
 
 /* Parameters for future modulation and envelope DSP. */
 static volatile int32_t mod_params[3] = {50, 0, 0};
+static const char *const LFO_DEST_NAME[3] = {"TIMBRE", "MORPH", "PITCH"};
+/* Keep the saved 0..100 representation compatible with 0.14.0 and earlier. */
+static uint32_t lfo_destination(int32_t value) { return (uint32_t)clamp(value / 34, 0, 2); }
 static volatile int32_t env_params[3] = {10, 50, 30};
 
 static const char *const PARAM_NAME[PAGE_N][3] = {
@@ -198,7 +201,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     float timbre = (float)plaits_timbre * 0.01f;
     float morph = (float)plaits_morph * 0.01f;
     float lfo_value = lfo_process(&synth.mod_lfo);
-    int32_t lfo_dest = mod_params[2] / 34;
+    uint32_t lfo_dest = lfo_destination(mod_params[2]);
     float pitch_offset = (lfo_dest == 2) ? lfo_value * 2.0f : 0.0f;
 
     if (lfo_dest == 0)
@@ -550,7 +553,10 @@ static int param_centred(uint32_t page, uint32_t index)
 /* a knob's value as the screen and a screen reader give it: PITCH in semitones (Beads' law), the rest as it is */
 static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
 {
-    if (page == PAGE_FX_SHAPE && index == 1u) {
+    if (page == PAGE_MOD && index == 2u) {
+        t[0] = 0;
+        text_cat(t, LFO_DEST_NAME[lfo_destination(value)]);
+    } else if (page == PAGE_FX_SHAPE && index == 1u) {
         float st = grav_beads_pitch((float)value * 0.01f);
         int32_t s = (int32_t)(st + (st < 0.0f ? -0.5f : 0.5f));
         if (s > 0) {
@@ -674,6 +680,14 @@ static void input(void)
             glo_turn((uint32_t)(k - EN_K1), e);
         } else if (k == EN_K3 && active_page == PAGE_FX_MIX) {
             quality_turn(e);
+        } else if (k == EN_K3 && active_page == PAGE_MOD) {
+            uint32_t destination = (uint32_t)clamp((int32_t)lfo_destination(mod_params[2]) + e, 0, 2);
+            int32_t value = (int32_t)destination * 34;
+            if (value != mod_params[2]) {
+                mod_params[2] = value;
+                set_dirty = 1;
+            }
+            app_say("LFO DEST", LFO_DEST_NAME[destination]);
         } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
             uint32_t index = (uint32_t)(k - EN_K1);
             volatile int32_t *value = param_of(active_page, index);
@@ -733,6 +747,13 @@ static void draw_knobs(void)
     for (uint32_t i = 0; i < 3u; i++) {
         int32_t x = 8 + (int32_t)i * 78;
         cv_text(x, 42, &FONT_XS, PARAM_NAME[active_page][i], C_GRAY);
+        if (active_page == PAGE_MOD && i == 2u) {
+            uint32_t destination = lfo_destination(mod_params[2]);
+            cv_text(x, 66, &FONT_S, LFO_DEST_NAME[destination], C_WHITE);
+            for (uint32_t d = 0; d < 3; ++d)
+                cv_rect(x + (int32_t)d * 24, 100, 20, 3, d == destination ? C_HI : C_LINE);
+            continue;
+        }
         if (active_page == PAGE_FX_MIX && i == 2u) {
             cv_text(x, 66, &FONT_S, QUALITY_NAME[fx_quality], C_WHITE);
             for (int32_t q = 0; q < GRAV_FX_QUALITIES; q++)
@@ -1033,6 +1054,13 @@ int app_sysex(const uint8_t *p, uint32_t n)
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
 {
     (void)a; (void)b; (void)c; (void)d;
+    if (!strcmp(cmd, "save_moddest")) {
+        settings_capture();
+        settings_t legacy = set;
+        legacy.mod[2] = (uint8_t)clamp(atoi(a), 0, 100);
+        plat_store_save(OBJ_SETTINGS, &legacy, sizeof legacy);
+        return 1;
+    }
     if (!strcmp(cmd, "debug_overload")) {
         app_overload();
         return 1;
@@ -1062,6 +1090,8 @@ int app_expect(const char *what, int *got)
         *got = (int)grav_debug.steals;
     else if (!strcmp(what, "wave"))
         *got = set.engine_id;
+    else if (!strcmp(what, "lfo_dest"))
+        *got = (int)lfo_destination(mod_params[2]);
     else if (!strcmp(what, "engine_ram"))    /* bytes of its voice's RAM the engine's Init took */
         *got = (int)grav_plaits_ram_used();
     else if (!strcmp(what, "voices"))        /* GLO VOICES: 1 MONO, 2..4 POLY */
