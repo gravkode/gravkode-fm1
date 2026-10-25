@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 Charles Vestal */
-/* GRAV CODE: one voice on Plaits' engines (dsp/), with an envelope and an LFO (synth/). The keys play it with
- * velocity and go out over USB MIDI (MIDI in, USB or TRS, plays it too); PRESET picks the engine, K1-K3 the page's
- * parameters (HOME: OSC, LFO: MOD, ENV: ENV), OCT- / OCT+ the octave, MASTER the volume, SAVE stores it all. No
+/* GRAV CODE: up to four voices on Plaits' engines (dsp/), with an envelope and an LFO (synth/), through Beads (the
+ * effect). The keys play them with velocity and go out over USB MIDI (MIDI in, USB or TRS, plays them too); PRESET
+ * picks the engine, K1-K3 the page's parameters (HOME: OSC, LFO: MOD, ENV: ENV, GLO: GLO, FX: the effect's three
+ * pages), EDIT freezes the effect, SEL seeds it, OCT- / OCT+ the octave, MASTER the volume, SAVE stores it all. No
  * radio: Bluetooth and WiFi are left out of the build. Part of the unity build (device/unity.c, host/plat_host.c),
  * after the platform: gfx.c and announce.c are in scope. */
 #include "fastmath.h"
@@ -10,6 +11,10 @@
 #include "dsp/grav_plaits.h"
 #include "synth/synth.h"
 #include "synth/event_queue.h"
+
+/* the effect's knobs (FX: GRAIN, SHAPE, MIX; QUALITY apart), 0..100 */
+enum { FX_DENSITY, FX_TIME, FX_SIZE, FX_SHAPE, FX_PITCH, FX_FEEDBACK, FX_DRY_WET, FX_REVERB, FX_N };
+static const uint8_t FX_DEFAULT[FX_N] = {65, 30, 50, 50, 50, 30, 0, 0};   /* (DRY/WET and REVERB 0: off) */
 
 #define SET_MAGIC 0x47525639u
 #define PREV_SET_MAGIC 0x54504C32u
@@ -27,7 +32,13 @@ typedef struct {
     uint8_t voices;                      /* 1 MONO, 2..4 POLY (GLO); 0, in a record saved before 0.12: the default */
     uint8_t velocity_off;                /* the FM-1's keys play at a fixed velocity (GLO); MIDI in keeps its own */
     uint8_t reserved[1];
+    uint8_t fx[FX_N];                    /* 0.13: the effect's knobs; in a record saved before (20 bytes): defaults */
+    uint8_t fx_quality;                  /* GRAV_FX_* (dsp/grav_beads.h) */
+    uint8_t fx_reserved[3];
 } settings_t;
+#define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
+_Static_assert(sizeof(settings_t) == 32 && SET_SIZE_012 == __builtin_offsetof(settings_t, fx),
+               "the settings record's layout");
 #define VOICES_DEFAULT SYNTH_VOICES_MAX
 #define FIXED_VELOCITY 100u              /* the keys' velocity with VELOCITY off */
 static settings_t set;
@@ -39,11 +50,17 @@ enum {
     PAGE_OSC = 0,
     PAGE_MOD,
     PAGE_ENV,
-    PAGE_GLO                             /* the firmware and its global settings: VOICES, VELOCITY */
+    PAGE_GLO,                            /* the firmware and its global settings: VOICES, VELOCITY */
+    PAGE_FX_GRAIN,                       /* the effect (FX, again for the next): DENSITY, TIME, SIZE */
+    PAGE_FX_SHAPE,                       /* SHAPE, PITCH, FEEDBACK */
+    PAGE_FX_MIX,                         /* DRY/WET, REVERB, QUALITY */
+    PAGE_N
 };
+#define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN)
 
 static uint8_t active_page = PAGE_OSC;
-static const char *const PAGE_NAME[] = {"OSC", "MOD", "ENV", "GLO"};
+static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back to it */
+static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX"};
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -69,7 +86,15 @@ static void queue_key_event(synth_event_type_t type, int32_t note, uint32_t velo
     }
 }
 static grav_engine_t grav_engine;
-static grav_beads_params_t fx;           /* the effect: off */
+
+/* the effect (Beads): its knobs (FX_*), QUALITY, and EDIT's and SEL's states; the audio interrupt reads them */
+static volatile int32_t fx_params[FX_N];
+static volatile int32_t fx_quality;      /* GRAV_FX_* */
+static volatile uint8_t fx_freeze;       /* EDIT: the recording held */
+static volatile uint8_t fx_seed;         /* SEL held */
+static volatile uint8_t fx_seed_auto = 1;   /* grains on their own (DENSITY's); SEL pressed: by hand, held 2 s: back */
+#define SEED_AUTO_MS 2000u
+static const char *const QUALITY_NAME[GRAV_FX_QUALITIES] = {"DIGITAL", "VINTAGE", "CLEAN TAPE", "DIRTY TAPE"};
 
 /* Plaits parameters: 0..100% */
 static volatile int32_t plaits_timbre = 65;
@@ -80,10 +105,14 @@ static volatile int32_t plaits_harmonics = 75;
 static volatile int32_t mod_params[3] = {50, 0, 0};
 static volatile int32_t env_params[3] = {10, 50, 30};
 
-static const char *const PARAM_NAME[3][3] = {
+static const char *const PARAM_NAME[PAGE_N][3] = {
     {"TIMBRE", "MORPH", "HARMONICS"},
     {"LFO RATE", "LFO DEPTH", "LFO DEST"},
-    {"ATTACK", "DECAY", "RELEASE"}
+    {"ATTACK", "DECAY", "RELEASE"},
+    {"VOICES", "VELOCITY", "VERSION"},
+    {"DENSITY", "TIME", "SIZE"},
+    {"SHAPE", "PITCH", "FEEDBACK"},
+    {"DRY/WET", "REVERB", "QUALITY"}
 };
 
 
@@ -179,6 +208,15 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     if (morph < 0.0f) morph = 0.0f;
     if (morph > 1.0f) morph = 1.0f;
 
+    grav_beads_params_t fx = {
+        (float)fx_params[FX_DENSITY] * 0.01f, (float)fx_params[FX_TIME] * 0.01f,
+        (float)fx_params[FX_SIZE] * 0.01f, (float)fx_params[FX_SHAPE] * 0.01f,
+        (float)fx_params[FX_PITCH] * 0.01f,
+        (float)fx_params[FX_FEEDBACK] * 0.01f, (float)fx_params[FX_DRY_WET] * 0.01f,
+        (float)fx_params[FX_REVERB] * 0.01f,
+        (uint8_t)fx_quality, fx_freeze, fx_seed, fx_seed_auto
+    };
+
     grav_engine_render(
         &grav_engine,
         lr,
@@ -220,6 +258,15 @@ void app_panic(void)
 }
 
 /* --------------------------------------------------------------- settings --- */
+static void fx_defaults(settings_t *s)   /* the effect's knobs at rest, off */
+{
+    for (int i = 0; i < FX_N; ++i)
+        s->fx[i] = FX_DEFAULT[i];
+    s->fx_quality = GRAV_FX_DIGITAL;
+    for (int i = 0; i < 3; ++i)
+        s->fx_reserved[i] = 0;
+}
+
 static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
@@ -233,6 +280,7 @@ static void settings_defaults(void)
     set.voices = VOICES_DEFAULT;
     set.velocity_off = 0;
     set.reserved[0] = 0;
+    fx_defaults(&set);
 }
 
 /* the knobs' parameters as they are now, into the settings record (SAVE writes the record) */
@@ -245,6 +293,9 @@ static void settings_capture(void)
         set.mod[i] = (uint8_t)mod_params[i];
         set.env[i] = (uint8_t)env_params[i];
     }
+    for (int i = 0; i < FX_N; ++i)
+        set.fx[i] = (uint8_t)fx_params[i];
+    set.fx_quality = (uint8_t)fx_quality;
 }
 
 void app_init(void)
@@ -258,20 +309,26 @@ void app_init(void)
     settings_defaults();
     set_dirty = 0;
 
-    if ((loaded == 8 || loaded == (int)sizeof loaded_settings) &&
+    if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == (int)sizeof loaded_settings) &&
         loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
-        if (loaded == (int)sizeof loaded_settings &&
+        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_012) &&
             loaded_settings.magic == SET_MAGIC &&
             loaded_settings.engine_id < GRAV_ENGINE_COUNT) {
             int valid = 1;
+            if (loaded == SET_SIZE_012)      /* (saved before 0.13, before the effect: its knobs at rest) */
+                fx_defaults(&loaded_settings);
             for (int i = 0; i < 3; ++i) {
                 if (loaded_settings.osc[i] > 100u ||
                     loaded_settings.mod[i] > 100u ||
                     loaded_settings.env[i] > 100u)
                     valid = 0;
             }
-            if (loaded_settings.voices > SYNTH_VOICES_MAX || loaded_settings.velocity_off > 1u)
+            for (int i = 0; i < FX_N; ++i)
+                if (loaded_settings.fx[i] > 100u)
+                    valid = 0;
+            if (loaded_settings.voices > SYNTH_VOICES_MAX || loaded_settings.velocity_off > 1u ||
+                loaded_settings.fx_quality >= GRAV_FX_QUALITIES)
                 valid = 0;
             if (valid) {
                 set = loaded_settings;
@@ -301,6 +358,9 @@ void app_init(void)
         mod_params[i] = set.mod[i];
         env_params[i] = set.env[i];
     }
+    for (int i = 0; i < FX_N; ++i)
+        fx_params[i] = set.fx[i];
+    fx_quality = set.fx_quality;
     synth_set_voices(&synth, set.voices);   /* (before the audio starts: no queue needed) */
 }
 
@@ -313,6 +373,7 @@ static struct {
     uint8_t note[NKEYS];                 /* the note each held key plays: the octave it was pressed in, so OCTAVE
                                           * while it is held changes the next notes, never this one's note-off */
     int32_t last_key;                    /* the key pressed last: its numbers in the header */
+    uint32_t seed_at;                    /* when SEL went down */
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint32_t cpu, xruns, cpu_at;         /* the render's load (% of its time) and late renders, as last shown */
@@ -460,6 +521,55 @@ static void glo_turn(uint32_t index, int32_t e)
     }
 }
 
+/* a page's knob: K1..K3 (index 0..2) on OSC, MOD, ENV and the FX pages (not GLO's, nor MIX's QUALITY) */
+static volatile int32_t *param_of(uint32_t page, uint32_t index)
+{
+    if (page == PAGE_OSC)
+        return index == 0u ? &plaits_timbre : index == 1u ? &plaits_morph : &plaits_harmonics;
+    if (page == PAGE_MOD)
+        return &mod_params[index];
+    if (page == PAGE_ENV)
+        return &env_params[index];
+    return &fx_params[(page - PAGE_FX_GRAIN) * 3u + index];
+}
+
+/* drawn from the middle: DENSITY (no grains there: random left, clocked right) and PITCH (0 there) */
+static int param_centred(uint32_t page, uint32_t index)
+{
+    return (page == PAGE_FX_GRAIN && index == 0u) || (page == PAGE_FX_SHAPE && index == 1u);
+}
+
+/* a knob's value as the screen and a screen reader give it: PITCH in semitones (Beads' law), the rest as it is */
+static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
+{
+    if (page == PAGE_FX_SHAPE && index == 1u) {
+        float st = grav_beads_pitch((float)value * 0.01f);
+        int32_t s = (int32_t)(st + (st < 0.0f ? -0.5f : 0.5f));
+        if (s > 0) {
+            t[0] = '+';
+            int_text(s, t + 1);
+        } else
+            int_text(s, t);
+    } else
+        int_text(value, t);
+}
+
+/* MIX's K3: QUALITY, from DIGITAL to DIRTY TAPE (Beads' media) */
+static void quality_turn(int32_t e)
+{
+    int32_t q = clamp(fx_quality + e, 0, GRAV_FX_QUALITIES - 1);
+    if (q != fx_quality) {
+        fx_quality = q;
+        set_dirty = 1;
+    }
+    app_say("QUALITY", QUALITY_NAME[fx_quality]);
+}
+
+static int fx_wanted(void)               /* the effect on: DRY/WET or REVERB up, or frozen */
+{
+    return fx_params[FX_DRY_WET] > 0 || fx_params[FX_REVERB] > 0 || fx_freeze;
+}
+
 static void input(void)
 {
     uint32_t keys, btn = plat_buttons(), k;
@@ -493,12 +603,23 @@ static void input(void)
         uint32_t bit = 1u << k;
         if (!(btn & bit) || (ui.btn & bit))
             continue;
-        if (k == B_HOME || k == B_LFO || k == B_ENV || k == B_GLO) {
+        if (k == B_HOME || k == B_LFO || k == B_ENV || k == B_GLO || k == B_FX) {
+            if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
+                fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
             active_page = k == B_HOME ? PAGE_OSC :
                           k == B_LFO  ? PAGE_MOD :
-                          k == B_ENV  ? PAGE_ENV : PAGE_GLO;
+                          k == B_ENV  ? PAGE_ENV :
+                          k == B_GLO  ? PAGE_GLO : fx_page;
             app_say("PAGE", PAGE_NAME[active_page]);
             ui.redraw = 1;
+        } else if (k == B_EDIT) {            /* FREEZE: the effect's recording held, or let go */
+            fx_freeze = !fx_freeze;
+            app_say("FREEZE", fx_freeze ? "ON" : "OFF");
+        } else if (k == B_SEL) {             /* SEED: a grain now, and grains by hand from here on */
+            ui.seed_at = plat_ms();
+            fx_seed = 1;
+            app_say("SEED", fx_seed_auto ? "MANUAL" : "");
+            fx_seed_auto = 0;
         } else if (k == B_OCTDN)
             octave_step(-1);
         else if (k == B_OCTUP)
@@ -515,6 +636,12 @@ static void input(void)
             app_say("BUTTON", BTN_NAME[k]);
         }
     }
+    if (!(btn & 1u << B_SEL))                /* SEL let go; held 2 s: the grains on their own again */
+        fx_seed = 0;
+    else if (!fx_seed_auto && plat_ms() - ui.seed_at >= SEED_AUTO_MS) {
+        fx_seed_auto = 1;
+        app_say("SEED", "AUTO");
+    }
     for (k = 0; k < NE; k++) {               /* an encoder turned: its count; PRESET also changes the wave */
         char t[12];
         if ((e = plat_enc((int)k)) == 0)
@@ -524,28 +651,16 @@ static void input(void)
         ui.redraw = 1;
         if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_GLO) {
             glo_turn((uint32_t)(k - EN_K1), e);
+        } else if (k == EN_K3 && active_page == PAGE_FX_MIX) {
+            quality_turn(e);
         } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
             uint32_t index = (uint32_t)(k - EN_K1);
-            volatile int32_t *value;
-
-            if (active_page == PAGE_OSC) {
-                if (index == 0u)
-                    value = (int32_t *)&plaits_timbre;
-                else if (index == 1u)
-                    value = (int32_t *)&plaits_morph;
-                else
-                    value = (int32_t *)&plaits_harmonics;
-            } else if (active_page == PAGE_MOD) {
-                value = &mod_params[index];
-            } else {
-                value = &env_params[index];
-            }
-
+            volatile int32_t *value = param_of(active_page, index);
             int32_t previous = *value;
             *value = clamp_percent(previous + e);
             if (*value != previous)
                 set_dirty = 1;
-            int_text(*value, t);
+            param_text(active_page, index, *value, t);
             app_say(PARAM_NAME[active_page][index], t);
         } else if (k == EN_PRESET) {
             set.engine_id = (uint8_t)grav_engine_step(set.engine_id, e);   /* in Plaits' order */
@@ -561,7 +676,12 @@ static void input(void)
     ui.keys = keys;
     ui.btn = btn;
     plat_glow(1);                            /* the unlit buttons glow, readable in the dark */
-    plat_leds(btn | (set_dirty ? 1u << B_SAVE : 0u), keys);
+    {                                        /* lit: held, SAVE (unsaved), EDIT (frozen); FX (on) and SEL (AUTO) */
+        uint32_t lit = btn | (set_dirty ? 1u << B_SAVE : 0u) | (fx_freeze ? 1u << B_EDIT : 0u);
+        if (grav_beads_on())
+            lit |= 1u << B_FX | (fx_seed_auto ? 1u << B_SEL : 0u);
+        plat_leds(lit, keys);
+    }
 }
 
 void app_input_only(void) { input(); }
@@ -585,13 +705,46 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
         cv_rect(x + 2, y + h - p, w - 4, p, C_WHITE);
 }
 
+/* OSC, MOD, ENV and the FX pages: each knob's name, value and bar; QUALITY by its name, one of four */
+static void draw_knobs(void)
+{
+    char t[12];
+    for (uint32_t i = 0; i < 3u; i++) {
+        int32_t x = 8 + (int32_t)i * 78;
+        cv_text(x, 42, &FONT_XS, PARAM_NAME[active_page][i], C_GRAY);
+        if (active_page == PAGE_FX_MIX && i == 2u) {
+            cv_text(x, 66, &FONT_S, QUALITY_NAME[fx_quality], C_WHITE);
+            for (int32_t q = 0; q < GRAV_FX_QUALITIES; q++)
+                cv_rect(x + q * 18, 100, 14, 3, q == fx_quality ? C_HI : C_LINE);
+            continue;
+        }
+        int32_t value = *param_of(active_page, i);
+        param_text(active_page, i, value, t);
+        cv_text(x, 62, &FONT_M, t, C_WHITE);
+        cv_rect(x, 100, 68, 3, C_LINE);
+        if (param_centred(active_page, i)) { /* from the middle, its mark there */
+            int32_t at = value * 68 / 100;
+            int32_t a = at < 34 ? at : 34, b = at < 34 ? 34 : at;
+            if (b > a)
+                cv_rect(x + a, 100, b - a, 3, C_HI);
+            cv_rect(x + 33, 97, 2, 9, C_GRAY);
+        } else if (value > 0)
+            cv_rect(x, 100, value * 68 / 100, 3, C_HI);
+    }
+    if (IS_FX_PAGE(active_page)) {           /* the effect's state: SEED's way and on or off */
+        cv_text(8, 116, &FONT_XS, "SEED", C_GRAY);
+        cv_text(40, 116, &FONT_XS, fx_seed_auto ? "AUTO" : "MANUAL", C_WHITE);
+        cv_text(164, 116, &FONT_XS, "FX", C_GRAY);
+        cv_text(184, 116, &FONT_XS, fx_wanted() ? "ON" : "OFF", fx_wanted() ? C_HI : C_WHITE);
+    }
+}
+
 /* GLO: VOICES and VELOCITY as the other pages' knobs are drawn, the version beside them, the identity below */
 static void draw_glo(void)
 {
-    static const char *const LABEL[3] = {"VOICES", "VELOCITY", "VERSION"};
     for (uint32_t i = 0; i < 3u; i++) {
         int32_t x = 8 + (int32_t)i * 78;
-        cv_text(x, 42, &FONT_XS, LABEL[i], C_GRAY);
+        cv_text(x, 42, &FONT_XS, PARAM_NAME[PAGE_GLO][i], C_GRAY);
         if (i == 2u) {                       /* (the small font: a version has dots) */
             cv_text(x, 66, &FONT_S, APP_VERSION, C_WHITE);
             continue;
@@ -661,30 +814,13 @@ static void draw(void)
     cv_begin(240, 144, C_BLACK);
 
     cv_text(8, 4, &FONT_S, grav_engine_name(set.engine_id), C_HI);
+    if (fx_freeze)                           /* the effect frozen: on every page (and EDIT lit) */
+        cell(172, 2, 60, "FREEZE", 1);
 
     if (active_page == PAGE_GLO)
         draw_glo();
-    for (i = 0; i < 3u && active_page != PAGE_GLO; i++) {
-        int32_t value;
-        int32_t x = 8 + (int32_t)i * 78;
-
-        if (active_page == PAGE_OSC) {
-            value = i == 0u ? plaits_timbre :
-                    i == 1u ? plaits_morph : plaits_harmonics;
-        } else if (active_page == PAGE_MOD) {
-            value = mod_params[i];
-        } else {
-            value = env_params[i];
-        }
-
-        cv_text(x, 42, &FONT_XS, PARAM_NAME[active_page][i], C_GRAY);
-        int_text(value, t);
-        cv_text(x, 62, &FONT_M, t, C_WHITE);
-
-        cv_rect(x, 100, 68, 3, C_LINE);
-        if (value > 0)
-            cv_rect(x, 100, value * 68 / 100, 3, C_HI);
-    }
+    else
+        draw_knobs();
 
     cv_blit(0, 36);
     /* the keys, black above white: a held key fills to its velocity (amber), its pressure over that (white) */
@@ -778,6 +914,16 @@ void app_frame(void)
 }
 
 #ifdef PLAT_HOST
+int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
+{
+    (void)a; (void)b; (void)c; (void)d;
+    if (strcmp(cmd, "save012"))
+        return 0;
+    settings_capture();
+    plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_012);
+    return 1;
+}
+
 int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "octave"))
@@ -792,6 +938,18 @@ int app_expect(const char *what, int *got)
         *got = (int)synth_voices_held(&synth);
     else if (!strcmp(what, "velocity_off"))  /* GLO VELOCITY off: the keys at a fixed velocity */
         *got = set.velocity_off;
+    else if (!strcmp(what, "page"))          /* the page shown (PAGE_*: 4..6 the FX pages) */
+        *got = active_page;
+    else if (!strcmp(what, "fx_on"))         /* the effect running (not off) */
+        *got = grav_beads_on();
+    else if (!strcmp(what, "quality"))       /* FX MIX QUALITY: GRAV_FX_* */
+        *got = fx_quality;
+    else if (!strcmp(what, "freeze"))
+        *got = fx_freeze;
+    else if (!strcmp(what, "seed_auto"))
+        *got = fx_seed_auto;
+    else if (!strncmp(what, "fx", 2))        /* fxN: the effect's knob N (FX_*: 0 DENSITY .. 7 REVERB) */
+        *got = fx_params[atoi(what + 2) % FX_N];
     else if (!strcmp(what, "note"))
         *got = synth.note;
     else if (!strcmp(what, "dirty"))

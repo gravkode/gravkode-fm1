@@ -1,0 +1,154 @@
+# FX: the effect (Beads): its three pages, FREEZE (EDIT), SEED (SEL), QUALITY, kept by SAVE; a record saved by 0.12
+# loads with the effect at rest. tools/build.py grav-code --host, then
+#   grav-code/build/host/grav_code_host grav-code/tests/fx.txt grav-code/build/host
+wait 600
+# at rest: off (DRY/WET and REVERB 0), DIGITAL, the grains on their own
+expect fx_on 0
+expect fx6 0
+expect fx7 0
+expect quality 0
+expect seed_auto 1
+expect freeze 0
+# FX: GRAIN, then SHAPE, MIX and GRAIN again; from HOME, FX goes back to the FX page shown last
+tap FX
+wait 30
+expect page 4
+tap FX
+wait 30
+expect page 5
+tap FX
+wait 30
+expect page 6
+tap FX
+wait 30
+expect page 4
+tap FX
+wait 30
+tap HOME
+wait 30
+expect page 0
+listen
+tap FX
+wait 30
+expect page 5
+said PAGE FX SHAPE
+# SHAPE's K2: PITCH in semitones (Beads' steps: 0, 1, 3, 4, 7, 12, 24)
+turn K2 20
+wait 30
+said PITCH +3
+turn K2 30
+wait 30
+said PITCH +24
+turn K2 -100
+wait 30
+said PITCH -24
+turn K2 50
+wait 30
+said PITCH 0
+expect fx4 50
+# off: a note let go is silent once its release is over, and nothing of the effect runs
+midi 90 3C 64
+wait 300
+midi 80 3C 00
+wait 1500
+peakreset
+wait 300
+expect peak_db_max -170
+expect fx_on 0
+# MIX: REVERB up: on, and FX lit; a note rings on after its release
+tap FX
+wait 30
+expect page 6
+turn K2 60
+wait 30
+said REVERB 60
+expect fx_on 1
+expect dirty 1
+leds
+midi 90 3C 64
+wait 300
+midi 80 3C 00
+wait 1300
+peakreset
+wait 300
+expect peak_db_min -60
+# REVERB down, DRY/WET up: FREEZE (EDIT) while a note plays holds it: the grains go on long after it ends
+turn K2 -60
+turn K1 100
+wait 30
+said DRY/WET 100
+midi 90 3C 64
+wait 600
+tap EDIT
+wait 30
+said FREEZE ON
+expect freeze 1
+midi 80 3C 00
+wait 2000
+peakreset
+wait 500
+expect peak_db_min -40
+# frozen, it stays on at DRY/WET 0 (what it holds stays); let go, it goes off
+turn K1 -100
+wait 200
+expect fx_on 1
+tap EDIT
+wait 30
+said FREEZE OFF
+wait 200
+expect fx_on 0
+# QUALITY (MIX K3): DIGITAL to DIRTY TAPE, and no further
+turn K3 2
+wait 30
+said QUALITY CLEAN TAPE
+turn K3 5
+wait 30
+said QUALITY DIRTY TAPE
+expect quality 3
+# a tape plays too: DRY/WET up, a note, its grains
+turn K1 70
+wait 30
+midi 90 3C 64
+wait 500
+peakreset
+wait 300
+expect peak_db_min -40
+midi 80 3C 00
+wait 30
+# SEL: SEED by hand (a grain each press); held 2 s, the grains on their own again
+tap SEL
+wait 30
+said SEED MANUAL
+expect seed_auto 0
+press SEL
+wait 2100
+said SEED AUTO
+expect seed_auto 1
+release SEL
+wait 30
+# SAVE, a reboot: the effect as it was (on), FREEZE and SEED's way not kept
+tap SAVE
+wait 30
+expect dirty 0
+reboot
+wait 600
+expect fx6 70
+expect fx7 0
+expect quality 3
+expect freeze 0
+expect seed_auto 1
+expect fx_on 1
+# a record as 0.12 saved it (before the effect): the rest kept, the effect at rest
+tap GLO
+wait 30
+turn K1 -1
+wait 30
+expect voices 3
+save012
+reboot
+wait 600
+expect voices 3
+expect fx6 0
+expect quality 0
+expect fx_on 0
+expect dirty 0

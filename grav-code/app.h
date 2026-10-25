@@ -31,3 +31,6 @@ void app_say(const char *a, const char *b);   /* a short message on the screen a
 /* the host simulator's checks (host/plat_host.c "expect"): octave, wave, note (-1 none), dirty, turnsN */
 #define APP_HOST_EXPECT
 int app_expect(const char *what, int *got);
+/* and its own command: save012 (the settings as 0.12 saved them, before the effect: a reboot loads that) */
+#define APP_HOST_CMD
+int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d);
