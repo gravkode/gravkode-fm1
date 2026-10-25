@@ -196,8 +196,27 @@ void grav_engine_render(
     float pitch_offset,
     const grav_beads_params_t *fx
 ) {
+    grav_sound_t sound[SYNTH_TRACKS];
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+        sound[t].engine = engine;
+        sound[t].timbre = timbre;
+        sound[t].morph = morph;
+        sound[t].harmonics = harmonics;
+    }
+    grav_engine_render_tracks(e, lr, n, synth, master_q12, sound, pitch_offset, fx);
+}
+
+static int is_six_op(uint32_t engine)
+{
+    return engine >= GRAV_ENGINE_SIX_OP_1 && engine <= GRAV_ENGINE_SIX_OP_3;
+}
+
+void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_t *synth, uint32_t master_q12,
+                               const grav_sound_t sound[SYNTH_TRACKS], float pitch_offset,
+                               const grav_beads_params_t *fx)
+{
     const float gain = (float)master_q12 / 4096.0f * GRAV_OUT_FULL;
-    const int six_op = engine >= GRAV_ENGINE_SIX_OP_1 && engine <= GRAV_ENGINE_SIX_OP_3;
+    uint8_t six_op[SYNTH_VOICES_MAX];
     if (grav_debug_reset) {
         memset(&grav_debug, 0, sizeof grav_debug);
         synth->steals = synth->shed_count = 0;
@@ -224,10 +243,14 @@ void grav_engine_render(
      * less (a tie: CPU0, CPU1 every other voice with the effect off) */
     int32_t load[2] = {0, fx_core ? e->fx_cost : 0};
     uint32_t active = 0;
-    /* Switching engines constructs every voice, only with the previous block's worker joined. */
-    grav_plaits_engine(engine);
     for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++) {
         synth_voice_t *voice = &synth->voice[v];
+        const uint32_t track = synth->voice_track[v];
+        const grav_sound_t *snd = &sound[track < SYNTH_TRACKS ? track : 0];
+        /* a track's engine changed: built anew in its voices, only with the previous block's worker joined */
+        if (track < SYNTH_TRACKS)
+            grav_plaits_voice_engine(v, snd->engine);
+        six_op[v] = (uint8_t)is_six_op(grav_plaits_voice_engine_id(v));
         int strike = voice->strikes != e->strikes_seen[v];   /* a note began on it since the last block */
         e->strikes_seen[v] = voice->strikes;
         if (strike) {
@@ -235,7 +258,7 @@ void grav_engine_render(
             e->fade_left[v] = 0;
         }
         if (v >= synth->voices) {        /* (VOICES changed: every note was let go) */
-            if (six_op && !e->asleep[v])
+            if (six_op[v] && !e->asleep[v])
                 grav_plaits_reset_voice(v);
             e->asleep[v] = 1;
             e->fade_left[v] = 0;
@@ -243,13 +266,13 @@ void grav_engine_render(
             e->fade_left[v] = GRAV_SHED_FADE;   /* the overload protection took it: it fades out, then sleeps */
         }
         work.p[v].note = (float)voice->note + pitch_offset;
-        work.p[v].timbre = timbre;
-        work.p[v].morph = morph;
-        work.p[v].harmonics = harmonics;
+        work.p[v].timbre = snd->timbre;
+        work.p[v].morph = snd->morph;
+        work.p[v].harmonics = snd->harmonics;
         work.p[v].accent = voice->velocity;
         /* Let the outer ENV own the six-op note's release. Releasing the DX gate here would
          * also start its short patch release and cut off the app's longer release. */
-        work.p[v].gate = voice->gate || (six_op && voice->env.stage != ENV_IDLE);
+        work.p[v].gate = voice->gate || (six_op[v] && voice->env.stage != ENV_IDLE);
         work.p[v].strike = (uint8_t)strike;
         work.peak[v] = 0.0f;
         work.own_envelope[v] = 0;
@@ -328,7 +351,7 @@ void grav_engine_render(
         if (e->fade_left[v]) {           /* fading out: asleep once it is silent, its envelope at rest */
             e->fade_left[v] = e->fade_left[v] > n ? e->fade_left[v] - n : 0;
             if (!e->fade_left[v]) {
-                if (six_op)
+                if (six_op[v])
                     grav_plaits_reset_voice(v);
                 envelope_init(&voice->env);
                 e->asleep[v] = 1;
@@ -339,7 +362,7 @@ void grav_engine_render(
         if (voice->gate)
             continue;
         if (work.own_envelope[v] ? work.peak[v] < GRAV_ASLEEP_PEAK : voice->env.stage == ENV_IDLE) {
-            if (six_op)
+            if (six_op[v])
                 grav_plaits_reset_voice(v);   /* no deferred old DX release on the next note */
             e->asleep[v] = 1;
         }

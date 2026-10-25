@@ -7,13 +7,14 @@ typedef enum {
     SYNTH_EVENT_NOTE_ON = 1,
     SYNTH_EVENT_NOTE_OFF,
     SYNTH_EVENT_PANIC,
-    SYNTH_EVENT_VOICES                   /* the voices in use (MONO 1, POLY 2..4): in .note */
+    SYNTH_EVENT_VOICES                   /* the tracks' voices: 4 bits each, S1's lowest, in .note */
 } synth_event_type_t;
 
 typedef struct {
     synth_event_type_t type;
     int32_t note;
     uint32_t velocity;
+    uint32_t track;                      /* a note's track (SYNTH_TRACKS: S1..S4 = 0..3) */
 } synth_event_t;
 
 typedef struct {

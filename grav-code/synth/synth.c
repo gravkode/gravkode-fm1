@@ -2,9 +2,9 @@
 
 void synth_init(synth_t *s)
 {
+    static const uint8_t ONE_TRACK[SYNTH_TRACKS] = {1, 0, 0, 0};
     s->note = -1;
-    s->voices = 1;
-    s->held_n = 0;
+    s->voices = 0;
     s->clock = 0;
     s->steals = s->shed_count = 0;
     for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++) {
@@ -16,34 +16,40 @@ void synth_init(synth_t *s)
         v->strikes = 0;
         v->age = 0;
         envelope_init(&v->env);
+        s->voice_track[i] = SYNTH_NO_TRACK;
     }
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+        s->track[t].first = s->track[t].count = 0;
+        s->track[t].held_n = 0;
+    }
+    synth_set_tracks(s, ONE_TRACK);
     lfo_init(&s->mod_lfo, 44100.0f);
 }
 
-/* takes note out of the held list; 1 if it was there */
-static int held_remove(synth_t *s, int32_t note)
+/* takes note out of a track's held list; 1 if it was there */
+static int held_remove(synth_track_t *k, int32_t note)
 {
-    for (uint32_t i = 0; i < s->held_n; i++) {
-        if (s->held[i] != (uint8_t)note)
+    for (uint32_t i = 0; i < k->held_n; i++) {
+        if (k->held[i] != (uint8_t)note)
             continue;
-        for (; i + 1 < s->held_n; i++) {
-            s->held[i] = s->held[i + 1];
-            s->held_vel[i] = s->held_vel[i + 1];
+        for (; i + 1 < k->held_n; i++) {
+            k->held[i] = k->held[i + 1];
+            k->held_vel[i] = k->held_vel[i + 1];
         }
-        s->held_n--;
+        k->held_n--;
         return 1;
     }
     return 0;
 }
 
-static void held_push(synth_t *s, int32_t note, uint32_t velocity)
+static void held_push(synth_track_t *k, int32_t note, uint32_t velocity)
 {
-    held_remove(s, note);                    /* (the same note again: it moves to the top) */
-    if (s->held_n == SYNTH_HELD_MAX)
-        held_remove(s, s->held[0]);
-    s->held[s->held_n] = (uint8_t)note;
-    s->held_vel[s->held_n] = (uint8_t)velocity;
-    s->held_n++;
+    held_remove(k, note);                    /* (the same note again: it moves to the top) */
+    if (k->held_n == SYNTH_HELD_MAX)
+        held_remove(k, k->held[0]);
+    k->held[k->held_n] = (uint8_t)note;
+    k->held_vel[k->held_n] = (uint8_t)velocity;
+    k->held_n++;
 }
 
 static void voice_start(synth_t *s, synth_voice_t *v, int32_t note, uint32_t velocity)
@@ -59,12 +65,12 @@ static void voice_start(synth_t *s, synth_voice_t *v, int32_t note, uint32_t vel
     envelope_note_on(&v->env);
 }
 
-/* POLY: the voice for a new note: the one already on it, else a free one (quiet), else the one let go longest ago,
- * else the oldest held */
-static synth_voice_t *voice_for(synth_t *s, int32_t note)
+/* POLY: the track's voice for a new note: the one already on it, else a free one (quiet), else the one let go
+ * longest ago, else the oldest held */
+static synth_voice_t *voice_for(synth_t *s, const synth_track_t *k, int32_t note)
 {
     synth_voice_t *free_v = 0, *released = 0, *oldest = 0;
-    for (uint32_t i = 0; i < s->voices; i++) {
+    for (uint32_t i = k->first; i < (uint32_t)k->first + k->count; i++) {
         synth_voice_t *v = &s->voice[i];
         if (v->note == note && (v->gate || v->env.stage != ENV_IDLE))
             return v;
@@ -81,24 +87,30 @@ static synth_voice_t *voice_for(synth_t *s, int32_t note)
     return free_v ? free_v : released ? released : oldest;
 }
 
-void synth_note_on(synth_t *s, int32_t note, uint32_t velocity)
+void synth_track_note_on(synth_t *s, uint32_t track, int32_t note, uint32_t velocity)
 {
-    if (note < 0 || note > 127)
+    if (track >= SYNTH_TRACKS || note < 0 || note > 127)
         return;
+    synth_track_t *k = &s->track[track];
+    if (!k->count)
+        return;                              /* a track without voices is silent */
     if (velocity > 127u)
         velocity = 127u;
-    held_push(s, note, velocity);
+    held_push(k, note, velocity);
     s->note = note;
-    voice_start(s, s->voices > 1 ? voice_for(s, note) : &s->voice[0], note, velocity);
+    voice_start(s, k->count > 1 ? voice_for(s, k, note) : &s->voice[k->first], note, velocity);
 }
 
-void synth_note_off(synth_t *s, int32_t note)
+void synth_track_note_off(synth_t *s, uint32_t track, int32_t note)
 {
-    if (!held_remove(s, note))
+    if (track >= SYNTH_TRACKS)
         return;
-    s->note = s->held_n ? s->held[s->held_n - 1] : -1;
-    if (s->voices > 1) {                     /* POLY: its voice lets go */
-        for (uint32_t i = 0; i < s->voices; i++) {
+    synth_track_t *k = &s->track[track];
+    if (!held_remove(k, note))
+        return;
+    s->note = k->held_n ? k->held[k->held_n - 1] : -1;
+    if (k->count > 1) {                      /* POLY: its voice lets go */
+        for (uint32_t i = k->first; i < (uint32_t)k->first + k->count; i++) {
             synth_voice_t *v = &s->voice[i];
             if (v->gate && v->note == note) {
                 v->gate = 0;
@@ -107,21 +119,27 @@ void synth_note_off(synth_t *s, int32_t note)
         }
         return;
     }
-    synth_voice_t *v = &s->voice[0];         /* MONO */
+    if (!k->count)
+        return;
+    synth_voice_t *v = &s->voice[k->first];  /* MONO */
     if (!v->gate || v->note != note)
         return;                              /* held under the one sounding */
-    if (s->held_n) {                         /* back to the note held before, as it is (no new attack) */
-        v->note = s->held[s->held_n - 1];
-        v->velocity = (float)s->held_vel[s->held_n - 1] / 127.0f;
+    if (k->held_n) {                         /* back to the note held before, as it is (no new attack) */
+        v->note = k->held[k->held_n - 1];
+        v->velocity = (float)k->held_vel[k->held_n - 1] / 127.0f;
         return;
     }
     v->gate = 0;
     envelope_note_off(&v->env);
 }
 
+void synth_note_on(synth_t *s, int32_t note, uint32_t velocity) { synth_track_note_on(s, 0, note, velocity); }
+void synth_note_off(synth_t *s, int32_t note) { synth_track_note_off(s, 0, note); }
+
 void synth_panic(synth_t *s)
 {
-    s->held_n = 0;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        s->track[t].held_n = 0;
     s->note = -1;
     for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++) {
         s->voice[i].gate = 0;
@@ -129,16 +147,40 @@ void synth_panic(synth_t *s)
     }
 }
 
+void synth_set_tracks(synth_t *s, const uint8_t counts[SYNTH_TRACKS])
+{
+    uint32_t total = 0, changed = 0;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        total += counts[t];
+    if (total > SYNTH_VOICES_MAX)
+        return;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        changed |= s->track[t].count != counts[t];
+    if (!changed && s->voices == total)
+        return;
+    synth_panic(s);
+    uint32_t first = 0;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+        s->track[t].first = (uint8_t)first;
+        s->track[t].count = counts[t];
+        for (uint32_t i = 0; i < counts[t]; i++)
+            s->voice_track[first + i] = (uint8_t)t;
+        first += counts[t];
+    }
+    for (uint32_t i = first; i < SYNTH_VOICES_MAX; i++)
+        s->voice_track[i] = SYNTH_NO_TRACK;
+    s->voices = total;
+}
+
 void synth_set_voices(synth_t *s, uint32_t voices)
 {
+    uint8_t counts[SYNTH_TRACKS] = {0, 0, 0, 0};
     if (voices < 1)
         voices = 1;
     if (voices > SYNTH_VOICES_MAX)
         voices = SYNTH_VOICES_MAX;
-    if (voices == s->voices)
-        return;
-    synth_panic(s);
-    s->voices = voices;
+    counts[0] = (uint8_t)voices;
+    synth_set_tracks(s, counts);
 }
 
 void synth_envelopes(synth_t *s, float attack, float decay, float sustain, float release, float sample_rate)
@@ -151,8 +193,6 @@ void synth_shed(synth_t *s)
 {
     synth_voice_t *oldest = 0;
     uint32_t sounding = 0;
-    if (s->voices == 1)
-        return;                              /* MONO keeps its one voice */
     for (uint32_t i = 0; i < s->voices; i++) {
         synth_voice_t *v = &s->voice[i];
         if (v->shed || (!v->gate && v->env.stage == ENV_IDLE))

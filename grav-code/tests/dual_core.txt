@@ -1,5 +1,13 @@
 # GLO twice opens DEBUG; a whole block is handed over only with >= 2 active voices.
 wait 600
+# S1 takes the four voices (every track has one at first)
+tap GLO
+wait 30
+turn K1 3
+wait 30
+expect voices 4
+tap HOME
+wait 30
 expect dual_core 1
 expect worker_jobs 0
 tap GLO

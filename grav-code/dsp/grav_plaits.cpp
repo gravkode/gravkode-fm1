@@ -140,14 +140,14 @@ struct Voice {
   uint32_t fifo_read;                // kBlockSize: all read, the next sample wants a new block
   bool fifo_enveloped;
   uint32_t random_state;             // voice-local stream: independent of scheduling and of Beads
+  uint32_t id;                       // the engine built in it (GRAV_ENGINE_*; GRAV_ENGINE_COUNT: none yet)
+  uint32_t ram_used;                 // bytes of its RAM the engine's Init took
 };
 
 // In the FM-1's pool (zeroed at boot; all plain data, nothing to construct): 4 x 24 KB.
 Voice voices[GRAV_VOICES] GRAV_POOL;
 char voice_ram[GRAV_VOICES][kVoiceRam] __attribute__((aligned(8))) GRAV_POOL;
-uint32_t ram_used;
 
-uint32_t current = GRAV_ENGINE_COUNT;
 bool initialized;
 
 // An engine built in a slot (the 6-op FM's three banks are one engine with three sets of user data, as on Plaits).
@@ -180,48 +180,62 @@ plaits::Engine* Build(uint32_t engine, void* slot) {
   }
 }
 
-// An engine chosen: built in every voice, from Init, with its user data (the 6-op FM's bank) and a fresh start,
+// An engine chosen for a voice: built in it, from Init, with its user data (the 6-op FM's bank) and a fresh start,
 // as Plaits' Voice starts an engine it switches to. (The engines' destructors do nothing: a slot is just reused.)
-void choose(uint32_t engine) {
-  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
-    Voice& v = voices[i];
-    const uint32_t previous_random = stmlib::Random::state();
-    stmlib::Random::Seed(0x21u + i * 0x9e3779b9u);
-    // Init does not clear every engine's scratch memory (notably the staggered 6-op FM buffers).
-    // A newly selected engine must not consume samples/state left by a previous engine.
-    std::memset(v.slot, 0, sizeof v.slot);
-    std::memset(voice_ram[i], 0, kVoiceRam);
-    v.engine = Build(engine, v.slot);
-    stmlib::BufferAllocator allocator(voice_ram[i], kVoiceRam);
-    v.engine->Init(&allocator);
-    ram_used = kVoiceRam - allocator.free();
-    v.engine->LoadUserData(info[engine].user_data);
-    v.engine->Reset();
-    v.fifo_read = plaits::kBlockSize;
-    v.fifo_enveloped = info[engine].own_envelope;
-    v.random_state = stmlib::Random::state();
-    stmlib::Random::Seed(previous_random);
-  }
-  current = engine;
+// Each voice its own (since 0.16: each track's engine in its voices).
+void choose(uint32_t i, uint32_t engine) {
+  Voice& v = voices[i];
+  const uint32_t previous_random = stmlib::Random::state();
+  stmlib::Random::Seed(0x21u + i * 0x9e3779b9u);
+  // Init does not clear every engine's scratch memory (notably the staggered 6-op FM buffers).
+  // A newly selected engine must not consume samples/state left by a previous engine.
+  std::memset(v.slot, 0, sizeof v.slot);
+  std::memset(voice_ram[i], 0, kVoiceRam);
+  v.engine = Build(engine, v.slot);
+  stmlib::BufferAllocator allocator(voice_ram[i], kVoiceRam);
+  v.engine->Init(&allocator);
+  v.ram_used = kVoiceRam - allocator.free();
+  v.engine->LoadUserData(info[engine].user_data);
+  v.engine->Reset();
+  v.fifo_read = plaits::kBlockSize;
+  v.fifo_enveloped = info[engine].own_envelope;
+  v.random_state = stmlib::Random::state();
+  v.id = engine;
+  stmlib::Random::Seed(previous_random);
 }
 
 }  // namespace
 
 extern "C" void grav_plaits_init(void) {
-  choose(GRAV_ENGINE_WAVESHAPING);
+  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
+    choose(i, GRAV_ENGINE_WAVESHAPING);
+  }
   initialized = true;
 }
 
-extern "C" void grav_plaits_engine(uint32_t engine) {
+extern "C" void grav_plaits_voice_engine(uint32_t voice, uint32_t engine) {
   if (!initialized) {
     grav_plaits_init();
+  }
+  if (voice >= GRAV_VOICES) {
+    return;
   }
   if (engine >= GRAV_ENGINE_COUNT) {
     engine = GRAV_ENGINE_WAVESHAPING;
   }
-  if (engine != current) {
-    choose(engine);
+  if (engine != voices[voice].id) {
+    choose(voice, engine);
   }
+}
+
+extern "C" void grav_plaits_engine(uint32_t engine) {
+  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
+    grav_plaits_voice_engine(i, engine);
+  }
+}
+
+extern "C" uint32_t grav_plaits_voice_engine_id(uint32_t voice) {
+  return voice < GRAV_VOICES ? voices[voice].id : GRAV_ENGINE_COUNT;
 }
 
 extern "C" void grav_plaits_reset_voice(uint32_t voice) {
@@ -229,7 +243,7 @@ extern "C" void grav_plaits_reset_voice(uint32_t voice) {
   Voice& v = voices[voice];
   v.engine->Reset();
   v.fifo_read = plaits::kBlockSize;
-  v.fifo_enveloped = info[current].own_envelope;
+  v.fifo_enveloped = info[v.id].own_envelope;
 }
 
 extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in, float* out, float* aux,
@@ -240,7 +254,7 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
   Voice& v = voices[voice < GRAV_VOICES ? voice : 0];
   const uint32_t previous_random = stmlib::Random::state();
   stmlib::Random::Seed(v.random_state);
-  const Info& e = info[current];
+  const Info& e = info[v.id < GRAV_ENGINE_COUNT ? v.id : 0];
 
   int first, held;                   // the trigger in the first block, and in the blocks after it
   switch (e.mode) {
@@ -302,5 +316,5 @@ extern "C" uint32_t grav_engine_step(uint32_t engine, int32_t steps) {
 }
 
 extern "C" uint32_t grav_plaits_ram_used(void) {
-  return ram_used;
+  return voices[0].ram_used;
 }

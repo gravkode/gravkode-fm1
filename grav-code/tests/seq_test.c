@@ -60,7 +60,7 @@ static void fresh(seq_t *s)
     nlog = 0;
     now = 0;
     for (uint32_t i = 0; i < SEQ_PAGE; i++)
-        s->pat.step[i].on = 1;
+        s->pat.track[0].step[i].on = 1;
 }
 
 int main(void)
@@ -96,10 +96,10 @@ int main(void)
 
     /* the length: steps past it do not play; a length of 3 loops 0, 1, 2 */
     fresh(&s);
-    s.pat.length = 3;
-    s.pat.step[1].on = 0;
-    s.pat.step[1].note[0] = 61;
-    s.pat.step[2].note[0] = 62;
+    s.pat.track[0].length = 3;
+    s.pat.track[0].step[1].on = 0;
+    s.pat.track[0].step[1].note[0] = 61;
+    s.pat.track[0].step[2].note[0] = 62;
     s.want = SEQ_WANT_PLAY;
     run(&s, 140);                        /* 6.5 steps: 0 (1 off) 2 0 (1) 2 0 */
     CHECK(count(SEQ_EV_ON) == 5, "length 3: 5 notes, got %u", count(SEQ_EV_ON));
@@ -115,11 +115,11 @@ int main(void)
 
     /* a chord, held two steps; the same note again ends the one sounding first */
     fresh(&s);
-    s.pat.step[0].n = 3;
-    s.pat.step[0].note[1] = 64;
-    s.pat.step[0].note[2] = 67;
-    s.pat.step[0].len = 2;
-    s.pat.step[1].on = 0;
+    s.pat.track[0].step[0].n = 3;
+    s.pat.track[0].step[0].note[1] = 64;
+    s.pat.track[0].step[0].note[2] = 67;
+    s.pat.track[0].step[0].len = 2;
+    s.pat.track[0].step[1].on = 0;
     s.want = SEQ_WANT_PLAY;
     run(&s, 60);                         /* 15360 samples: past step 2 (11025) */
     CHECK(find(SEQ_EV_ON, 2) == 0 && find(SEQ_EV_ON, 3) == grid(2 * step), "a chord at 0, the next note at step 2");
@@ -127,7 +127,7 @@ int main(void)
 
     /* stop: every note sounding ends, MIDI stop goes out, nothing more plays */
     fresh(&s);
-    s.pat.step[0].len = 8;
+    s.pat.track[0].step[0].len = 8;
     s.want = SEQ_WANT_PLAY;
     run(&s, 10);
     s.want = SEQ_WANT_STOP;
@@ -184,19 +184,63 @@ int main(void)
         CHECK(!s.ext && s.playing && ons > 5, "on our own tempo again: ext %u, %u notes", s.ext, ons);
     }
 
-    /* a record saved, read back */
+    /* tracks: each its own length (polymeter), each event its track; S2 (length 3) beside S1 (length 4) */
+    fresh(&s);
+    for (uint32_t i = 0; i < 4; i++)
+        s.pat.track[0].step[i].note[0] = (uint8_t)(60 + i);
+    s.pat.track[0].length = 4;
+    s.pat.track[1].length = 3;
+    for (uint32_t i = 0; i < 3; i++) {
+        s.pat.track[1].step[i].on = 1;
+        s.pat.track[1].step[i].note[0] = (uint8_t)(40 + i);
+    }
+    s.want = SEQ_WANT_PLAY;
+    run(&s, 260);                        /* 66560 samples: 12 steps */
+    {
+        uint32_t k0 = 0, k1 = 0;
+        for (uint32_t i = 0; i < nlog; i++) {
+            if (log_[i].e.type != SEQ_EV_ON)
+                continue;
+            if (log_[i].e.track == 0) {
+                CHECK(log_[i].e.note == 60 + k0 % 4, "S1 step %u: note %u", k0, log_[i].e.note);
+                k0++;
+            } else if (log_[i].e.track == 1) {
+                CHECK(log_[i].e.note == 40 + k1 % 3, "S2 step %u: note %u", k1, log_[i].e.note);
+                k1++;
+            } else
+                CHECK(0, "a note on track %u", log_[i].e.track);
+        }
+        CHECK(k0 == 13 && k1 == 13, "both tracks every step: %u %u", k0, k1);
+        CHECK(s.step[0] == 0 && s.step[1] == 0 && s.hits[0] == 13 && s.hits[1] == 13,
+              "after 13 steps: S1 at %d, S2 at %d", s.step[0], s.step[1]);
+    }
+
+    /* a record saved, read back; 0.15's (one track) read into S1 */
     {
         seq_pattern_t p;
+        static seq_pattern_v1_t v1;
         seq_defaults(&p);
         CHECK(seq_valid(&p), "the defaults are valid");
-        p.length = 0;
+        p.track[2].length = 0;
         CHECK(!seq_valid(&p), "length 0 refused");
+        v1.magic = SEQ_MAGIC_V1;
+        v1.bpm = 97;
+        v1.swing = 61;
+        v1.length = 24;
+        for (uint32_t i = 0; i < SEQ_STEPS; i++) {
+            v1.step[i] = p.track[0].step[i];
+            v1.step[i].on = i == 5;
+        }
+        CHECK(seq_from_v1(&v1, &p) && seq_valid(&p) && p.bpm == 97 && p.swing == 61 && p.track[0].length == 24 &&
+              p.track[0].step[5].on && !p.track[1].step[5].on && p.track[1].length == 16, "0.15's pattern into S1");
+        v1.magic = 0;
+        CHECK(!seq_from_v1(&v1, &p), "not a 0.15 record: refused");
     }
 
     if (fails) {
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in)\n");
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 4 tracks)\n");
     return 0;
 }

@@ -48,9 +48,11 @@ typedef struct {
 } grav_plaits_params_t;
 
 void grav_plaits_init(void);
-/* the engine every voice plays (GRAV_ENGINE_*): a change builds it anew in each voice, as Plaits starts an engine
- * it switches to afresh */
+/* the engine a voice plays (GRAV_ENGINE_*): a change builds it anew in that voice, as Plaits starts an engine it
+ * switches to afresh. Each voice its own (a track's engine in its voices); grav_plaits_engine: every voice the same */
+void grav_plaits_voice_engine(uint32_t voice, uint32_t engine);
 void grav_plaits_engine(uint32_t engine);
+uint32_t grav_plaits_voice_engine_id(uint32_t voice);   /* the engine built in it */
 /* At zero outer amplitude, discard a six-op voice's held gate/FIFO before it sleeps. Joined worker only. */
 void grav_plaits_reset_voice(uint32_t voice);
 /* size samples of voice (12 or more, so that a strike is never lost: GRAV_PLAITS_BLOCK chunks), the engine's
@@ -61,7 +63,7 @@ int grav_plaits_render(uint32_t voice, const grav_plaits_params_t *p, float *out
 
 const char *grav_engine_name(uint32_t engine);           /* on the screen: 10 characters at most */
 uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* PRESET: steps away in Plaits' order, round */
-uint32_t grav_plaits_ram_used(void);     /* bytes of its voice's RAM the engine's Init took (each voice the same) */
+uint32_t grav_plaits_ram_used(void);     /* bytes of voice 1's RAM its engine's Init took (S1's engine) */
 
 #ifdef __cplusplus
 }

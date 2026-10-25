@@ -7,28 +7,34 @@
 #define SEQ_EXT_TIMEOUT (SEQ_RATE / 2u)                /* no clock in for half a second: the tempo is ours again */
 #define SEQ_CLOCKS_PER_STEP 6u                         /* MIDI clock: 24 a quarter note */
 
+static void step_defaults(seq_step_t *t)
+{
+    memset(t, 0, sizeof *t);
+    t->n = 1;
+    t->note[0] = 60;
+    t->vel = 100;
+    t->len = 1;
+}
+
 void seq_defaults(seq_pattern_t *p)
 {
     memset(p, 0, sizeof *p);
     p->magic = SEQ_MAGIC;
     p->bpm = 120;
     p->swing = SEQ_SWING_MIN;
-    p->length = SEQ_PAGE;
-    for (uint32_t i = 0; i < SEQ_STEPS; i++) {
-        p->step[i].n = 1;
-        p->step[i].note[0] = 60;
-        p->step[i].vel = 100;
-        p->step[i].len = 1;
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++) {
+        p->track[k].length = SEQ_PAGE;
+        for (uint32_t i = 0; i < SEQ_STEPS; i++)
+            step_defaults(&p->track[k].step[i]);
     }
 }
 
-int seq_valid(const seq_pattern_t *p)
+static int steps_valid(const seq_step_t *step, uint32_t length)
 {
-    if (p->magic != SEQ_MAGIC || p->bpm < SEQ_BPM_MIN || p->bpm > SEQ_BPM_MAX || p->swing < SEQ_SWING_MIN ||
-        p->swing > SEQ_SWING_MAX || p->length < 1u || p->length > SEQ_STEPS)
+    if (length < 1u || length > SEQ_STEPS)
         return 0;
     for (uint32_t i = 0; i < SEQ_STEPS; i++) {
-        const seq_step_t *t = &p->step[i];
+        const seq_step_t *t = &step[i];
         if (t->on > 1u || t->n < 1u || t->n > SEQ_NOTES || t->vel < 1u || t->vel > 127u || t->len < 1u ||
             t->len > SEQ_STEPS)
             return 0;
@@ -39,11 +45,36 @@ int seq_valid(const seq_pattern_t *p)
     return 1;
 }
 
+int seq_valid(const seq_pattern_t *p)
+{
+    if (p->magic != SEQ_MAGIC || p->bpm < SEQ_BPM_MIN || p->bpm > SEQ_BPM_MAX || p->swing < SEQ_SWING_MIN ||
+        p->swing > SEQ_SWING_MAX)
+        return 0;
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+        if (!steps_valid(p->track[k].step, p->track[k].length))
+            return 0;
+    return 1;
+}
+
+int seq_from_v1(const seq_pattern_v1_t *v1, seq_pattern_t *p)
+{
+    if (v1->magic != SEQ_MAGIC_V1 || v1->bpm < SEQ_BPM_MIN || v1->bpm > SEQ_BPM_MAX ||
+        v1->swing < SEQ_SWING_MIN || v1->swing > SEQ_SWING_MAX || !steps_valid(v1->step, v1->length))
+        return 0;
+    seq_defaults(p);
+    p->bpm = v1->bpm;
+    p->swing = v1->swing;
+    p->track[0].length = v1->length;
+    memcpy(p->track[0].step, v1->step, sizeof p->track[0].step);
+    return 1;
+}
+
 void seq_init(seq_t *s)
 {
     memset(s, 0, sizeof *s);
     seq_defaults(&s->pat);
-    s->step = -1;
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+        s->step[k] = -1;
     s->due_q8 = SEQ_FAR;
     s->ext_step_q8 = (int32_t)(SEQ_STEP_Q8_BPM / 120u);
 }
@@ -68,7 +99,8 @@ uint32_t seq_bpm(const seq_t *s)
     return SEQ_STEP_Q8_BPM / (uint32_t)straight_q8(s);
 }
 
-static void put(seq_event_t *ev, uint32_t *ne, uint32_t max, int32_t at_q8, uint8_t type, uint8_t note, uint8_t vel)
+static void put(seq_event_t *ev, uint32_t *ne, uint32_t max, int32_t at_q8, uint8_t type, uint8_t note, uint8_t vel,
+                uint8_t track)
 {
     if (*ne >= max)
         return;
@@ -77,46 +109,59 @@ static void put(seq_event_t *ev, uint32_t *ne, uint32_t max, int32_t at_q8, uint
     ev[*ne].type = type;
     ev[*ne].note = note;
     ev[*ne].vel = vel;
+    ev[*ne].track = track;
     (*ne)++;
 }
 
 static void all_off(seq_t *s, seq_event_t *ev, uint32_t *ne, uint32_t max)
 {
     for (uint32_t i = 0; i < s->nsounding; i++)
-        put(ev, ne, max, 0, SEQ_EV_OFF, s->sounding[i].note, 0);
+        put(ev, ne, max, 0, SEQ_EV_OFF, s->sounding[i].note, 0, s->sounding[i].track);
     s->nsounding = 0;
 }
 
-/* the next step, at at_q8: its notes start (one already sounding is ended first), and end after its length */
+static void steps_reset(seq_t *s)
+{
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+        s->step[k] = -1;
+}
+
+/* the next step of every track, at at_q8 (each round its own length): its notes start (one already sounding on
+ * the track is ended first), and end after its length */
 static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_t max)
 {
-    const uint32_t length = s->pat.length ? s->pat.length : 1u;
     const uint32_t count = s->count++;
-    int32_t step = s->step + 1;
-    if (step < 0 || (uint32_t)step >= length)
-        step = 0;
-    s->step = step;
-    const seq_step_t *t = &s->pat.step[step];
-    if (!t->on)
-        return;
-    int32_t gate = 0;
-    for (uint32_t k = 0; k < t->len; k++)
-        gate += step_q8(s, count + k);
-    gate -= straight_q8(s) / 8;
-    for (uint32_t k = 0; k < t->n && k < SEQ_NOTES; k++) {
-        const uint8_t note = t->note[k];
-        for (uint32_t i = 0; i < s->nsounding; i++)
-            if (s->sounding[i].note == note) {          /* sounding still: ended, then started anew */
-                put(ev, ne, max, at_q8, SEQ_EV_OFF, note, 0);
-                s->sounding[i] = s->sounding[--s->nsounding];
-                break;
-            }
-        if (s->nsounding >= SEQ_SOUNDING)
+    for (uint32_t track = 0; track < SEQ_TRACKS; track++) {
+        const seq_track_t *tr = &s->pat.track[track];
+        const uint32_t length = tr->length ? tr->length : 1u;
+        int32_t step = s->step[track] + 1;
+        if (step < 0 || (uint32_t)step >= length)
+            step = 0;
+        s->step[track] = step;
+        const seq_step_t *t = &tr->step[step];
+        if (!t->on)
             continue;
-        put(ev, ne, max, at_q8, SEQ_EV_ON, note, t->vel);
-        s->sounding[s->nsounding].note = note;
-        s->sounding[s->nsounding].off_q8 = at_q8 + gate;
-        s->nsounding++;
+        s->hits[track]++;
+        int32_t gate = 0;
+        for (uint32_t k = 0; k < t->len; k++)
+            gate += step_q8(s, count + k);
+        gate -= straight_q8(s) / 8;
+        for (uint32_t k = 0; k < t->n && k < SEQ_NOTES; k++) {
+            const uint8_t note = t->note[k];
+            for (uint32_t i = 0; i < s->nsounding; i++)
+                if (s->sounding[i].note == note && s->sounding[i].track == track) {   /* sounding: ended, anew */
+                    put(ev, ne, max, at_q8, SEQ_EV_OFF, note, 0, (uint8_t)track);
+                    s->sounding[i] = s->sounding[--s->nsounding];
+                    break;
+                }
+            if (s->nsounding >= SEQ_SOUNDING)
+                continue;
+            put(ev, ne, max, at_q8, SEQ_EV_ON, note, t->vel, (uint8_t)track);
+            s->sounding[s->nsounding].note = note;
+            s->sounding[s->nsounding].track = (uint8_t)track;
+            s->sounding[s->nsounding].off_q8 = at_q8 + gate;
+            s->nsounding++;
+        }
     }
 }
 
@@ -124,7 +169,7 @@ static void start(seq_t *s, int ext, int cont, seq_event_t *ev, uint32_t *ne, ui
 {
     s->playing = 1;
     if (!cont) {
-        s->step = -1;
+        steps_reset(s);
         s->count = 0;
     }
     if (ext) {                           /* the first step on the next clock in */
@@ -133,7 +178,7 @@ static void start(seq_t *s, int ext, int cont, seq_event_t *ev, uint32_t *ne, ui
     } else {
         s->due_q8 = 0;
         s->clock_q8 = 0;
-        put(ev, ne, max, 0, SEQ_EV_START, 0, 0);
+        put(ev, ne, max, 0, SEQ_EV_START, 0, 0, 0);
     }
 }
 
@@ -141,9 +186,9 @@ static void stop(seq_t *s, seq_event_t *ev, uint32_t *ne, uint32_t max)
 {
     all_off(s, ev, ne, max);
     if (!s->ext)
-        put(ev, ne, max, 0, SEQ_EV_STOP, 0, 0);
+        put(ev, ne, max, 0, SEQ_EV_STOP, 0, 0, 0);
     s->playing = 0;
-    s->step = -1;
+    steps_reset(s);
     s->due_q8 = SEQ_FAR;
 }
 
@@ -181,7 +226,7 @@ void seq_midi_start(seq_t *s, int cont)
     s->ext_quiet = 0;
     s->playing = 1;
     if (!cont) {
-        s->step = -1;
+        steps_reset(s);
         s->count = 0;
     }
     s->ext_ticks = 0;
@@ -243,7 +288,7 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
         }
         for (uint32_t i = 0; i < s->nsounding;) {   /* the notes that end in this block */
             if (s->sounding[i].off_q8 < span) {
-                put(ev, &ne, max, s->sounding[i].off_q8, SEQ_EV_OFF, s->sounding[i].note, 0);
+                put(ev, &ne, max, s->sounding[i].off_q8, SEQ_EV_OFF, s->sounding[i].note, 0, s->sounding[i].track);
                 s->sounding[i] = s->sounding[--s->nsounding];
             } else {
                 s->sounding[i].off_q8 -= span;
@@ -253,7 +298,7 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
         if (!s->ext) {
             const int32_t tick = straight_q8(s) / (int32_t)SEQ_CLOCKS_PER_STEP;
             while (s->clock_q8 < span) {
-                put(ev, &ne, max, s->clock_q8, SEQ_EV_CLOCK, 0, 0);
+                put(ev, &ne, max, s->clock_q8, SEQ_EV_CLOCK, 0, 0, 0);
                 s->clock_q8 += tick;
             }
             s->clock_q8 -= span;

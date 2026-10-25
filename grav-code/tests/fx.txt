@@ -138,16 +138,16 @@ expect quality 3
 expect freeze 0
 expect seed_auto 1
 expect fx_on 1
-# a record as 0.12 saved it (before the effect): the rest kept, the effect at rest
+# a record as 0.12 saved it (before the effect): the rest kept (VELOCITY), the effect at rest
 tap GLO
 wait 30
-turn K1 -1
+turn K2 -1
 wait 30
-expect voices 3
+expect velocity_off 1
 save012
 reboot
 wait 600
-expect voices 3
+expect velocity_off 1
 expect fx6 0
 expect quality 0
 expect fx_on 0

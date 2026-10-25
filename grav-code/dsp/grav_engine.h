@@ -21,9 +21,19 @@ typedef struct {
                                           * cores' split */
 } grav_engine_t;
 
+/* a track's sound: its engine and Plaits' three knobs (the LFO's share in) */
+typedef struct {
+    uint32_t engine;                     /* GRAV_ENGINE_* */
+    float timbre, morph, harmonics;      /* 0..1 */
+} grav_sound_t;
+
 void grav_engine_init(grav_engine_t *e);
-/* n stereo frames, 24-bit: the synth's voices (their notes, velocities, strikes and envelopes) on engine
- * (GRAV_ENGINE_*), mixed, through the effect (fx: grav_beads.h), then MASTER and the limiter */
+/* n stereo frames, 24-bit: the synth's voices (their notes, velocities, strikes and envelopes), each on its track's
+ * sound, mixed, through the effect (fx: grav_beads.h), then MASTER and the limiter */
+void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_t *synth, uint32_t master_q12,
+                               const grav_sound_t sound[SYNTH_TRACKS], float pitch_offset,
+                               const grav_beads_params_t *fx);
+/* the same with one sound for every voice */
 void grav_engine_render(
     grav_engine_t *e,
     int32_t *lr,
