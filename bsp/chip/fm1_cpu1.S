@@ -22,7 +22,10 @@ fm1_cpu1_entry:
 	.balign 8
 	.globl fm1_cpu1_ustack
 fm1_cpu1_ustack:		/* after rti CPU1 runs on this one: the jobs' (FM1_CPU1_USTACK_WORDS; marked at start) */
-	.space 2816
+#ifndef FM1_CPU1_USTACK_BYTES
+#define FM1_CPU1_USTACK_BYTES 2816
+#endif
+	.space FM1_CPU1_USTACK_BYTES
 fm1_cpu1_ustack_top:
 	.space 256		/* exceptions only (no interrupts on this core) */
 	.globl fm1_cpu1_sstack_top

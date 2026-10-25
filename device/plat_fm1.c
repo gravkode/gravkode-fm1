@@ -313,5 +313,22 @@ int plat_store_save(uint32_t obj, const void *src, uint32_t len) { return flash_
 static volatile uint32_t audio_cpu_pct, audio_xruns;
 uint32_t plat_cpu_pct(void) { return audio_cpu_pct; }
 uint32_t plat_xruns(void) { return audio_xruns; }
+static volatile uint32_t audio_last_us, audio_peak_us, audio_budget_us, audio_overloads;
+uint32_t plat_cpu_index(void) { return fm1_cnum(); }
+void plat_audio_debug(plat_audio_debug_t *out)
+{
+    uint32_t f = plat_lock();
+    out->last_us = audio_last_us;
+    out->peak_us = audio_peak_us;
+    out->budget_us = audio_budget_us;
+    out->overloads = audio_overloads;
+    plat_unlock(f);
+}
+void plat_audio_debug_reset(void)
+{
+    uint32_t f = plat_lock();
+    audio_peak_us = audio_overloads = 0;
+    plat_unlock(f);
+}
 _Static_assert(PLAT_TICKS_PER_US == FM1_TICKS_PER_US, "plat_ticks24 is TIMER4's count");
 uint32_t plat_ticks24(void) { return fm1_ticks(); }

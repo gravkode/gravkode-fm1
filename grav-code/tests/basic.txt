@@ -157,11 +157,12 @@ expect prs >40
 shot touch.png
 key 7 up
 wait 50
-# no radio: REC is a button like the others, Bluetooth stays off, and the keys go out over USB alone
+# no radio: REC opens DEBUG, Bluetooth stays off, and the keys go out over USB alone
 listen
 tap REC
 wait 30
-said BUTTON REC
+said PAGE DEBUG
+expect page 7
 expect ble 0
 out
 key 7 down

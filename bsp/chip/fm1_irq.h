@@ -19,6 +19,7 @@
  */
 #pragma once
 #include <stdint.h>
+#include "fm1_core.h"
 #define FM1_IRQ_TARGET 1
 
 #define FM1_VEC ((volatile uint32_t *)0x01C7FE00u)
@@ -45,7 +46,6 @@ static inline uint32_t fm1_icfg(void) { uint32_t v; __asm__ volatile("%0 = icfg"
 static inline void fm1_icfg_set(uint32_t v) { __asm__ volatile("icfg = %0" ::"r"(v) : "memory"); }
 static inline void fm1_irq_off(void) { __asm__ volatile("cli" ::: "memory"); }
 static inline void fm1_irq_on(void) { __asm__ volatile("csync\n\tsti" ::: "memory"); }
-static inline uint32_t fm1_cnum(void) { uint32_t v; __asm__ volatile("%0 = cnum" : "=r"(v)); return v; }   /* 0 / 1 */
 
 #define FM1_CRASH_MAGIC 0x43525348u          /* "CRSH" */
 typedef struct {

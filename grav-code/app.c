@@ -12,6 +12,8 @@
 #include "synth/synth.h"
 #include "synth/event_queue.h"
 
+_Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
+
 /* the effect's knobs (FX: GRAIN, SHAPE, MIX; QUALITY apart), 0..100 */
 enum { FX_DENSITY, FX_TIME, FX_SIZE, FX_SHAPE, FX_PITCH, FX_FEEDBACK, FX_DRY_WET, FX_REVERB, FX_N };
 static const uint8_t FX_DEFAULT[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};   /* (DRY/WET and REVERB 0: off) */
@@ -54,13 +56,14 @@ enum {
     PAGE_FX_GRAIN,                       /* the effect (FX, again for the next): DENSITY, TIME, SIZE */
     PAGE_FX_SHAPE,                       /* SHAPE, PITCH, FEEDBACK */
     PAGE_FX_MIX,                         /* DRY/WET, REVERB, QUALITY */
+    PAGE_DEBUG,                          /* REC: temporary dual-core diagnostics */
     PAGE_N
 };
-#define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN)
+#define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN && (p) <= PAGE_FX_MIX)
 
 static uint8_t active_page = PAGE_OSC;
 static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back to it */
-static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX"};
+static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG"};
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -244,6 +247,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 void app_overload(void)
 {
     synth_shed(&synth);
+    grav_debug.shed = synth.shed_count;
 }
 
 void app_ota_mute(int active)
@@ -362,6 +366,9 @@ void app_init(void)
         fx_params[i] = set.fx[i];
     fx_quality = set.fx_quality;
     synth_set_voices(&synth, set.voices);   /* (before the audio starts: no queue needed) */
+#if FM1B_CPU2
+    plat_cpu2_set(1);                     /* boot only, before audio/timers start */
+#endif
 }
 
 /* --------------------------------------------------------------------- UI --- */
@@ -378,6 +385,7 @@ static struct {
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint32_t cpu, xruns, cpu_at;         /* the render's load (% of its time) and late renders, as last shown */
     uint8_t redraw;
+    uint32_t debug_at, debug_xruns_base;
 } ui;
 
 static void text_cat(char *d, const char *s)
@@ -612,6 +620,9 @@ static void input(void)
                           k == B_GLO  ? PAGE_GLO : fx_page;
             app_say("PAGE", PAGE_NAME[active_page]);
             ui.redraw = 1;
+        } else if (k == B_REC) {
+            active_page = active_page == PAGE_DEBUG ? PAGE_OSC : PAGE_DEBUG;
+            app_say("PAGE", PAGE_NAME[active_page]);
         } else if (k == B_EDIT) {            /* FREEZE: the effect's recording held, or let go */
             fx_freeze = !fx_freeze;
             app_say("FREEZE", fx_freeze ? "ON" : "OFF");
@@ -649,7 +660,17 @@ static void input(void)
         ui.turns[k] += e;
         ui.turned_at[k] = plat_ms();
         ui.redraw = 1;
-        if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_GLO) {
+        if ((k == EN_K1 || k == EN_K2 || k == EN_K3 || k == EN_K4) && active_page == PAGE_DEBUG) {
+            if (k == EN_K1) {
+                grav_dual_core = e > 0;
+                app_say("CORES", grav_dual_core ? "2" : "1");
+            } else if (k == EN_K2) {
+                grav_debug_reset = 1;
+                plat_audio_debug_reset();
+                ui.debug_xruns_base = plat_xruns();
+                app_say("DEBUG", "RESET");
+            }
+        } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_GLO) {
             glo_turn((uint32_t)(k - EN_K1), e);
         } else if (k == EN_K3 && active_page == PAGE_FX_MIX) {
             quality_turn(e);
@@ -760,6 +781,57 @@ static void draw_glo(void)
     cv_text(140, 116, &FONT_XS, "24 ENGINES", C_GRAY);
 }
 
+/* DEBUG times are microseconds; AVG/PEAK are the whole render's deadline usage.
+ * CPU0 cannot run the UI until the audio ISR has joined CPU1, so this short lock
+ * obtains a completed block without displaying half-updated worker results. */
+static void debug_number(int32_t x, int32_t y, const char *label, uint32_t value, int percent)
+{
+    char t[16];
+    int_text((int32_t)value, t);
+    if (percent) text_cat(t, "%");
+    cv_text(x, y, &FONT_T, label, C_GRAY);
+    cv_text(x + 46, y, &FONT_T, t, C_WHITE);
+}
+
+static void draw_debug(void)
+{
+    grav_debug_t d;
+    plat_audio_debug_t audio;
+    uint32_t f = plat_lock();
+    d = grav_debug;
+    plat_unlock(f);
+    plat_audio_debug(&audio);
+    const uint32_t budget = audio.budget_us ? audio.budget_us : APP_BLOCK * 1000000u / 44100u;
+    int on = 0, error = 0;
+    uint32_t bad = 0, stack = 0;
+#if FM1B_CPU2
+    on = plat_cpu2_on();
+    error = plat_cpu2_gave_up();
+    bad = plat_cpu2_bad();
+    stack = plat_cpu2_stack();
+#endif
+    debug_number(8, 24, "CORES", grav_dual_core && on ? 2 : 1, 0);
+    cv_text(126, 24, &FONT_T, "CPU1", C_GRAY);
+    cv_text(172, 24, &FONT_T, on ? (grav_dual_core ? "ON" : "IDLE") : "OFF", on ? C_HI : RGB(240,55,45));
+    debug_number(8, 36, "AVG", ui.cpu, 1);
+    debug_number(126, 36, "PEAK", audio.peak_us * 100u / budget, 1);
+    debug_number(8, 48, "SYN0", d.voice_us[0], 0);
+    debug_number(126, 48, "SYN1", d.voice_us[1], 0);
+    debug_number(8, 60, "FX", d.fx_us, 0);
+    debug_number(126, 60, "WAIT", d.wait_us, 0);
+    debug_number(8, 72, "XRUN", plat_xruns() - ui.debug_xruns_base, 0);
+    debug_number(126, 72, "SHED", d.shed, 0);
+    debug_number(8, 84, "STEAL", d.steals, 0);
+    debug_number(126, 84, "OVER", audio.overloads, 0);
+    debug_number(8, 96, "VOICES", d.active, 0);
+    debug_number(126, 96, "JOBS", d.jobs, 0);
+    debug_number(8, 108, "MASK0", d.masks[0], 0);
+    debug_number(126, 108, "MASK1", d.masks[1], 0);
+    debug_number(8, 120, error ? "ERROR" : "BAD", error ? (uint32_t)error : bad, 0);
+    debug_number(126, 120, "STACK", stack, 0);
+    cv_text(8, 132, &FONT_T, "K1 CORES   K2 RESET   us", C_HI);
+}
+
 static void draw(void)
 {
     char t[24];
@@ -819,6 +891,8 @@ static void draw(void)
 
     if (active_page == PAGE_GLO)
         draw_glo();
+    else if (active_page == PAGE_DEBUG)
+        draw_debug();
     else
         draw_knobs();
 
@@ -836,7 +910,9 @@ static void draw(void)
     cv_text(30, 36, &FONT_XS, t, C_HI);
     cv_text(64, 36, &FONT_XS, "PRESET", C_GRAY);
     cv_text(112, 36, &FONT_XS, grav_engine_name(set.engine_id), C_HI);
-    if (midi_count) {                        /* the last MIDI message in, and where from */
+    if (active_page == PAGE_DEBUG) {
+        debug_number(4, 48, "QUEUE", synth_queue_overflows, 0);
+    } else if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
         static const char HEX[] = "0123456789ABCDEF";
         uint32_t m = midi_last, b;
@@ -897,6 +973,10 @@ void app_frame(void)
             ui.redraw = 1;
         }
     }
+    if (active_page == PAGE_DEBUG && now - ui.debug_at >= 250u) {
+        ui.debug_at = now;
+        ui.redraw = 1;
+    }
     if (midi_count != last_midi) {
         last_midi = midi_count;
         ui.redraw = 1;
@@ -913,10 +993,50 @@ void app_frame(void)
     }
 }
 
+/* F0 7D 47 44 F7 ("GD"): version 1, then 22 unsigned words, five 7-bit bytes each.
+ * Read-only companion to DEBUG, so automated hardware checks need no framebuffer allocation. */
+int app_sysex(const uint8_t *p, uint32_t n)
+{
+    if (n != 3 || p[0] != 0x7d || p[1] != 0x47 || p[2] != 0x44)
+        return 0;
+    grav_debug_t d;
+    plat_audio_debug_t a;
+    uint32_t f = plat_lock();
+    d = grav_debug;
+    plat_unlock(f);
+    plat_audio_debug(&a);
+    uint32_t on = 0, error = 0, bad = 0, stack = 0;
+#if FM1B_CPU2
+    on = (uint32_t)plat_cpu2_on();
+    error = (uint32_t)plat_cpu2_gave_up();
+    bad = plat_cpu2_bad();
+    stack = plat_cpu2_stack();
+#endif
+    const uint32_t values[] = {
+        grav_dual_core, on, error, d.voice_us[0], d.voice_us[1], d.fx_us, d.wait_us,
+        plat_cpu_pct(), a.last_us, a.peak_us, a.budget_us, a.overloads,
+        plat_xruns() - ui.debug_xruns_base, d.active, d.masks[0], d.masks[1],
+        d.jobs, d.steals, d.shed, synth_queue_overflows, bad, stack
+    };
+    uint8_t frame[6 + sizeof(values) / sizeof(values[0]) * 5];
+    uint32_t k = 0;
+    frame[k++] = 0xf0; frame[k++] = 0x7d; frame[k++] = 0x47; frame[k++] = 0x44; frame[k++] = 1;
+    for (uint32_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
+        for (uint32_t shift = 0; shift < 35; shift += 7)
+            frame[k++] = (uint8_t)((values[i] >> shift) & 0x7f);
+    frame[k++] = 0xf7;
+    plat_sysex_send(frame, k);
+    return 1;
+}
+
 #ifdef PLAT_HOST
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
 {
     (void)a; (void)b; (void)c; (void)d;
+    if (!strcmp(cmd, "debug_overload")) {
+        app_overload();
+        return 1;
+    }
     if (strcmp(cmd, "save012"))
         return 0;
     settings_capture();
@@ -928,6 +1048,18 @@ int app_expect(const char *what, int *got)
 {
     if (!strcmp(what, "octave"))
         *got = set.octave;
+    else if (!strcmp(what, "dual_core"))
+        *got = (int)grav_dual_core;
+    else if (!strcmp(what, "worker_jobs"))
+        *got = (int)grav_debug.jobs;
+    else if (!strcmp(what, "worker_mask"))
+        *got = (int)grav_debug.masks[1];
+    else if (!strcmp(what, "render_voices"))
+        *got = (int)grav_debug.active;
+    else if (!strcmp(what, "shed"))
+        *got = (int)grav_debug.shed;
+    else if (!strcmp(what, "steals"))
+        *got = (int)grav_debug.steals;
     else if (!strcmp(what, "wave"))
         *got = set.engine_id;
     else if (!strcmp(what, "engine_ram"))    /* bytes of its voice's RAM the engine's Init took */

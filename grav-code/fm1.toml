@@ -4,6 +4,10 @@ id_prefix = "FM-1_73"          # package identity (each firmware its own; the te
 usb_manufacturer = "GRAV CODE"
 usb_product = "GRAV CODE FM-1"
 include = ["vendor"]
+cpu2 = true
+# DSP jobs change engine state: a failed job must restart, never be replayed partly twice.
+cpu2_fallback = false
+cpu2_stack = 8192              # nested Plaits engine calls; DEBUG shows the measured high water mark
 
 o2 = [
     "dsp/grav_engine.c",

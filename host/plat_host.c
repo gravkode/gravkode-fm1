@@ -555,6 +555,10 @@ int plat_store_save(uint32_t obj, const void *src, uint32_t len)
 static uint32_t cpu_pct;
 uint32_t plat_cpu_pct(void) { return cpu_pct; }
 uint32_t plat_xruns(void) { return 0; }
+static plat_audio_debug_t audio_debug;
+uint32_t plat_cpu_index(void) { return 0; }   /* simulator jobs run synchronously */
+void plat_audio_debug(plat_audio_debug_t *out) { *out = audio_debug; }
+void plat_audio_debug_reset(void) { audio_debug.peak_us = audio_debug.overloads = 0; }
 uint32_t plat_ticks24(void)                     /* the host's monotonic clock, at the device's rate */
 {
     struct timespec t;
@@ -964,6 +968,12 @@ static void run_ms(uint32_t ms)
             render_ns_total += dt;
             render_budget_ns_total += APP_BLOCK * 1e9 / 44100.0;
             cpu_pct = (uint32_t)(100.0 * dt / (APP_BLOCK * 1e9 / 44100.0));
+            audio_debug.last_us = (uint32_t)(dt / 1000.0);
+            audio_debug.budget_us = APP_BLOCK * 1000000u / 44100u;
+            if (audio_debug.last_us > audio_debug.peak_us)
+                audio_debug.peak_us = audio_debug.last_us;
+            if (audio_debug.last_us > audio_debug.budget_us * 9u / 10u)
+                audio_debug.overloads++;
             for (k = 0; k < APP_BLOCK; k++) {
                 float l = (float)blk[2 * k] / 8388608.0f, r = (float)blk[2 * k + 1] / 8388608.0f;
                 int16_t s[2];

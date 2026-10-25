@@ -21,6 +21,10 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Build, test, install
 
+This branch enables a second-core audio worker and a temporary DEBUG page (REC).
+K1 switches one/two-core processing; K2 clears peaks and counters. See
+[the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
+
 From the repository's root:
 
     export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"

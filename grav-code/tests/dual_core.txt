@@ -1,0 +1,73 @@
+# REC opens DEBUG; a whole block is handed over only with >= 2 active voices.
+wait 600
+expect dual_core 1
+expect worker_jobs 0
+tap REC
+wait 30
+expect page 7
+midi 90 3C 64
+midi 90 40 64
+midi 90 43 64
+midi 90 47 64
+wait 100
+expect render_voices 4
+expect worker_mask 10
+expect worker_jobs >0
+# A fifth note reuses an audible voice; this is separate from an overload cut.
+midi 90 48 64
+wait 30
+expect steals 1
+expect shed 0
+debug_overload
+wait 30
+expect shed 1
+# Toggle scheduling while notes sound. The worker stays booted, idle, for later A/B.
+turn K1 -1
+wait 30
+expect dual_core 0
+expect worker_mask 0
+turn K1 1
+wait 30
+expect dual_core 1
+expect worker_mask >0
+turn K2 1
+wait 30
+expect steals 0
+expect shed 0
+shot debug.png
+tap HOME
+wait 30
+# Turn on reverb, keep it running through DEBUG and one/two-core switches.
+tap FX
+tap FX
+tap FX
+wait 30
+expect page 6
+turn K2 60
+wait 30
+expect fx_on 1
+tap REC
+wait 30
+turn K1 -1
+wait 200
+expect fx_on 1
+expect worker_mask 0
+turn K1 1
+wait 200
+expect fx_on 1
+expect worker_mask >0
+shot debug-fx.png
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
+midi 80 47 00
+midi 80 48 00
+wait 1600
+expect render_voices 0
+expect worker_mask 0
+# DEBUG knobs must not change saved settings or access an FX parameter outside its page.
+turn K3 1
+turn K4 1
+tap REC
+wait 30
+expect page 0

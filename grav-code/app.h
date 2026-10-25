@@ -12,6 +12,8 @@
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_OVERLOAD                     /* app_overload: the render ran long, a voice falls silent */
 void app_overload(void);
+#define APP_SYSEX                        /* read-only dual-core debug snapshot over USB-MIDI */
+int app_sysex(const uint8_t *p, uint32_t n);
 
 /* the store: the app's objects (the panel calibration is the platform's), and their flash offsets. No radio, so no
  * OBJ_BLE (it was object 2: a radio added again would take it back) */

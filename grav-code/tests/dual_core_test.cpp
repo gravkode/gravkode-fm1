@@ -1,0 +1,107 @@
+// Real concurrent DSP test. Build with tests/run_dual_core_test.py after --host.
+#include <atomic>
+#include <cassert>
+#include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <thread>
+#include <vector>
+#include "stmlib/utils/random.h"
+extern "C" {
+#include "dsp/grav_engine.h"
+#include "dsp/grav_plaits.h"
+#include "plat.h"
+}
+
+static thread_local uint32_t core_index;
+static std::thread worker;
+static bool enabled = true, accept_job = true;
+static std::atomic<bool> running(false);
+static std::atomic<unsigned> overlaps(0);
+static unsigned dispatched;
+
+extern "C" uint32_t plat_cpu_index(void) { return core_index; }
+extern "C" uint32_t plat_ticks24(void) {
+    if (!core_index && running.load()) ++overlaps;
+    return uint32_t(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count() / 1000 * 24);
+}
+extern "C" int plat_cpu2_on(void) { return enabled; }
+extern "C" int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg) {
+    if (!enabled || !accept_job) return 0;
+    assert(!worker.joinable());
+    ++dispatched;
+    worker = std::thread([=] {
+        core_index = 1;
+        running = true;
+        fn(arg);
+        running = false;
+    });
+    return 1;
+}
+extern "C" int plat_cpu2_wait(void) { worker.join(); return 0; }
+
+static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
+                                 bool dual, bool reject, bool offline, bool toggle) {
+    stmlib::Random::Seed(0x21);
+    synth_t synth;
+    grav_engine_t dsp;
+    synth_init(&synth);
+    synth_set_voices(&synth, voices);
+    synth_envelopes(&synth, 0.005f, 0.02f, 0.7f, 0.025f, 44100.0f);
+    grav_engine_init(&dsp);
+    grav_dual_core = dual;
+    enabled = !offline;
+    accept_job = !reject;
+    grav_beads_params_t fx = {};
+    fx.density = 0.8f; fx.time = 0.4f; fx.size = 0.35f; fx.shape = 0.6f; fx.pitch = 0.5f;
+    fx.feedback = 0.2f; fx.dry_wet = fx_on ? 0.35f : 0.0f;
+    fx.reverb = fx_on ? 0.6f : 0.0f;
+    fx.quality = engine % GRAV_FX_QUALITIES;
+    fx.seed_auto = 1;
+    std::vector<int32_t> result;
+    for (unsigned b = 0; b < 40; ++b) {
+        // Changes and steals occur while releases and reverb are still sounding.
+        if (!(b % 5)) {
+            if (b) synth_note_off(&synth, 48 + (b / 5 - 1) % 12);
+            synth_note_on(&synth, 48 + (b / 5) % 12, 100);
+        }
+        if (b == 1)
+            for (unsigned v = 1; v < voices; ++v) synth_note_on(&synth, 60 + 3 * v, 80 + v);
+        if (b == 25) synth_panic(&synth);
+        if (toggle) grav_dual_core = b % 3 != 0;
+        fx.freeze = fx_on && b >= 20 && b < 24;
+        // 256 is not a multiple of Plaits' 12-sample FIFO; also exercise partial blocks.
+        const unsigned n = b % 7 == 0 ? 37 : 256;
+        int32_t output[512];
+        const unsigned current_engine = b >= 16 && b < 33 ? (engine + 1) % GRAV_ENGINE_COUNT : engine;
+        const float timbre = float(b % 3) * 0.5f;
+        grav_engine_render(&dsp, output, n, &synth, current_engine, 3200, timbre, 0.5f, 0.75f, 0.0f, &fx);
+        assert(!worker.joinable());
+        assert((grav_debug.masks[0] & grav_debug.masks[1]) == 0);
+        result.insert(result.end(), output, output + 2 * n);
+    }
+    return result;
+}
+
+int main() {
+    unsigned comparisons = 0;
+    for (unsigned e = 0; e < GRAV_ENGINE_COUNT; ++e) {
+        for (unsigned voices = 1; voices <= 4; ++voices) {
+            for (bool fx : {false, true}) {
+                const auto reference = render(e, voices, fx, false, false, false, false);
+                for (unsigned mode = 0; mode < 4; ++mode) {
+                    const auto actual = render(e, voices, fx, true, mode == 1, mode == 2, mode == 3);
+                    if (actual != reference) {
+                        std::fprintf(stderr, "Mismatch engine=%u voices=%u fx=%d mode=%u\n", e, voices, fx, mode);
+                        return 1;
+                    }
+                    ++comparisons;
+                }
+            }
+        }
+    }
+    assert(dispatched > 0 && overlaps > 0);
+    std::printf("PASS: %u bit-exact comparisons across 24 engines, 1..4 voices, FX off/on; "
+                "%u real worker jobs, %u overlap observations\n", comparisons, dispatched, overlaps.load());
+}

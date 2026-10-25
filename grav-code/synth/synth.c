@@ -6,6 +6,7 @@ void synth_init(synth_t *s)
     s->voices = 1;
     s->held_n = 0;
     s->clock = 0;
+    s->steals = s->shed_count = 0;
     for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++) {
         synth_voice_t *v = &s->voice[i];
         v->note = -1;
@@ -47,6 +48,8 @@ static void held_push(synth_t *s, int32_t note, uint32_t velocity)
 
 static void voice_start(synth_t *s, synth_voice_t *v, int32_t note, uint32_t velocity)
 {
+    if (v->note >= 0 && v->note != note && !v->shed && (v->gate || v->env.stage != ENV_IDLE))
+        s->steals++;
     v->note = note;
     v->velocity = (float)velocity / 127.0f;
     v->gate = 1;
@@ -159,6 +162,7 @@ void synth_shed(synth_t *s)
     if (!oldest)
         return;
     oldest->shed = 1;
+    s->shed_count++;
     oldest->gate = 0;
     envelope_init(&oldest->env);             /* silent at once */
 }

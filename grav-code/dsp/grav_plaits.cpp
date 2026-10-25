@@ -1,5 +1,6 @@
 /* Mutable Instruments Plaits' engines for GRAV CODE: built, chosen and rendered here for the C side (grav_plaits.h) */
 #include <new>
+#include <cstring>
 
 #include "grav_plaits.h"
 
@@ -28,6 +29,7 @@
 #include "plaits/dsp/engine2/wave_terrain_engine.h"
 #include "plaits/resources.h"
 #include "stmlib/utils/buffer_allocator.h"
+#include "stmlib/utils/random.h"
 
 static_assert(GRAV_PLAITS_BLOCK >= plaits::kBlockSize, "grav_plaits.h: a chunk renders a block at least");
 
@@ -136,6 +138,7 @@ struct Voice {
   float fifo_aux[plaits::kBlockSize];
   uint32_t fifo_read;                // kBlockSize: all read, the next sample wants a new block
   bool fifo_enveloped;
+  uint32_t random_state;             // voice-local stream: independent of scheduling and of Beads
 };
 
 // In the FM-1's pool (zeroed at boot; all plain data, nothing to construct): 4 x 24 KB.
@@ -181,6 +184,12 @@ plaits::Engine* Build(uint32_t engine, void* slot) {
 void choose(uint32_t engine) {
   for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
     Voice& v = voices[i];
+    const uint32_t previous_random = stmlib::Random::state();
+    stmlib::Random::Seed(0x21u + i * 0x9e3779b9u);
+    // Init does not clear every engine's scratch memory (notably the staggered 6-op FM buffers).
+    // A newly selected engine must not consume samples/state left by a previous engine.
+    std::memset(v.slot, 0, sizeof v.slot);
+    std::memset(voice_ram[i], 0, kVoiceRam);
     v.engine = Build(engine, v.slot);
     stmlib::BufferAllocator allocator(voice_ram[i], kVoiceRam);
     v.engine->Init(&allocator);
@@ -189,6 +198,8 @@ void choose(uint32_t engine) {
     v.engine->Reset();
     v.fifo_read = plaits::kBlockSize;
     v.fifo_enveloped = info[engine].own_envelope;
+    v.random_state = stmlib::Random::state();
+    stmlib::Random::Seed(previous_random);
   }
   current = engine;
 }
@@ -218,6 +229,8 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
     grav_plaits_init();
   }
   Voice& v = voices[voice < GRAV_VOICES ? voice : 0];
+  const uint32_t previous_random = stmlib::Random::state();
+  stmlib::Random::Seed(v.random_state);
   const Info& e = info[current];
 
   int first, held;                   // the trigger in the first block, and in the blocks after it
@@ -261,6 +274,8 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
     aux[i] = v.fifo_aux[v.fifo_read];
     ++v.fifo_read;
   }
+  v.random_state = stmlib::Random::state();
+  stmlib::Random::Seed(previous_random);
   return v.fifo_enveloped ? 1 : 0;
 }
 

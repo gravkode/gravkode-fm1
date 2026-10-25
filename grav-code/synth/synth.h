@@ -29,6 +29,7 @@ typedef struct {
     uint8_t held_vel[SYNTH_HELD_MAX];    /* and the velocity each came with */
     uint32_t held_n;
     uint32_t clock;                      /* notes begun so far: the voices' ages */
+    uint32_t steals, shed_count;         /* diagnostic: reassigned ringing voices and overload cuts */
     lfo_t mod_lfo;
 } synth_t;
 

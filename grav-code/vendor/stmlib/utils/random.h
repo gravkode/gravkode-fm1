@@ -30,20 +30,27 @@
 #define STMLIB_UTILS_RANDOM_H_
 
 #include "stmlib/stmlib.h"
+// GRAV CODE: Plaits and Beads can run on different FM-1 cores.
+#ifdef PLAT_HOST
+extern "C" uint32_t plat_cpu_index(void);
+#else
+#include "fm1_core.h"  // inline core register read: no function call for each random sample
+#endif
 
 namespace stmlib {
 
 class Random {
  public:
-  static inline uint32_t state() { return rng_state_; }
+  static inline uint32_t state() { return State(); }
 
   static inline void Seed(uint32_t seed) {
-    rng_state_ = seed;
+    State() = seed;
   }
 
   static inline uint32_t GetWord() {
-    rng_state_ = rng_state_ * 1664525L + 1013904223L;
-    return state();
+    uint32_t& s = State();
+    s = s * 1664525L + 1013904223L;
+    return s;
   }
   
   static inline int16_t GetSample() {
@@ -55,7 +62,14 @@ class Random {
   }
 
  private:
-  static uint32_t rng_state_;
+  static inline uint32_t& State() {
+#ifdef PLAT_HOST
+    return rng_state_[plat_cpu_index() & 1u];
+#else
+    return rng_state_[fm1_cnum() & 1u];
+#endif
+  }
+  static uint32_t rng_state_[2];
 
   DISALLOW_COPY_AND_ASSIGN(Random);
 };

@@ -203,6 +203,12 @@ int plat_store_save(uint32_t obj, const void *src, uint32_t len);   /* 0 = ok */
 /* audio load in % of the render budget, and xruns since boot (device: from the ISR) */
 uint32_t plat_cpu_pct(void);
 uint32_t plat_xruns(void);
+/* Debug measurements of the entire audio interrupt, including USB and nested timer work.
+ * Reset only the peak and overload counter; xruns remain the lifetime counter above. */
+typedef struct { uint32_t last_us, peak_us, budget_us, overloads; } plat_audio_debug_t;
+void plat_audio_debug(plat_audio_debug_t *out);
+void plat_audio_debug_reset(void);
+uint32_t plat_cpu_index(void);         /* executing core: CPU0 = 0, CPU1 = 1 */
 
 /* a free-running count of PLAT_TICKS_PER_US ticks a microsecond, for timing spans shorter than plat_ms can: a part of
  * the render, say. Device: TIMER4, from the 24 MHz crystal (one register read); host: its monotonic clock, at the same
@@ -231,7 +237,7 @@ int plat_cpu2_gave_up(void);           /* why it is off: 0 no, 1 it misread a jo
                                         * faulted, 5 it did not answer at its start */
 uint32_t plat_cpu2_bad(void);          /* the jobs it misread */
 int plat_cpu2_barred(void);            /* 1: one core until power-off (given up, or the first core crashed beside it) */
-uint32_t plat_cpu2_stack(void);        /* how deep its stack (2816 B) has gone, in bytes */
+uint32_t plat_cpu2_stack(void);        /* stack high water mark, bytes (cpu2_stack; default 2816 B) */
 
 /* the app's optional hooks (app.h defines the macro when it has the function):
  *   APP_TICK        void app_tick(void)           1 kHz, in the timer interrupt (a clock, a sequencer)

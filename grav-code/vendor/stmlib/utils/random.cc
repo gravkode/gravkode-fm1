@@ -31,6 +31,6 @@
 namespace stmlib {
 
 /* static */
-uint32_t Random::rng_state_ = 0x21;
+uint32_t Random::rng_state_[2] = { 0x21, 0x21 };
 
 }  // namespace stmlib

@@ -79,6 +79,12 @@ static void render_block(int32_t *o)                /* ALNK0: one half, measured
         }
     }
     us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
+    audio_last_us = us;
+    audio_budget_us = budget;
+    if (us > audio_peak_us)
+        audio_peak_us = us;
+    if (us > budget * 9u / 10u)
+        audio_overloads++;
 #ifdef APP_OVERLOAD
     if (us > budget * 9u / 10u)
         app_overload();                             /* over 90 % of its time: the app sheds what it can */
