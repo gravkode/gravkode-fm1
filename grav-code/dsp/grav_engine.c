@@ -23,6 +23,7 @@
 grav_debug_t grav_debug;
 volatile uint32_t grav_dual_core = 1;
 volatile uint32_t grav_debug_reset;
+volatile float grav_track_peak[SYNTH_TRACKS];
 
 /* The render, on one core or two (CPU0: the audio interrupt; CPU1: the worker, one job at a time).
  *   The effect off: CPU1 renders its share of the voices for the whole block in one job while CPU0 renders the
@@ -44,6 +45,8 @@ static struct {
     uint32_t fade[SYNTH_VOICES_MAX];     /* a voice fading out (shed): its fade's samples left at the block's start */
     float out[SYNTH_VOICES_MAX][GRAV_RENDER_FRAMES];
     float mix[GRAV_RENDER_FRAMES], fx_l[GRAV_RENDER_FRAMES], fx_r[GRAV_RENDER_FRAMES];
+    float send[SYNTH_VOICES_MAX];        /* (0.26) each voice's track's share through the effect */
+    uint32_t split;                      /* some voice's share below 1: the rest of its sound goes past the effect */
     uint32_t ticks[2], fx_ticks, voice_ticks[SYNTH_VOICES_MAX];
 } work __attribute__((aligned(32)));
 
@@ -98,13 +101,27 @@ static void effect_chunk(uint32_t c)
     const uint32_t base = c * GRAV_PLAITS_BLOCK;
     uint32_t count = work.n - base;
     if (count > GRAV_PLAITS_BLOCK) count = GRAV_PLAITS_BLOCK;
+    float past[GRAV_PLAITS_BLOCK];       /* (0.26) the voices' sound not sent through the effect: added after it */
     for (uint32_t j = 0; j < count; ++j) {
-        float sample = 0.0f;
+        float sample = 0.0f, dry = 0.0f;
         for (uint32_t v = 0; v < SYNTH_VOICES_MAX; ++v)
-            if (work.live & (1u << v)) sample += work.out[v][base + j];
+            if (work.live & (1u << v)) {
+                const float x = work.out[v][base + j];
+                if (work.split) {
+                    sample += x * work.send[v];
+                    dry += x * (1.0f - work.send[v]);
+                } else
+                    sample += x;         /* (every track sent whole: the sum as before, sample for sample) */
+            }
         work.mix[base + j] = sample;
+        past[j] = dry;
     }
     grav_beads_process(work.fx, &work.mix[base], &work.fx_l[base], &work.fx_r[base], count);
+    if (work.split)
+        for (uint32_t j = 0; j < count; ++j) {
+            work.fx_l[base + j] += past[j];
+            work.fx_r[base + j] += past[j];
+        }
     work.fx_ticks += plat_ticks24() - start;
 }
 
@@ -204,6 +221,7 @@ void grav_engine_render(
         sound[t].harmonics = harmonics;
         sound[t].pitch = 0.0f;
         sound[t].controls = 0;
+        sound[t].send = 1.0f;                /* (every voice through the effect) */
         grav_drum_shape(engine, harmonics, sound[t].shape);   /* (a drum's, as Plaits folds them on HARMONICS) */
     }
     grav_engine_render_tracks(e, lr, n, synth, master_q12, sound, pitch_offset, fx);
@@ -277,6 +295,7 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         work.p[v].shape[2] = snd->shape[2];
         work.p[v].accent = voice->velocity;
         work.p[v].controls = snd->controls;
+        work.send[v] = track < SYNTH_TRACKS ? snd->send : 1.0f;
         if (snd->controls && track < SYNTH_S_TRACKS)
             work.p[v].note += ((int32_t)snd->controls->tune - 50) * 0.5f;
         /* Let the outer ENV own the six-op note's release. Releasing the DX gate here would
@@ -295,6 +314,10 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         }
     }
     work.live = work.masks[0] | work.masks[1];
+    work.split = 0;
+    for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++)
+        if ((work.live & (1u << v)) && work.send[v] < 1.0f)
+            work.split = 1;
 
     const uint32_t chunks = GRAV_CHUNKS(n);
     int failed = 0;
@@ -335,6 +358,17 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
     grav_debug.active = active;
     grav_debug.steals = synth->steals;
     grav_debug.shed = synth->shed_count;
+
+    {                                    /* (0.26) each track's loudest sample: the mixer's meters */
+        float peak[SYNTH_TRACKS] = {0};
+        for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++) {
+            const uint32_t track = synth->voice_track[v];
+            if ((work.live & (1u << v)) && track < SYNTH_TRACKS && work.peak[v] > peak[track])
+                peak[track] = work.peak[v];
+        }
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+            grav_track_peak[t] = peak[t];
+    }
 
     /* MASTER and the limiter on each side */
     for (uint32_t i = 0; i < n; i++) {

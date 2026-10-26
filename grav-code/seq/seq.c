@@ -266,7 +266,8 @@ static void flush_pending(seq_t *s, int32_t limit_q8, seq_event_t *ev, uint32_t 
 {
     for (uint32_t track = 0; track < SEQ_TRACKS; track++)
         if (s->pend_q8[track] < limit_q8) {
-            play_step(s, track, s->pend_step[track], s->pend_q8[track], s->pend_gate[track], ev, ne, max);
+            if (!(s->mute & (1u << track)))
+                play_step(s, track, s->pend_step[track], s->pend_q8[track], s->pend_gate[track], ev, ne, max);
             s->pend_q8[track] = SEQ_FAR;
         }
 }
@@ -317,7 +318,7 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
             if (here)
                 continue;
         }
-        if (!t->on)
+        if (!t->on || (s->mute & (1u << track)))   /* (muted: no note) */
             continue;
         const int32_t late = swing_q8(s, track, count);
         const int32_t gate = (int32_t)t->len * st + swing_q8(s, track, count + t->len) - late - st / 8;
@@ -423,6 +424,14 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
         s->all_off = 0;
         all_off(s, ev, &ne, max);
     }
+    if (s->mute)                         /* (0.26) a track muted: its notes sounding end now */
+        for (uint32_t i = 0; i < s->nsounding;) {
+            if (s->mute & (1u << s->sounding[i].track)) {
+                put(ev, &ne, max, 0, SEQ_EV_OFF, s->sounding[i].note, 0, s->sounding[i].track);
+                s->sounding[i] = s->sounding[--s->nsounding];
+            } else
+                i++;
+        }
     if (want) {
         s->want = SEQ_WANT_NONE;
         if (want == SEQ_WANT_STOP) {

@@ -12,6 +12,8 @@ typedef struct {
 extern grav_debug_t grav_debug;         /* audio-owned; UI copies with plat_lock */
 extern volatile uint32_t grav_dual_core; /* UI request, sampled once at a block boundary */
 extern volatile uint32_t grav_debug_reset;
+extern volatile float grav_track_peak[SYNTH_TRACKS];   /* (0.26) each track's loudest sample in the last block
+                                                        * (its voices', before the effect and MASTER): the meters */
 
 typedef struct {
     float gain;                          /* MASTER, glided */
@@ -30,6 +32,8 @@ typedef struct {
                                           * pitch_offset */
     float shape[3];                      /* a drum's SHAPE knobs, 0..1 (dsp/grav_drums.h) */
     const grav_controls_t *controls;
+    float send;                          /* (0.26) its share through the effect, 0..1; the rest goes past it, dry. 1
+                                          * (every track): the whole mix through it, as before */
 } grav_sound_t;
 
 void grav_engine_init(grav_engine_t *e);

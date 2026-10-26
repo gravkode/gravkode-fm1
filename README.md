@@ -13,13 +13,12 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.25.1**, the screen in teal, its colours chosen on GLO's second page (THEME, ten palettes)
-(0.25.0, recording finished): each track its own swing (SWING on SEQ; SEQ held: the pattern's); a bar's count-in
-before recording from a stop (GLO's METRONOME at COUNT); notes from a MIDI keyboard recorded too; SEQ held while
-recording erases the steps it passes. Before it: 0.24, live recording (REC while playing, quantized, with a
-metronome; SEQ held and REC clears a track); 0.23, the sequencer's screen (HOME the selected track as a piano roll,
-step mode all eight tracks as a grid); 0.22, the sound editor. HOME advances pages; hold HOME and turn SELECT to
-jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.26.0**, the mixer: SEL opens the eight tracks' strips, each with its LEVEL fader, a meter
+moving as it plays, its SEND (how much goes through the effect) and its mute on white keys 1–8; K3 is the effect's
+RETURN. Before it: 0.25.1, the screen in teal, its colours chosen on GLO's second page; 0.25, recording finished
+(each track its swing, a count-in, a MIDI keyboard recorded, erasing); 0.24, live recording with a metronome; 0.23,
+the sequencer's screen. HOME advances pages; hold HOME and turn SELECT to jump. [All sound
+controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's piano roll of one track, and step mode's grid of all eight"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
@@ -64,6 +63,7 @@ jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
 | FX again | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO again | DEBUG | one/two cores | reset peaks/counters | — |
+| SEL | MIXER | LEVEL (the selected track's) | SEND (its share through the effect) | RETURN (the effect's DRY/WET); white keys 1–8 mute the tracks |
 
 SELECT picks the track (S1–S4, D1–D4) the keys, ALGO, PRESET, OSC, VOICES and the steps are for; ALGO picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
@@ -74,8 +74,8 @@ is written after stopping and releasing the notes; wait for PRESET SAVED before 
 velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length), PLAY
 starts and stops, REC (stopped) records notes and chords step by step. HOME held and a white key, or K4, picks the
 pattern (playing: at the pattern's end). The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
-the effect's recording (FREEZE); SEL seeds a grain by hand, and held 2 s lets the grains come on their own again
-(SEED). The effect is off with DRY/WET and REVERB at 0, and costs nothing then.
+the effect's recording (FREEZE); SEL opens the mixer, and on the FX pages seeds a grain by hand (held 2 s, the
+grains come on their own again: SEED). The effect is off with DRY/WET and REVERB at 0, and costs nothing then.
 
 DEBUG keeps two-core mode on by default. Its controls are temporary and are not saved. Heavy FX settings can
 still trigger voice cuts above 90% of an audio block; the smoothed CPU meter can hide short peaks. See
@@ -122,7 +122,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.25.1.fwsc 0.25.1 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.0.fwsc 0.26.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -137,7 +137,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.25.1      # grav-code/build/grav_code-0.25.1.fwsc
+python3 tools/build.py grav-code --release 0.26.0      # grav-code/build/grav_code-0.26.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -145,7 +145,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

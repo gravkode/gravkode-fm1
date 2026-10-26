@@ -64,7 +64,7 @@ From the top:
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
   settles back. On SEQ the page is the sequencer's, and its knobs are small, in the bottom band (section 5).
-- **The bottom band:** the page's state (a sound page: how to change pages; FX: SEED and whether the effect is on);
+- **The bottom band:** the page's state (a sound page: how to change pages; FX: SEED and whether the effect is on; the mixer: what its keys do);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. On SEQ: TEMPO, SWING and LENGTH, then PLAY or
@@ -89,7 +89,7 @@ From the top:
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
-| SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
+| SEL | The MIXER (section 4); SEL again: back to the page it was opened on. On the FX pages: SEED, a grain by hand; held 2 s, the grains on their own again (lit while they come on their own) |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording; playing: live recording (section 5). Held SEQ, then REC: the selected track cleared |
@@ -204,9 +204,34 @@ On 6-OP FM the DX gate stays high while the app's release fades the output. The 
 amplitude before sleeping, so its old gate/release cannot reappear on the next note. A patch's natural
 decay while held still exists; extending RELEASE cannot restore a carrier that has already gone silent.
 
+### MIXER (SEL)
+
+![The mixer playing: the eight tracks a strip each, S1 selected; each with its fader, its meter moving, its send bar and its M; LEVEL, SEND, RETURN below](img/screen-mixer.png "The mixer")
+
+SEL opens the mixer (from any page but the FX pages, where SEL is SEED); SEL again goes back to the page it was
+opened on. Each track is a strip, S1 to S4 then D1 to D4:
+
+- **its name**, the selected track's in the theme's colour;
+- **its LEVEL** as a fader (its sound's OUTPUT level, the same as on its last sound page, and kept with its preset);
+- **a meter** of its sound beside it, moving as it plays and falling back over 0.6 s;
+- **its SEND** as a bar under them: how much of it goes through the effect; the rest goes past it, dry;
+- **M**, lit red while it is muted.
+
+| Control | What it does |
+| --- | --- |
+| K1 LEVEL | the selected track's level, 0 to 100 |
+| K2 SEND | its share through the effect, 0 to 100 % (100 %: all of it, as before 0.26; 0: none, it stays dry) |
+| K3 RETURN | how much of the effect comes back: FX MIX's DRY/WET, the same knob |
+| White keys 1–8 | mute a track (S1 to D4): its steps start no notes and its notes sounding end; again: on. The keys are lit while their track plays, dim while it is muted |
+| Black keys 1–8 | pick a track (as SELECT does) |
+
+The other keys do not play on the mixer. A muted track shows MUTE at the top of every page and its row red in step
+mode; the keys still play it. Live recording goes on while muted. SEND and the mutes are saved with the settings
+(SAVE); settings saved before 0.26 have every track sent whole and none muted.
+
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002501, version 0.25.1](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002600, version 0.26.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -519,9 +544,9 @@ EDIT freezes the recording: nothing new goes in, and the grains play what it hol
 EDIT is lit and FREEZE shows beside the engine, on every page. EDIT again lets go. Frozen, the effect stays on even
 with DRY/WET and REVERB at 0, so that what it holds is kept.
 
-### SEED (SEL)
+### SEED (SEL on the FX pages)
 
-Beads' SEED button. At first the grains come on their own, at DENSITY's rate: AUTO, and SEL is lit while the effect
+Beads' SEED button: SEL, while an FX page is open (elsewhere SEL opens the mixer). At first the grains come on their own, at DENSITY's rate: AUTO, and SEL is lit while the effect
 runs. Press SEL and they come by hand (MANUAL): a grain each press, and grains at DENSITY's rate while it is held
 (with DENSITY at the middle, one a press). Hold SEL for 2 s and they come on their own again. The FX pages show
 which: SEED AUTO or SEED MANUAL.

@@ -48,7 +48,8 @@ extern "C" int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg) {
 extern "C" int plat_cpu2_wait(void) { worker.join(); return 0; }
 
 static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
-                                 bool dual, bool reject, bool offline, bool toggle, bool drums = false, bool extended = false) {
+                                 bool dual, bool reject, bool offline, bool toggle, bool drums = false, bool extended = false,
+                                 float send = 1.0f) {
     stmlib::Random::Seed(0x21);
     synth_t synth;
     grav_engine_t dsp;
@@ -95,6 +96,7 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
             grav_controls_t controls[SYNTH_TRACKS];
             for (unsigned t = 0; t < SYNTH_TRACKS; ++t) {
                 const bool drum = t >= SYNTH_S_TRACKS;
+                sound[t].send = send < 0.0f ? 0.5f * float(t % 3) : send;   // (0.26: < 0, each its own: 0, 0.5, 1)
                 sound[t].engine = drum ? KIT[engine & 1u][t - SYNTH_S_TRACKS] : current_engine;
                 sound[t].timbre = drum ? 0.3f + 0.1f * float(t - SYNTH_S_TRACKS) : timbre;
                 sound[t].morph = drum ? 0.6f : 0.5f;
@@ -354,6 +356,8 @@ static bool preset_audio() {
     grav_engine_init(&dsp);
     grav_dual_core = 0;
     grav_sound_t sound[SYNTH_TRACKS] = {};
+    for (unsigned t = 0; t < 8; ++t)
+        sound[t].send = 1.0f;
     for (unsigned t = 4; t < 8; ++t) {
         sound[t].engine = GRAV_ENGINE_BASS_DRUM;
         sound[t].timbre = 0.3f;
@@ -555,7 +559,28 @@ int main() {
             }
             ++comparisons;
         }
+    // (0.26) each track its own share through the effect: the same on one core or two; sent none, the effect hears
+    // nothing and every track goes past it: as with the effect off
+    for (unsigned e = 0; e < GRAV_ENGINE_COUNT; e += 5)
+        for (bool fx : {false, true}) {
+            const auto reference = render(e, 4, fx, false, false, false, false, true, false, -1.0f);
+            const auto actual = render(e, 4, fx, true, false, false, false, true, false, -1.0f);
+            if (reference != actual) {
+                std::fprintf(stderr, "Track send dual-core mismatch engine=%u fx=%d\n", e, fx);
+                return 1;
+            }
+            ++comparisons;
+        }
+    {
+        const auto past = render(3, 4, true, false, false, false, false, true, false, 0.0f);
+        const auto off = render(3, 4, false, false, false, false, false, true, false, 1.0f);
+        const auto through = render(3, 4, true, false, false, false, false, true, false, 1.0f);
+        if (past != off || through == off) {
+            std::fprintf(stderr, "Track send 0 is not the effect bypassed (or 1 not through it)\n");
+            return 1;
+        }
+    }
     assert(dispatched > 0 && overlaps > 0);
-    std::printf("PASS: %u bit-exact comparisons (960 stock + 48 extended controls) across 24 engines, 1..4 voices and 4 + 4 drums, FX off/on; "
+    std::printf("PASS: %u bit-exact comparisons (960 stock + 48 extended controls + 10 track sends) across 24 engines, 1..4 voices and 4 + 4 drums, FX off/on; send 0 bypasses the effect; "
                 "%u real worker jobs, %u overlap observations\n", comparisons, dispatched, overlaps.load());
 }

@@ -109,6 +109,8 @@ typedef struct {
     volatile uint8_t skip[SEQ_TRACKS];   /* (0.24) a step + 1 a track does not play when it next comes (a note
                                           * recorded live just ahead of it: already heard); 0: none */
     volatile uint8_t beats;              /* (0.24) SEQ_EV_BEAT on every quarter note (the UI: the metronome on) */
+    volatile uint8_t mute;               /* (0.26) the tracks muted, a bit each (the mixer): their steps start no notes,
+                                          * the ones sounding end */
     volatile uint8_t count_in;           /* (0.25) steps of a count-in still to come before the first (set with
                                           * want = SEQ_WANT_PLAY): only the beats sound, the tracks wait */
     uint8_t start_due;                   /* the count-in over: MIDI start with the next step */

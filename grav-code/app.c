@@ -62,6 +62,10 @@ typedef struct {
     uint8_t drum_tune[SYNTH_D_TRACKS];
     uint8_t drum_shape[SYNTH_D_TRACKS][3];
     grav_controls_t controls[SYNTH_TRACKS];
+    /* 0.26: the mixer (SEL): each track's share through the effect (SEND, 0..100), the tracks muted (a bit each) */
+    uint8_t send[SYNTH_TRACKS];
+    uint8_t mute;
+    uint8_t mix_reserved[7];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
@@ -70,7 +74,9 @@ typedef struct {
 #define SET_SIZE_018 76                  /* as 0.18 saved it: up to metro, then reserved (the drums on Plaits'
                                           * three knobs) */
 #define SET_SIZE_021 92
-_Static_assert(sizeof(settings_t) == 1404 && SET_SIZE_021 == __builtin_offsetof(settings_t, controls) && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
+#define SET_SIZE_025 1404                /* as 0.21..0.25 saved it: up to the mixer (every track sent whole, none muted) */
+_Static_assert(sizeof(settings_t) == 1420 && SET_SIZE_025 == __builtin_offsetof(settings_t, send) &&
+               SET_SIZE_021 == __builtin_offsetof(settings_t, controls) && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
                SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine) &&
                SET_SIZE_016 == __builtin_offsetof(settings_t, drum_engine) &&
                SET_SIZE_017 == __builtin_offsetof(settings_t, bpm), "the settings record's layout");
@@ -107,6 +113,7 @@ enum {
     PAGE_SOUND,
     PAGE_OUTPUT,
     PAGE_SCREEN,                         /* (0.25.1) GLO again: THEME, the screen's colours (GLO again: DEBUG) */
+    PAGE_MIXER,                          /* (0.26) SEL: the eight tracks' LEVEL, SEND, mutes; the effect's RETURN */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN && (p) <= PAGE_FX_MIX)
@@ -117,7 +124,7 @@ static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG",
-                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN"};
+                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -211,7 +218,8 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"", "", ""},
     {"TEMPO", "SWING", "LENGTH"},
     {"PUNCH", "SWEEP", "DRIVE"},
-    [PAGE_SCREEN] = {"THEME", "", ""}
+    [PAGE_SCREEN] = {"THEME", "", ""},
+    [PAGE_MIXER] = {"LEVEL", "SEND", "RETURN"}
 };
 
 
@@ -462,6 +470,7 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
         sound[t].timbre = timbre;            /* (a drum: TONE) */
         sound[t].morph = morph;              /* (a drum: DECAY) */
         sound[t].harmonics = (float)osc_params[t][2] / 100.0f;
+        sound[t].send = (float)set.send[t] * 0.01f;   /* (0.26) the mixer's SEND */
         for (uint32_t i = 0; i < 3; i++)
             sound[t].shape[i] = drum ? (float)drum_shape[t - SYNTH_S_TRACKS][i] * 0.01f : 0.0f;
     }
@@ -534,6 +543,9 @@ static void fx_defaults(settings_t *s)   /* the effect's knobs at rest, off */
 static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)   /* (0.26) the mixer: every track through the effect, none muted */
+        set.send[t] = 100;
+    set.mute = 0;
     set.octave = 0;
     set.engine_id = 0;
     set.rsv_ble = 0;
@@ -593,10 +605,12 @@ void app_init(void)
 
     int tempo_old = 1;                       /* (no tempo of its own in the settings: the 0.17 pattern's) */
     if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == SET_SIZE_013 || loaded == SET_SIZE_016 ||
-         loaded == SET_SIZE_017 || loaded == SET_SIZE_018 || loaded == SET_SIZE_021 || loaded == (int)sizeof loaded_settings) &&
+         loaded == SET_SIZE_017 || loaded == SET_SIZE_018 || loaded == SET_SIZE_021 || loaded == SET_SIZE_025 ||
+         loaded == (int)sizeof loaded_settings) &&
         loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
-        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_021 || loaded == SET_SIZE_018 || loaded == SET_SIZE_017 ||
+        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_025 || loaded == SET_SIZE_021 ||
+             loaded == SET_SIZE_018 || loaded == SET_SIZE_017 ||
              loaded == SET_SIZE_016 ||
              loaded == SET_SIZE_013 || loaded == SET_SIZE_012) &&
             loaded_settings.magic == SET_MAGIC &&
@@ -607,7 +621,7 @@ void app_init(void)
                 for (uint32_t t = 0; t < SYNTH_TRACKS; t++) grav_controls_init(&loaded_settings.controls[t]);
             for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
                 const uint32_t engine = t < SYNTH_S_TRACKS ? loaded_settings.trk_engine[t] : loaded_settings.drum_engine[t - SYNTH_S_TRACKS];
-                if (loaded == (int)sizeof loaded_settings && !grav_controls_valid(engine, &loaded_settings.controls[t])) valid = 0;
+                if (loaded >= SET_SIZE_025 && !grav_controls_valid(engine, &loaded_settings.controls[t])) valid = 0;
             }
             if (loaded == SET_SIZE_012)      /* (saved before 0.13, before the effect: its knobs at rest) */
                 fx_defaults(&loaded_settings);
@@ -620,6 +634,14 @@ void app_init(void)
                 loaded_settings.pattern = 0;
                 loaded_settings.metro = METRO_REC;
             }
+            if (loaded <= SET_SIZE_025) {    /* (saved before 0.26: no mixer; every track sent whole, none muted) */
+                for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+                    loaded_settings.send[t] = 100;
+                loaded_settings.mute = 0;
+            }
+            for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+                if (loaded_settings.send[t] > 100u)
+                    valid = 0;
             if (loaded_settings.theme > NPALETTES)   /* (a byte reserved before 0.25.1) */
                 loaded_settings.theme = 0;
             if (loaded_settings.metro > METRO_COUNT)   /* (a byte reserved before 0.24) */
@@ -706,6 +728,7 @@ void app_init(void)
 
     seq_init(&seq);
     seq.bpm = set.bpm;
+    seq.mute = set.mute;                     /* (0.26) the mixer's mutes */
     bank_init(&bank);                        /* the patterns; their stale copies erased now, before the sound */
     while (bank_tidy(&bank))
         ;
@@ -810,6 +833,10 @@ static struct {
     uint8_t home_down, home_used, home_shown;   /* HOME held; a pattern picked meanwhile (no page change); the grid shown */
     uint32_t home_at;                    /* when HOME went down */
     uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
+    uint32_t key_mix;                    /* (0.26) the keys pressed on the mixer (mutes, tracks: let go as such) */
+    uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
+    uint8_t seed_down;                   /* SEL pressed as SEED (on an FX page) and still held */
+    uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
     uint32_t patterns_until;             /* K4 turned: the patterns' grid shown until then */
     uint8_t save_req;                    /* SAVE: the pattern too, then SAVED */
     uint8_t full_said;                   /* (no free slot while playing: said once) */
@@ -1865,6 +1892,52 @@ static void rec_midi(void)
     }
 }
 
+/* (0.26) the mixer: a track muted (its steps start no notes, the ones sounding end), or on again */
+static void mute_toggle(uint32_t t)
+{
+    set.mute ^= (uint8_t)(1u << t);
+    seq.mute = set.mute;
+    set_dirty = 1;
+    ui.redraw = 1;
+    app_say(TRACK_NAME[t], set.mute >> t & 1u ? "MUTE" : "ON");
+}
+
+/* the mixer's knobs: K1 the selected track's LEVEL (OUTPUT's, its sound's), K2 its SEND (its share through the
+ * effect), K3 the effect's RETURN (FX MIX's DRY/WET) */
+static void mixer_turn(uint32_t index, int32_t e)
+{
+    char a[16], t[8];
+    if (index == 0u) {
+        grav_controls_t *c = &set.controls[track_sel];
+        const uint8_t level = (uint8_t)clamp((int32_t)c->level + e, 0, 100);
+        if (level != c->level) {
+            const uint32_t f = plat_lock();
+            c->level = level;
+            plat_unlock(f);
+            set_dirty = 1;
+            preset_id[track_sel] = PRESET_CUSTOM;
+        }
+        int_text(level, t);
+    } else if (index == 1u) {
+        set.send[track_sel] = (uint8_t)clamp((int32_t)set.send[track_sel] + e, 0, 100);
+        set_dirty = 1;
+        int_text(set.send[track_sel], t);
+        text_cat(t, "%");
+    } else {
+        fx_params[FX_DRY_WET] = clamp_percent(fx_params[FX_DRY_WET] + e);
+        set_dirty = 1;
+        int_text(fx_params[FX_DRY_WET], t);
+        text_cat(t, "%");
+        app_say("RETURN", t);
+        return;
+    }
+    a[0] = 0;
+    text_cat(a, PARAM_NAME[PAGE_MIXER][index]);
+    text_cat(a, " ");
+    text_cat(a, TRACK_NAME[track_sel]);
+    app_say(a, t);
+}
+
 /* SEQ held, REC: the selected track's steps all off (its length kept) */
 static void track_clear(void)
 {
@@ -1882,7 +1955,7 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
     return page == PAGE_SEQ || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
-           page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : B_FX;
+           page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL : B_FX;
 }
 
 /* its blink's period: the first of a button's pages slow, the next faster (FX: GRAIN, SHAPE, MIX) */
@@ -2004,6 +2077,21 @@ static void lights(uint32_t btn, uint32_t keys)
                 dim_keys |= bit;
         }
     }
+    if (active_page == PAGE_MIXER && !ui.step_mode) {   /* (0.26) the mixer: white 1..8 a track playing lit, muted
+                                                      * dim; black 1..8 the tracks (selected lit, a note flashes) */
+        lit_keys = mid_keys = 0;
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+            const uint32_t w = 1u << WHITE_KEYS[t], b = 1u << BLACK_KEYS[t];
+            if (set.mute >> t & 1u)
+                dim_keys |= w;
+            else
+                lit_keys |= w;
+            if (t == track_sel || now - ui.hit_at[t] < 80u)
+                lit_keys |= b;
+            else
+                mid_keys |= b;
+        }
+    }
     if (ui.home_down) {                      /* HOME held: the patterns on the white keys: the one playing lit, the
                                               * next blinking, one with steps mid, an empty one dim */
         const uint32_t used = patterns_used();
@@ -2103,6 +2191,16 @@ static void input(void)
                     pattern_pick(w);
                 continue;
             }
+            if (active_page == PAGE_MIXER) {   /* (0.26) the mixer: white 1..8 mute a track (again: on), black 1..8
+                                              * pick one; the other keys silent */
+                int w = key_index(WHITE_KEYS, 16, k), b = key_index(BLACK_KEYS, 11, k);
+                ui.key_mix |= bit;
+                if (w >= 0 && w < (int)SYNTH_TRACKS)
+                    mute_toggle((uint32_t)w);
+                else if (b >= 0 && b < (int)SYNTH_TRACKS)
+                    track_select((uint32_t)b);
+                continue;
+            }
             if (ui.step_mode) {              /* step mode: a white key is a step, black 1..8 the tracks */
                 int w = key_index(WHITE_KEYS, 16, k), b = key_index(BLACK_KEYS, 11, k);
                 ui.key_step |= bit;
@@ -2136,6 +2234,10 @@ static void input(void)
             }
             if (ui.key_pat & bit) {          /* (pressed as a pattern) */
                 ui.key_pat &= ~bit;
+                continue;
+            }
+            if (ui.key_mix & bit) {          /* (pressed on the mixer) */
+                ui.key_mix &= ~bit;
                 continue;
             }
             if (ui.key_step & bit) {         /* (pressed as a step: let go as one, whatever the mode now) */
@@ -2219,11 +2321,22 @@ static void input(void)
         } else if (k == B_EDIT) {            /* FREEZE: the effect's recording held, or let go */
             fx_freeze = !fx_freeze;
             app_say("FREEZE", fx_freeze ? "ON" : "OFF");
-        } else if (k == B_SEL) {             /* SEED: a grain now, and grains by hand from here on */
+        } else if (k == B_SEL && IS_FX_PAGE(active_page)) {   /* on the effect's pages: SEED, a grain now, and
+                                                               * grains by hand from here on */
             ui.seed_at = plat_ms();
+            ui.seed_down = 1;
             fx_seed = 1;
             app_say("SEED", fx_seed_auto ? "MANUAL" : "");
             fx_seed_auto = 0;
+        } else if (k == B_SEL) {             /* (0.26) the mixer; SEL again: back to the page it was opened on */
+            if (active_page == PAGE_MIXER)
+                active_page = ui.mixer_from;
+            else {
+                ui.mixer_from = active_page;
+                active_page = PAGE_MIXER;
+            }
+            app_say("PAGE", page_name(active_page));
+            ui.redraw = 1;
         } else if ((k == B_OCTDN || k == B_OCTUP) && ui.preset_down) {
             ui.preset_page = (uint8_t)clamp((int32_t)ui.preset_page + (k == B_OCTUP ? 1 : -1), 0, 3);
             ui.preset_used = ui.preset_shown = ui.redraw = 1;
@@ -2285,9 +2398,9 @@ static void input(void)
             ui.redraw = 1;
         }
     }
-    if (!(btn & 1u << B_SEL))                /* SEL let go; held 2 s: the grains on their own again */
-        fx_seed = 0;
-    else if (!fx_seed_auto && plat_ms() - ui.seed_at >= SEED_AUTO_MS) {
+    if (!(btn & 1u << B_SEL))                /* SEL let go; held 2 s (as SEED): the grains on their own again */
+        fx_seed = ui.seed_down = 0;
+    else if (ui.seed_down && !fx_seed_auto && plat_ms() - ui.seed_at >= SEED_AUTO_MS) {
         fx_seed_auto = 1;
         app_say("SEED", "AUTO");
     }
@@ -2328,6 +2441,8 @@ static void input(void)
                 app_say("REC STEP", t);
             } else
                 track_select((uint32_t)clamp((int32_t)track_sel + e, 0, SYNTH_TRACKS - 1));
+        } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_MIXER) {
+            mixer_turn((uint32_t)(k - EN_K1), e);
         } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_SCREEN) {
             if (k == EN_K1)                  /* (K2, K3: none) */
                 theme_turn(e);
@@ -2567,6 +2682,15 @@ static void knob_get(uint32_t i, knob_t *k)
         }
         return;
     }
+    if (active_page == PAGE_MIXER) {         /* (0.26) the selected track's LEVEL and SEND, the effect's RETURN */
+        const int32_t v = i == 0u ? set.controls[track_sel].level : i == 1u ? set.send[track_sel] : fx_params[FX_DRY_WET];
+        k->name = PARAM_NAME[PAGE_MIXER][i];
+        int_text(v, k->value);
+        if (i)
+            text_cat(k->value, "%");
+        k->frac = v * 256;
+        return;
+    }
     if (active_page == PAGE_SCREEN) {        /* THEME alone */
         k->name = PARAM_NAME[PAGE_SCREEN][i];
         if (i) {
@@ -2752,7 +2876,7 @@ static void draw_knobs(void)
 static int animate_dials(uint32_t now)
 {
     if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page) ||
-          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_SCREEN) ||
+          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_SCREEN || active_page == PAGE_MIXER) ||
         ui.splash_until || ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown) return 0;
     const uint32_t dt = now - ui.dial_at, period = plat_cpu_pct() >= 75u ? 96u : 30u;
     if (dt < period) return 0;
@@ -2779,7 +2903,7 @@ static int animate_dials(uint32_t now)
     for (uint32_t n = 0; n < 3; n++, dial = (dial + 1u) % 3u)
         if (ui.dial_dirty & 1u << dial) break;
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
-    if (active_page == PAGE_SEQ) {           /* (SEQ's small ones: in the bottom band) */
+    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER) {   /* (SEQ's and the mixer's: small, below) */
         cv_begin(80, CHIP_H, C_BLACK);
         draw_chips(0, 1u << dial, (int32_t)dial * 80);
         cv_blit(dial * 80, 180u + CHIP_Y);
@@ -2951,7 +3075,8 @@ static void draw_grid(int32_t dy, uint32_t now)
         const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
         if (sel)                             /* the selected track: its row on a warm ground */
             cv_rect(0, y - 1, 240, 13, mix565(C_BLACK, C_AMB, 34));
-        cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], sel ? C_HI : C_GRAY);
+        const int muted = set.mute >> t & 1u;   /* (0.26) muted: its name red, its steps dim */
+        cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], muted ? RGB(240, 55, 45) : sel ? C_HI : C_GRAY);
         for (uint32_t i = 0; i < SEQ_PAGE; i++) {
             const uint32_t s = page * SEQ_PAGE + i;
             const int32_t x = step_x(i);
@@ -2962,8 +3087,8 @@ static void draw_grid(int32_t dy, uint32_t now)
             const seq_step_t *st = &tr->step[s];
             uint16_t c = i % 4u ? RGB(20, 20, 25) : RGB(28, 28, 34);
             if (st->on)
-                c = sel ? mix565(sel_lo, C_HI, 96 + (int32_t)st->vel * 160 / 127)
-                        : mix565(other_lo, other_hi, (int32_t)st->vel * 256 / 127);
+                c = muted ? C_DIM : sel ? mix565(sel_lo, C_HI, 96 + (int32_t)st->vel * 160 / 127)
+                                        : mix565(other_lo, other_hi, (int32_t)st->vel * 256 / 127);
             if (at == (int32_t)s)            /* its step playing: lit; a note, flashing as it begins */
                 c = st->on ? mix565(c, C_WHITE, 64 + hit * 192 / 256) : RGB(70, 70, 82);
             cv_rect(x, y, 12, 11, c);
@@ -2993,6 +3118,43 @@ static void draw_seq_body(int32_t dy)        /* the strip (rows STRIP_Y on), dra
 static void draw_seq(void)
 {
     draw_seq_body(0);
+}
+
+/* (0.26) the mixer (SEL), under the track's line: the eight tracks a strip each, S1..S4 then D1..D4: its name (the
+ * selected one's in the theme's colour), its LEVEL as a fader, a meter of its sound beside it (falling back over
+ * 0.6 s), its SEND as a bar (its share through the effect), M lit red when it is muted. While it sounds, the strip
+ * under the track's line redraws alone, as SEQ's does */
+static void draw_mixer_body(int32_t dy)
+{
+    const int32_t H = 64;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+        const int32_t x = 8 + (int32_t)t * 28, top = 40 + dy, sel = t == track_sel, muted = set.mute >> t & 1u;
+        const int32_t lv = (int32_t)set.controls[t].level * H / 100, m = (int32_t)ui.meter[t] * H / 256;
+        if (sel)
+            cv_rect(x, 22 + dy, 26, 15, C_HI);
+        cv_text(x + 13 - text_w(&FONT_XS, TRACK_NAME[t]) / 2, 22 + dy, &FONT_XS, TRACK_NAME[t],
+                sel ? C_BLACK : muted ? C_DIM : C_WHITE);
+        cv_rect(x + 5, top, 4, H, RGB(24, 24, 30));   /* the fader: its slot, filled to the level, its cap */
+        cv_rect(x + 5, top + H - lv, 4, lv, muted ? C_DIM : sel ? C_HI : C_GRAY);
+        cv_rect(x + 1, top + H - lv - 1, 12, 3, muted ? C_DIM : C_WHITE);
+        cv_rect(x + 16, top, 6, H, RGB(18, 18, 23));   /* the meter, a segment every other row */
+        for (int32_t r = 0; r < m; r += 2)
+            cv_rect(x + 16, top + H - 1 - r, 6, 1, r >= H * 7 / 8 ? C_WHITE : r >= H / 2 ? C_HI : C_AMB);
+        cv_rect(x + 1, 110 + dy, 22, 4, RGB(24, 24, 30));   /* the send */
+        cv_rect(x + 1, 110 + dy, (int32_t)set.send[t] * 22 / 100, 4, muted ? C_DIM : sel ? C_HI : C_GRAY);
+        if (muted)                           /* M: muted, lit */
+            cv_rect(x + 1, 120 + dy, 22, 14, RGB(240, 55, 45));
+        else {
+            cv_rect(x + 1, 120 + dy, 22, 14, C_LINE);
+            cv_rect(x + 2, 121 + dy, 20, 12, C_BLACK);
+        }
+        cv_text(x + 12 - text_w(&FONT_XS, "M") / 2, 119 + dy, &FONT_XS, "M", muted ? C_BLACK : C_DIM);
+    }
+}
+
+static uint32_t meter_of(float peak)         /* a track's loudest sample (0..~1) as a meter's height, 0..256 */
+{
+    return peak > 0.0f ? (uint32_t)(peak / (peak + 0.15f) * 256.0f) : 0u;
 }
 
 /* HOME held, K4 turned: the 16 patterns for a moment, over the page: the one playing lit, the next one framed
@@ -3084,7 +3246,10 @@ static void draw_splash(void)
 static void draw_seq_grid(void)
 {
     cv_begin(240, 144u - STRIP_Y, C_BLACK);
-    draw_seq_body(-STRIP_Y);
+    if (active_page == PAGE_MIXER)
+        draw_mixer_body(-STRIP_Y);
+    else
+        draw_seq_body(-STRIP_Y);
     cv_blit(0, 36 + STRIP_Y);
 }
 
@@ -3241,6 +3406,20 @@ static void draw_seq_band(void)
     draw_cpu(178, y);
 }
 
+/* (0.26) the mixer's bottom band: its three knobs, small; under them how the keys act here, or a moment's message;
+ * the load */
+static void draw_mixer_band(void)
+{
+    char t[48];
+    const int32_t y = 43;
+    draw_chips(CHIP_Y, 7u, 0);
+    if (band_message(t, 160))
+        cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
+    else
+        cv_text(8, y + 2, &FONT_T, "WHITE 1-8 MUTE  BLACK 1-8 TRACK", C_GRAY);
+    draw_cpu(178, y);
+}
+
 /* the page's state, in the bottom band's first line: a sound page's HOME; the effect's SEED and whether it is on */
 static void draw_status(int32_t y)
 {
@@ -3314,6 +3493,8 @@ static void draw(void)
     cv_text(30, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
     if (fx_freeze)                           /* the effect frozen: on every page (and EDIT lit) */
         cell(172, 2, 60, "FREEZE", 1);
+    if (set.mute >> track_sel & 1u)          /* (0.26) the selected track muted (the mixer): on every page */
+        cv_text(fx_freeze ? 132 : 200, 6, &FONT_XS, "MUTE", RGB(240, 55, 45));
 
     if (active_page == PAGE_GLO)
         draw_glo();
@@ -3323,6 +3504,8 @@ static void draw(void)
         draw_debug();
     else if (active_page == PAGE_SEQ)
         draw_seq();
+    else if (active_page == PAGE_MIXER)
+        draw_mixer_body(0);
     else
         draw_knobs();
     if (ui.splash_until)
@@ -3341,8 +3524,11 @@ static void draw(void)
      * last MIDI message in or DEBUG's queue, and the load. No keys drawn: the FM-1's own are under the screen */
     cv_begin(240, 60, C_BLACK);
     cv_rect(8, 0, 224, 1, C_LINE);
-    if (active_page == PAGE_SEQ) {
-        draw_seq_band();
+    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER) {
+        if (active_page == PAGE_SEQ)
+            draw_seq_band();
+        else
+            draw_mixer_band();
         cv_blit(0, 180);
         return;
     }
@@ -3479,6 +3665,22 @@ void app_frame(void)
             ui.redraw = 1;
         }
     }
+    if (active_page == PAGE_MIXER && now - ui.grid_at >= (plat_cpu_pct() >= 75u ? 96u : 30u)) {
+        int moving = 0;                      /* (0.26) the meters: up at once, falling back over 0.6 s */
+        const uint32_t fall = (now - ui.grid_at) * 256u / 600u;
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+            const uint32_t target = meter_of(grav_track_peak[t]);
+            uint32_t m = ui.meter[t] > fall ? ui.meter[t] - fall : 0u;
+            if (target > m)
+                m = target;
+            moving |= m != ui.meter[t] || m;
+            ui.meter[t] = (uint16_t)m;
+        }
+        if (moving && !(ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown || ui.splash_until))
+            ui.redraw_grid = 1;
+        else
+            ui.grid_at = now;                /* (still: the next fall from now) */
+    }
     if (ui.splash_until && now >= ui.splash_until) {   /* the splash goes */
         ui.splash_until = 0;
         ui.redraw = 1;
@@ -3578,6 +3780,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         plat_store_save(OBJ_DRUMS, seq_drum_record_of(&seq.pat), sizeof(seq_drum_record_t));
         for (uint32_t off = BANK_LO; off < BANK_HI; off += 0x1000u)
             plat_data_erase(off);
+        return 1;
+    }
+    if (!strcmp(cmd, "save025")) {           /* (0.26) the settings as 0.21..0.25 saved them: no mixer */
+        settings_capture();
+        plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_025);
         return 1;
     }
     if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016") || !strcmp(cmd, "save018") || !strcmp(cmd, "save021")) {   /* the settings as 0.12,
@@ -3698,6 +3905,16 @@ int app_expect(const char *what, int *got)
         *got = ui.rec_live;
     else if (!strcmp(what, "clicks"))
         *got = (int)clicks;
+    else if (!strcmp(what, "mute"))          /* (0.26) the mixer: the tracks muted (a bit each), the sequencer's too */
+        *got = set.mute | seq.mute << 8;
+    else if (!strcmp(what, "send"))          /* the selected track's SEND, LEVEL; the effect's RETURN (DRY/WET) */
+        *got = set.send[track_sel];
+    else if (!strcmp(what, "level"))
+        *got = set.controls[track_sel].level;
+    else if (!strcmp(what, "fx_return"))
+        *got = fx_params[FX_DRY_WET];
+    else if (!strcmp(what, "meter"))         /* the selected track's meter, 0..256 */
+        *got = ui.meter[track_sel];
     else if (!strcmp(what, "theme"))         /* (0.25.1) GLO's SCREEN: the palette chosen + 1 (0: the app's); shown */
         *got = set.theme;
     else if (!strcmp(what, "palette"))
