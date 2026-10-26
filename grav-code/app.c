@@ -14,6 +14,7 @@
 #include "seq/seq.h"
 #include "seq/bank.h"
 #include "presets/presets.h"
+#include "presets/store.h"
 
 _Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
 
@@ -57,13 +58,15 @@ typedef struct {
      * three (dsp/grav_drums.h); drum_osc's HARMONICS unread since */
     uint8_t drum_tune[SYNTH_D_TRACKS];
     uint8_t drum_shape[SYNTH_D_TRACKS][3];
+    grav_controls_t controls[SYNTH_TRACKS];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
 #define SET_SIZE_016 56                  /* as 0.16 saved it: up to trk_reserved[] (no drums) */
 #define SET_SIZE_017 72                  /* as 0.17 saved it: up to drum_osc[] (the tempo the pattern's) */
 #define SET_SIZE_018 76                  /* as 0.18 saved it: up to rsv18 (the drums on Plaits' three knobs) */
-_Static_assert(sizeof(settings_t) == 92 && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
+#define SET_SIZE_021 92
+_Static_assert(sizeof(settings_t) == 1404 && SET_SIZE_021 == __builtin_offsetof(settings_t, controls) && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
                SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine) &&
                SET_SIZE_016 == __builtin_offsetof(settings_t, drum_engine) &&
                SET_SIZE_017 == __builtin_offsetof(settings_t, bpm), "the settings record's layout");
@@ -97,16 +100,20 @@ enum {
     PAGE_DEBUG,                          /* GLO again: dual-core diagnostics */
     PAGE_SEQ,                            /* HOME: the sequence (HOME again: OSC, the sound) */
     PAGE_SHAPE,                          /* a drum track's: HOME after its DRUM page (OSC's): SHAPE's knobs */
+    PAGE_SOUND,
+    PAGE_OUTPUT,
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN && (p) <= PAGE_FX_MIX)
+#define IS_SOUND_PAGE(p) ((p) == PAGE_OSC || (p) == PAGE_SHAPE || (p) == PAGE_SOUND || (p) == PAGE_OUTPUT)
 
 static uint8_t active_page = PAGE_SEQ;
 static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back to it */
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG",
-                                              "SEQ", "SHAPE"};
+                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT"};
+static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
 static const char *const BTN_NAME[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -156,7 +163,8 @@ static volatile uint8_t track_sel;       /* the track selected (SELECT): the key
 static preset_bank_t user_presets;
 static int8_t preset_id[SYNTH_TRACKS];
 static uint8_t preset_dirty, preset_write_req;
-_Static_assert(sizeof user_presets <= PLAT_STORE_MAX, "user presets fit a platform store object");
+static uint8_t preset_import_failed;
+_Static_assert(sizeof(settings_t) <= PLAT_STORE_MAX, "extended settings fit their existing store object");
 static const char *const TRACK_NAME[SYNTH_TRACKS] = {"S1", "S2", "S3", "S4", "D1", "D2", "D3", "D4"};
 
 static uint8_t *track_engine(uint32_t t)   /* a track's engine, where the settings keep it */
@@ -170,6 +178,7 @@ static void preset_capture(uint32_t t, preset_t *p)
     p->engine = *track_engine(t);
     p->drum = SYNTH_IS_DRUM(t);
     p->tune = 50;
+    p->controls = set.controls[t];
     for (uint32_t i = 0; i < 3; i++) p->osc[i] = (uint8_t)osc_params[t][i];
     if (p->drum) {
         const uint32_t d = t - SYNTH_S_TRACKS;
@@ -378,6 +387,7 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
         if (morph < 0.0f) morph = 0.0f;
         if (morph > 1.0f) morph = 1.0f;
         sound[t].engine = *track_engine(t);
+        sound[t].controls = &set.controls[t];
         sound[t].pitch = drum ? (float)(drum_tune[t - SYNTH_S_TRACKS] - 50) * 0.5f : pitch_offset;
         sound[t].timbre = timbre;            /* (a drum: TONE) */
         sound[t].morph = morph;              /* (a drum: DECAY) */
@@ -470,6 +480,7 @@ static void settings_defaults(void)
     set.bpm = 120;
     set.pattern = 0;
     set.rsv18 = 0;
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) grav_controls_init(&set.controls[t]);
 }
 
 /* the knobs' parameters as they are now, into the settings record (SAVE writes the record) */
@@ -512,16 +523,22 @@ void app_init(void)
 
     int tempo_old = 1;                       /* (no tempo of its own in the settings: the 0.17 pattern's) */
     if ((loaded == 8 || loaded == SET_SIZE_012 || loaded == SET_SIZE_013 || loaded == SET_SIZE_016 ||
-         loaded == SET_SIZE_017 || loaded == SET_SIZE_018 || loaded == (int)sizeof loaded_settings) &&
+         loaded == SET_SIZE_017 || loaded == SET_SIZE_018 || loaded == SET_SIZE_021 || loaded == (int)sizeof loaded_settings) &&
         loaded_settings.octave >= -2 && loaded_settings.octave <= 2) {
 
-        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_018 || loaded == SET_SIZE_017 ||
+        if ((loaded == (int)sizeof loaded_settings || loaded == SET_SIZE_021 || loaded == SET_SIZE_018 || loaded == SET_SIZE_017 ||
              loaded == SET_SIZE_016 ||
              loaded == SET_SIZE_013 || loaded == SET_SIZE_012) &&
             loaded_settings.magic == SET_MAGIC &&
             loaded_settings.engine_id < GRAV_ENGINE_COUNT) {
             int valid = 1;
             uint32_t voices = 0;
+            if (loaded <= SET_SIZE_021)
+                for (uint32_t t = 0; t < SYNTH_TRACKS; t++) grav_controls_init(&loaded_settings.controls[t]);
+            for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+                const uint32_t engine = t < SYNTH_S_TRACKS ? loaded_settings.trk_engine[t] : loaded_settings.drum_engine[t - SYNTH_S_TRACKS];
+                if (loaded == (int)sizeof loaded_settings && !grav_controls_valid(engine, &loaded_settings.controls[t])) valid = 0;
+            }
             if (loaded == SET_SIZE_012)      /* (saved before 0.13, before the effect: its knobs at rest) */
                 fx_defaults(&loaded_settings);
             if (loaded <= SET_SIZE_013)      /* (saved before 0.16, one sound: S1's, the other tracks their own) */
@@ -645,10 +662,14 @@ void app_init(void)
     set_stored = set;
     if (loaded != (int)sizeof set)           /* (an older record, or none: SAVE writes this one) */
         memset(&set_stored, 0, sizeof set_stored);
-    if (plat_store_load(OBJ_PRESETS, &user_presets, sizeof user_presets) != (int)sizeof user_presets ||
-        !presets_valid(&user_presets))
-        presets_init(&user_presets);
-    preset_dirty = preset_write_req = 0;
+    preset_store_init(&user_presets);
+    {   /* 0.21 bank remains intact; interrupted imports resume at the next boot, before audio starts. */
+        uint8_t legacy[1296] __attribute__((aligned(4)));
+        const int size = plat_store_load(OBJ_PRESETS, legacy, sizeof legacy);
+        preset_import_failed = size > 0 && preset_store_import_021(&user_presets, legacy, (uint32_t)size) < 0;
+    }
+    preset_dirty = user_presets.n_pending != 0;
+    preset_write_req = 0;
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
         preset_t p;
         preset_capture(t, &p);
@@ -710,6 +731,10 @@ static struct {
     uint32_t splash_until;               /* ALGO turned: the engine's splash shown until then */
     uint8_t preset_down, preset_used, preset_shown, preset_page;
     uint32_t preset_at, key_preset;      /* SAVE modifier, its grid, and keys that must never play/record notes */
+    uint8_t sound_page[SYNTH_TRACKS], sound_nav;
+    int32_t dial_q8[3];
+    uint32_t dial_id, dial_at, dial_frames;
+    uint8_t dial_hot, dial_dirty, dial_next;
     uint32_t icon_strikes[SYNTH_TRACKS], icon_hit_at[SYNTH_TRACKS];   /* each track's notes begun: its icon's strike */
 } ui;
 
@@ -727,6 +752,7 @@ static void preset_turn(int32_t e)
     preset_t p;
     if (!preset_get(&user_presets, *track_engine(t), SYNTH_IS_DRUM(t), id, &p)) return;
     const uint32_t f = plat_lock();
+    set.controls[t] = p.controls;
     for (uint32_t i = 0; i < 3; i++) osc_params[t][i] = p.osc[i];
     if (p.drum) {
         const uint32_t d = t - SYNTH_S_TRACKS;
@@ -748,7 +774,10 @@ static void preset_save_slot(uint32_t slot)
     memcpy(p.name, "USER 00", 8);
     p.name[5] = (char)('0' + (slot + 1u) / 10u);
     p.name[6] = (char)('0' + (slot + 1u) % 10u);
-    if (!preset_put(&user_presets, slot, &p)) return;
+    if (!preset_put(&user_presets, slot, &p)) {
+        app_say("PRESET QUEUE FULL", "STOP TO SAVE");
+        return;
+    }
     /* A slot may have been selected by several tracks. Overwriting it must not rename an old sound. */
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
         if (preset_id[t] == (int)(PRESET_FACTORY + slot)) preset_id[t] = PRESET_CUSTOM;
@@ -766,13 +795,15 @@ static void presets_poll(void)
     }
     if (!preset_write_req || seq.playing || seq.want == SEQ_WANT_PLAY || ui.keys ||
         !synth_quiet(&synth) || grav_debug.active || bank_busy(&bank)) return;
-    preset_write_req = 0;                   /* a failed write retries only on the next explicit SAVE */
-    if (plat_store_save(OBJ_PRESETS, &user_presets, sizeof user_presets) == 0) {
+    /* One sound per idle frame: recheck transport/voices before the next queued record. */
+    if (preset_store_flush(&user_presets) < 0) {
+        preset_write_req = 0;               /* retry only on the next explicit SAVE */
+        app_say("PRESET FAILED", "TAP SAVE TO RETRY");
+    } else if (!user_presets.n_pending) {
+        preset_write_req = 0;
         preset_dirty = 0;
         app_say("PRESET SAVED", "");
-    } else {
-        app_say("PRESET FAILED", "TAP SAVE TO RETRY");
-    }
+    } else return;
     ui.redraw = 1;
 }
 
@@ -930,7 +961,7 @@ static void octave_text(char *t)
 /* a screen reader that has just started listening (or asks) hears the whole screen */
 static void speak(void)
 {
-    char t[112], o[4], o2[8];
+    char t[160], o[4], o2[8];
     if (ann_on() && ann_where()) {
         octave_text(o);
         t[0] = 0;
@@ -943,6 +974,10 @@ static void speak(void)
         int_text((int32_t)seq_bpm(&seq), o2);
         text_cat(t, ". TEMPO ");
         text_cat(t, o2);
+        text_cat(t, ". PAGE ");
+        text_cat(t, page_name(active_page));
+        text_cat(t, ". PRESET ");
+        text_cat(t, preset_label(track_sel));
         if (midi_count) {                    /* the last MIDI message in, as the screen shows it */
             static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
             static const char HEX[] = "0123456789ABCDEF";
@@ -1066,6 +1101,19 @@ static void glo_turn(uint32_t index, int32_t e)
     }
 }
 
+static uint32_t sound_pages(void)
+{
+    return SYNTH_IS_DRUM(track_sel) ? 3u : 2u + grav_control_pages(*track_engine(track_sel));
+}
+static void sound_activate(uint32_t page)
+{
+    ui.sound_page[track_sel] = (uint8_t)(page % sound_pages());
+    const uint32_t p = ui.sound_page[track_sel];
+    active_page = home_page = p == 0 ? PAGE_OSC : p + 1u == sound_pages() ? PAGE_OUTPUT :
+                              SYNTH_IS_DRUM(track_sel) ? PAGE_SHAPE : PAGE_SOUND;
+    ui.redraw = 1;
+}
+
 /* a page's knob: K1..K3 (index 0..2) on OSC, MOD, ENV, the FX pages and a drum's SHAPE (not GLO's, nor MIX's
  * QUALITY). A drum track's OSC is its DRUM page: TUNE, DECAY (MORPH), TONE (TIMBRE) */
 static volatile int32_t *param_of(uint32_t page, uint32_t index)
@@ -1084,16 +1132,52 @@ static volatile int32_t *param_of(uint32_t page, uint32_t index)
     return &fx_params[(page - PAGE_FX_GRAIN) * 3u + index];
 }
 
+static int32_t param_value(uint32_t page, uint32_t index)
+{
+    if (page == PAGE_FX_MIX && index == 2) return fx_quality;
+    if (page == PAGE_SOUND) {
+        grav_control_info_t info;
+        if (!grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &info)) return -1;
+        if (grav_controls_fm(*track_engine(track_sel)) && !(set.controls[track_sel].flags & GRAV_CUSTOM_FM)) {
+            grav_controls_t c = set.controls[track_sel];
+            grav_fm_patch(*track_engine(track_sel), (uint32_t)osc_params[track_sel][2], c.value);
+            return grav_control_read(&c, &info);
+        }
+        return grav_control_read(&set.controls[track_sel], &info);
+    }
+    if (page == PAGE_OUTPUT) {
+        const grav_controls_t *c = &set.controls[track_sel];
+        if (SYNTH_IS_DRUM(track_sel)) return index == 0 ? c->level : index == 1 ? c->accent : !!(c->flags & GRAV_DRUM_HOLD);
+        return index == 0 ? c->tune : index == 1 ? c->level : c->aux;
+    }
+    if (!IS_SOUND_PAGE(page) && page != PAGE_MOD && page != PAGE_ENV && !IS_FX_PAGE(page)) return -1;
+    return *param_of(page, index);
+}
+
 /* drawn from the middle: DENSITY (no grains there: clocked left, random right), PITCH and a drum's TUNE (0 there) */
 static int param_centred(uint32_t page, uint32_t index)
 {
+    if (page == PAGE_SOUND) {
+        grav_control_info_t i;
+        return grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &i) &&
+               (i.kind == GC_SIGNED || i.kind == GC_FM_SIGNED);
+    }
     return (page == PAGE_FX_GRAIN && index == 0u) || (page == PAGE_FX_SHAPE && index == 1u) ||
+           (page == PAGE_OUTPUT && index == 0u && !SYNTH_IS_DRUM(track_sel)) ||
            (page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel));
 }
 
 /* a knob's name: a drum track's DRUM and SHAPE pages by its drum (dsp/grav_drums.h) */
 static const char *param_name(uint32_t page, uint32_t index)
 {
+    if (page == PAGE_SOUND) {
+        grav_control_info_t info;
+        return grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &info) ? info.name : "--";
+    }
+    if (page == PAGE_OUTPUT) {
+        static const char *const out[2][3] = {{"TUNE","LEVEL","AUX MIX"},{"LEVEL","ACCENT","HOLD"}};
+        return out[SYNTH_IS_DRUM(track_sel)][index];
+    }
     static const char *const DRUM[3] = {"TUNE", "DECAY", "TONE"};
     static const char *const SHAPE[3][3] = {{"PUNCH", "SWEEP", "DRIVE"}, {"SNAPPY", "DRIVE", "LEVEL"},
                                             {"NOISE", "DRIVE", "LEVEL"}};
@@ -1111,13 +1195,71 @@ static const char *param_name(uint32_t page, uint32_t index)
 
 static const char *page_name(uint32_t page)   /* a drum track's OSC: DRUM */
 {
+    if (page == PAGE_SOUND) {
+        static char title[24];
+        title[0] = 0;
+        if (grav_controls_fm(*track_engine(track_sel)) && ui.sound_page[track_sel] >= 8u) {
+            char op[8];
+            text_cat(title, "OP "); int_text((ui.sound_page[track_sel] - 8u) / 8u + 1u, op);
+            text_cat(title, op); text_cat(title, " ");
+        }
+        text_cat(title, grav_control_page(*track_engine(track_sel), ui.sound_page[track_sel] - 1u));
+        return title;
+    }
     return page == PAGE_OSC && SYNTH_IS_DRUM(track_sel) ? "DRUM" : PAGE_NAME[page];
 }
 
 /* a knob's value as the screen and a screen reader give it: PITCH in semitones (Beads' law), the rest as it is */
 static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
 {
-    if (page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel)) {   /* TUNE: semitones, a half each */
+    if (page == PAGE_SOUND) {
+        grav_control_info_t i;
+        t[0] = 0;
+        if (!grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &i)) { text_cat(t,"--"); return; }
+        if (value == GRAV_AUTO) { text_cat(t,"AUTO"); return; }
+        if (i.kind == GC_STEP) {
+            if (*track_engine(track_sel) == GRAV_ENGINE_CHIPTUNE && i.offset == 3) {
+                static const char *const mode[] = {"UP","DOWN","UP/DOWN","RANDOM"};
+                text_cat(t, mode[value]);
+            } else if (*track_engine(track_sel) == GRAV_ENGINE_CHIPTUNE && i.offset == 4) int_text(1 << value, t);
+            else if (!value) text_cat(t,"VOWEL");
+            else int_text(value, t);
+            return;
+        }
+        if (i.kind == GC_FM && i.offset == 142) {
+            static const char *const wave[] = {"TRI","SAW DN","SAW UP","SQUARE","SINE","S&H"};
+            text_cat(t, wave[value]); return;
+        }
+        if (i.kind == GC_FM && i.offset < 126 && (i.offset % 21 == 11 || i.offset % 21 == 12)) {
+            static const char *const curve[] = {"-LIN","-EXP","+EXP","+LIN"};
+            text_cat(t, curve[value]); return;
+        }
+        if (i.kind == GC_FM && i.offset < 126 && i.offset % 21 == 18 && value == 0) {
+            uint8_t raw[GRAV_CONTROL_BYTES];
+            const uint8_t *patch = set.controls[track_sel].value;
+            if (!(set.controls[track_sel].flags & GRAV_CUSTOM_FM)) {
+                grav_fm_patch(*track_engine(track_sel), (uint32_t)osc_params[track_sel][2], raw);
+                patch = raw;
+            }
+            text_cat(t, patch[i.offset - 1] ? "0" : "0.5");
+            return;
+        }
+        if (i.kind == GC_BOOL || i.kind == GC_FM_BOOL || i.kind == GC_FM_BIT) {
+            if (i.kind == GC_FM_BOOL && i.offset < 126 && i.offset % 21 == 17) text_cat(t, value ? "FIXED" : "RATIO");
+            else text_cat(t, value ? "ON" : "OFF");
+        } else {
+            if (i.kind == GC_SIGNED) value -= 50;
+            else if (i.kind == GC_FM_SIGNED) value -= i.offset == 144 ? 24 : 7;
+            else if (i.kind == GC_FM && i.offset == 134) value++;
+            int_text(value, t);
+        }
+    } else if (page == PAGE_FX_MIX && index == 2) {
+        static const char *const quality[] = {"DIGITAL","VINTAGE","CLEAN","DIRTY"};
+        t[0] = 0; text_cat(t, quality[value]);
+    } else if (page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && index == 2) {
+        t[0] = 0; text_cat(t, value ? "ON" : "OFF");
+    } else if ((page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel)) ||
+               (page == PAGE_OUTPUT && index == 0 && !SYNTH_IS_DRUM(track_sel))) {
         const int32_t half = value - 50, a = half < 0 ? -half : half;
         t[0] = half < 0 ? '-' : '+';
         int_text(a / 2, t + 1);
@@ -1136,6 +1278,36 @@ static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
             int_text(s, t);
     } else
         int_text(value, t);
+}
+
+static void sound_param_turn(uint32_t index, int32_t e)
+{
+    grav_controls_t c = set.controls[track_sel];
+    if (active_page == PAGE_SOUND) {
+        grav_control_info_t i;
+        if (!grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &i)) return;
+        if (grav_controls_fm(*track_engine(track_sel)) && !(c.flags & GRAV_CUSTOM_FM))
+            grav_fm_patch(*track_engine(track_sel), (uint32_t)osc_params[track_sel][2], c.value);
+        int32_t old = grav_control_read(&c, &i);
+        if (old == GRAV_AUTO) old = i.kind == GC_BOOL ? (e > 0 ? 0 : 1) : i.kind == GC_STEP ? (e > 0 ? -1 : i.max + 1) : 50;
+        int32_t value = clamp(old + e, i.kind < GC_FM ? -1 : 0, i.max);
+        grav_control_write(&c, &i, value < 0 ? GRAV_AUTO : (uint32_t)value);
+    } else if (SYNTH_IS_DRUM(track_sel)) {
+        if (index == 0) c.level = (uint8_t)clamp_percent(c.level + e);
+        else if (index == 1) c.accent = (uint8_t)clamp_percent(c.accent + e);
+        else if (e > 0) c.flags |= GRAV_DRUM_HOLD;
+        else c.flags &= ~GRAV_DRUM_HOLD;
+    } else {
+        uint8_t *v = index == 0 ? &c.tune : index == 1 ? &c.level : &c.aux;
+        *v = (uint8_t)clamp_percent(*v + e);
+    }
+    const uint32_t f = plat_lock();
+    set.controls[track_sel] = c;
+    plat_unlock(f);
+    preset_id[track_sel] = PRESET_CUSTOM;
+    set_dirty = 1;
+    char t[12]; param_text(active_page, index, param_value(active_page, index), t);
+    app_say(param_name(active_page, index), t);
 }
 
 /* MIX's K3: QUALITY, from DIGITAL to DIRTY TAPE (Beads' media) */
@@ -1393,7 +1565,7 @@ static void patterns(void)
         ui.patterns_until = 0;
         ui.redraw = 1;
     }
-    if (ui.home_down && !ui.home_shown && now - ui.home_at >= 300u) {   /* HOME held: the patterns' grid */
+    if (ui.home_down && !ui.home_shown && !ui.sound_nav && now - ui.home_at >= 300u) {
         ui.home_shown = 1;
         ui.redraw = 1;
     }
@@ -1413,8 +1585,16 @@ static void track_select(uint32_t t)
     if (t >= SYNTH_TRACKS)
         return;
     if (t != track_sel) {
+        const uint32_t previous_page = active_page;
+        const uint32_t previous_sound = ui.sound_page[track_sel];
         track_sel = (uint8_t)t;
         ui.step_held = -1;
+        if (IS_SOUND_PAGE(previous_page)) {
+            uint32_t page = previous_page == PAGE_OUTPUT ? sound_pages() - 1u :
+                            previous_page == PAGE_OSC || (!SYNTH_IS_DRUM(t) && previous_page == PAGE_SHAPE) ? 0u :
+                            previous_sound < sound_pages() - 1u ? previous_sound : sound_pages() - 2u;
+            sound_activate(page);
+        }
     }
     if (!SYNTH_IS_DRUM(t) && home_page == PAGE_SHAPE)   /* (SHAPE: a drum's; a synth track's sound instead) */
         home_page = PAGE_OSC;
@@ -1456,7 +1636,7 @@ static void chord_done(void)
 
 static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
-    return page == PAGE_SEQ || page == PAGE_OSC || page == PAGE_SHAPE ? B_HOME : page == PAGE_MOD ? B_LFO :
+    return page == PAGE_SEQ || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
            page == PAGE_GLO || page == PAGE_DEBUG ? B_GLO : B_FX;
 }
@@ -1578,10 +1758,17 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
 {
     if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
         fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
-    if (k == B_HOME)                         /* HOME: SEQ, again OSC (the sound; a drum: DRUM, then SHAPE), and back */
-        home_page = active_page == PAGE_SEQ ? PAGE_OSC :
-                    active_page == PAGE_OSC ? (SYNTH_IS_DRUM(track_sel) ? PAGE_SHAPE : PAGE_SEQ) :
-                    active_page == PAGE_SHAPE ? PAGE_SEQ : home_page;
+    if (k == B_HOME) {
+        if (active_page == PAGE_SEQ) sound_activate(0);
+        else if (IS_SOUND_PAGE(active_page)) {
+            if (ui.sound_page[track_sel] + 1u < sound_pages()) sound_activate(ui.sound_page[track_sel] + 1u);
+            else active_page = home_page = PAGE_SEQ;
+        } else if (IS_SOUND_PAGE(home_page)) sound_activate(ui.sound_page[track_sel]);
+        else active_page = home_page;
+        app_say("PAGE", page_name(active_page));
+        ui.redraw = 1;
+        return;
+    }
     if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
         glo_page = active_page == PAGE_GLO ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
     active_page = k == B_HOME ? home_page :
@@ -1687,6 +1874,7 @@ static void input(void)
         if (k == B_HOME) {                   /* HOME: on its release (held, a white key is a pattern) */
             ui.home_down = 1;
             ui.home_used = ui.home_shown = 0;
+            ui.sound_nav = 0;
             ui.home_at = plat_ms();
         } else if (k == B_LFO || k == B_ENV || k == B_GLO || k == B_FX) {
             page_open(k);
@@ -1766,6 +1954,7 @@ static void input(void)
         ui.home_down = 0;
         if (ui.home_shown)
             ui.redraw = 1;
+        ui.home_shown = 0;
         if (!ui.home_used)
             page_open(B_HOME);
     }
@@ -1808,6 +1997,13 @@ static void input(void)
             }
         } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_SEQ) {
             seq_turn((uint32_t)(k - EN_K1), e);
+        } else if (k == EN_SELECT && ui.home_down) {
+            ui.home_used = ui.sound_nav = 1;
+            ui.home_shown = 0;
+            ui.patterns_until = ui.tracks_until = ui.splash_until = 0;
+            int32_t n = (int32_t)ui.sound_page[track_sel] + e % (int32_t)sound_pages();
+            sound_activate((uint32_t)((n + (int32_t)sound_pages()) % (int32_t)sound_pages()));
+            app_say("PAGE", page_name(active_page));
         } else if (k == EN_SELECT) {         /* the track (S1..S4), on every page; recording: the step */
             if (ui.rec) {
                 ui.rec_pos = (uint8_t)(((int32_t)ui.rec_pos + e % (int32_t)TRK.length + (int32_t)TRK.length) %
@@ -1829,6 +2025,8 @@ static void input(void)
                 set_dirty = 1;
             }
             app_say("LFO DEST", LFO_DEST_NAME[destination]);
+        } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && (active_page == PAGE_SOUND || active_page == PAGE_OUTPUT)) {
+            sound_param_turn((uint32_t)(k - EN_K1), e);
         } else if (k == EN_K1 || k == EN_K2 || k == EN_K3) {
             uint32_t index = (uint32_t)(k - EN_K1);
             volatile int32_t *value = param_of(active_page, index);
@@ -1837,6 +2035,12 @@ static void input(void)
             if (*value != previous) {
                 set_dirty = 1;
                 if (active_page == PAGE_OSC || active_page == PAGE_SHAPE) preset_id[track_sel] = PRESET_CUSTOM;
+                if (active_page == PAGE_OSC && index == 2 && grav_controls_fm(*track_engine(track_sel))) {
+                    const uint32_t f = plat_lock();
+                    set.controls[track_sel].flags &= ~GRAV_CUSTOM_FM;
+                    memset(set.controls[track_sel].value, GRAV_AUTO, GRAV_CONTROL_BYTES);
+                    plat_unlock(f);
+                }
             }
             param_text(active_page, index, *value, t);
             app_say(param_name(active_page, index), t);
@@ -1849,6 +2053,12 @@ static void input(void)
             *engine = (uint8_t)(SYNTH_IS_DRUM(track_sel) ? grav_drum_step(*engine, e) : grav_engine_step(*engine, e));
             set_dirty = 1;
             preset_id[track_sel] = PRESET_CUSTOM;
+            const uint32_t f = plat_lock();
+            set.controls[track_sel].flags &= ~GRAV_CUSTOM_FM;
+            memset(set.controls[track_sel].value, GRAV_AUTO, GRAV_CONTROL_BYTES);
+            plat_unlock(f);
+            ui.sound_page[track_sel] = 0;
+            if (IS_SOUND_PAGE(active_page)) sound_activate(0);
             ui.splash_until = plat_ms() + 1500u;   /* its splash, a moment */
             app_say("ALGO", grav_engine_name(*track_engine(track_sel)));
         } else {
@@ -1884,55 +2094,191 @@ static void key_cell(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t k, uin
         cv_rect(x + 2, y + h - p, w - 4, p, C_WHITE);
 }
 
-/* OSC, MOD, ENV and the FX pages: each knob's name, value and bar; QUALITY by its name, one of four */
+/* A small dial strip: its own redraw while a value settles, with no audio-rate or full-screen animation. */
+static const int8_t DIAL_POINT[49][2] = {
+    {-90,90},
+    {-98,81},
+    {-106,71},
+    {-112,60},
+    {-117,49},
+    {-122,37},
+    {-125,25},
+    {-126,12},
+    {-127,0},
+    {-126,-12},
+    {-125,-25},
+    {-122,-37},
+    {-117,-49},
+    {-112,-60},
+    {-106,-71},
+    {-98,-81},
+    {-90,-90},
+    {-81,-98},
+    {-71,-106},
+    {-60,-112},
+    {-49,-117},
+    {-37,-122},
+    {-25,-125},
+    {-12,-126},
+    {0,-127},
+    {12,-126},
+    {25,-125},
+    {37,-122},
+    {49,-117},
+    {60,-112},
+    {71,-106},
+    {81,-98},
+    {90,-90},
+    {98,-81},
+    {106,-71},
+    {112,-60},
+    {117,-49},
+    {122,-37},
+    {125,-25},
+    {126,-12},
+    {127,0},
+    {126,12},
+    {125,25},
+    {122,37},
+    {117,49},
+    {112,60},
+    {106,71},
+    {98,81},
+    {90,90}
+};
+static int32_t dial_target(uint32_t i)
+{
+    int32_t v = param_value(active_page, i), max = 100;
+    if (v < 0 || v == GRAV_AUTO) return 0;
+    if (active_page == PAGE_SOUND) {
+        grav_control_info_t info;
+        if (grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, i, &info)) max = info.max;
+    } else if (active_page == PAGE_MOD && i == 2) { v = (int32_t)lfo_destination(mod_params[2]); max = 2; }
+    else if (active_page == PAGE_FX_MIX && i == 2) { v = fx_quality; max = 3; }
+    else if (active_page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && i == 2) max = 1;
+    return clamp(v, 0, max) * 25600 / max;
+}
+static void dials_sync(void)
+{
+    const uint32_t id = 1u + ((uint32_t)active_page << 24) + ((uint32_t)track_sel << 16) +
+                        ((uint32_t)ui.sound_page[track_sel] << 8) + *track_engine(track_sel);
+    if (ui.dial_id == id) return;
+    ui.dial_id = id;
+    for (uint32_t i = 0; i < 3; i++) ui.dial_q8[i] = dial_target(i);
+    ui.dial_at = plat_ms();
+}
+static const char *dial_hint(uint32_t i)
+{
+    if (active_page == PAGE_SOUND) {
+        const uint32_t e = *track_engine(track_sel);
+        grav_control_info_t info;
+        if (!grav_control_info(e, ui.sound_page[track_sel] - 1u, i, &info)) return "";
+        if (grav_controls_fm(e)) return "DX";
+        if ((e == GRAV_ENGINE_WAVESHAPING && info.offset == 0) ||
+            (e == GRAV_ENGINE_GRAIN && info.offset >= 3) ||
+            (e == GRAV_ENGINE_BASS_DRUM && info.offset >= 3) || e == GRAV_ENGINE_SNARE_DRUM || e == GRAV_ENGINE_HI_HAT ||
+            (e == GRAV_ENGINE_PHASE_DISTORTION && (info.offset == 1 || info.offset == 2))) return "AUX";
+        if (e == GRAV_ENGINE_SPEECH) return "WORDS";
+        if (e == GRAV_ENGINE_CHIPTUNE && (info.offset == 3 || info.offset == 4)) return "CLOCK";
+        if (e == GRAV_ENGINE_PARTICLE && info.offset == 2) return "DIFFUSE";
+        return info.kind == GC_BOOL || info.kind == GC_STEP ? "" : "%";
+    }
+    if ((active_page == PAGE_OUTPUT && !SYNTH_IS_DRUM(track_sel) && i == 0) ||
+        (active_page == PAGE_OSC && SYNTH_IS_DRUM(track_sel) && i == 0)) return "st";
+    if ((active_page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && i == 2) ||
+        (active_page == PAGE_MOD && i == 2) || (active_page == PAGE_FX_MIX && i == 2)) return "";
+    if (active_page == PAGE_FX_SHAPE && i == 1) return "st";
+    return "%";
+}
+static void draw_dials(int32_t y0, uint32_t mask, int32_t xoffset)
+{
+    dials_sync();
+    ui.dial_hot &= (uint8_t)~mask;
+    ui.dial_dirty &= (uint8_t)~mask;
+    for (uint32_t i = 0; i < 3u; i++) {
+        if (!(mask & 1u << i)) continue;
+        const int32_t x = 40 + (int32_t)i * 80 - xoffset, y = y0 + 49;
+        const int32_t v = param_value(active_page, i);
+        const uint32_t progress = (uint32_t)clamp(ui.dial_q8[i], 0, 25600) * 48u;
+        const uint32_t at = progress / 25600u, fraction = progress % 25600u;
+        const int hot = plat_ms() - ui.turned_at[EN_K1 + i] < 450u;
+        ui.dial_hot |= (uint8_t)(hot << i);
+        char value[12];
+        param_text(active_page, i, v, value);
+        const char *name = param_name(active_page, i);
+        cv_text(x - text_w(&FONT_XS, name) / 2, y0, &FONT_XS, name, hot ? C_HI : C_GRAY);
+        for (uint32_t j = 0; j < 48; j++) {
+            const int filled = v >= 0 && v != GRAV_AUTO && (param_centred(active_page, i) ?
+                (j >= (at < 24 ? at : 24) && j < (at < 24 ? 24 : at)) : j < at);
+            for (int32_t r = 25; r <= 26; r++)
+                cv_line(x + DIAL_POINT[j][0] * r / 127, y + DIAL_POINT[j][1] * r / 127,
+                        x + DIAL_POINT[j + 1][0] * r / 127, y + DIAL_POINT[j + 1][1] * r / 127,
+                        filled ? C_HI : C_LINE);
+        }
+        for (uint32_t j = 0; j <= 48; j += 6)
+            cv_line(x + DIAL_POINT[j][0] * 29 / 127, y + DIAL_POINT[j][1] * 29 / 127,
+                    x + DIAL_POINT[j][0] * 31 / 127, y + DIAL_POINT[j][1] * 31 / 127, C_DIM);
+        if (v >= 0 && v != GRAV_AUTO) {
+            const uint32_t next = at < 48 ? at + 1 : at;
+            const int32_t dx = (DIAL_POINT[at][0] * (int32_t)(25600u - fraction) + DIAL_POINT[next][0] * (int32_t)fraction) / 25600;
+            const int32_t dy = (DIAL_POINT[at][1] * (int32_t)(25600u - fraction) + DIAL_POINT[next][1] * (int32_t)fraction) / 25600;
+            cv_line(x + dx * 18 / 127, y + dy * 18 / 127, x + dx * 23 / 127, y + dy * 23 / 127, C_WHITE);
+        }
+        const felucca_font_t *font = text_w(&FONT_M, value) <= 44 ? &FONT_M : text_w(&FONT_S, value) <= 46 ? &FONT_S : &FONT_XS;
+        cv_text(x - text_w(font, value) / 2, y - (font == &FONT_M ? 12 : 8), font, value, v == GRAV_AUTO ? C_GRAY : C_WHITE);
+        const char *hint = dial_hint(i);
+        cv_text(x - text_w(&FONT_T, hint) / 2, y0 + 72, &FONT_T, hint, C_GRAY);
+    }
+}
 static void draw_knobs(void)
 {
-    char t[12];
-    int32_t y0 = 42;                         /* the knobs' row: under the icon on a sound page */
-    if (active_page == PAGE_OSC || active_page == PAGE_SHAPE) {   /* a sound page: the engine's icon, its line */
-        cv_rect(8, 22, 100, 1, C_LINE);
-        cv_rect(8, 77, 100, 1, C_LINE);
-        cv_rect(8, 22, 1, 56, C_LINE);
-        cv_rect(107, 22, 1, 56, C_LINE);
-        live_area(9, 23, 98, 54);
-        draw_wrapped(engine_desc(*track_engine(track_sel)), 116, 24, 118, 4u, 0, C_GRAY);
-        y0 = 82;
-    }
-    for (uint32_t i = 0; i < 3u; i++) {
-        int32_t x = 8 + (int32_t)i * 78;
-        cv_text(x, y0, &FONT_XS, param_name(active_page, i), C_GRAY);
-        if (active_page == PAGE_MOD && i == 2u) {
-            uint32_t destination = lfo_destination(mod_params[2]);
-            cv_text(x, y0 + 24, &FONT_S, LFO_DEST_NAME[destination], C_WHITE);
-            for (uint32_t d = 0; d < 3; ++d)
-                cv_rect(x + (int32_t)d * 24, y0 + 58, 20, 3, d == destination ? C_HI : C_LINE);
-            continue;
+    char title[24], n[8];
+    title[0] = 0;
+    if (IS_SOUND_PAGE(active_page)) {
+        text_cat(title, page_name(active_page));
+        int_text(ui.sound_page[track_sel] + 1u, n); text_cat(n, "/");
+        char total[8]; int_text(sound_pages(), total); text_cat(n, total);
+        cv_text(230 - text_w(&FONT_XS, n), 24, &FONT_XS, n, C_WHITE);
+        live_area(158, 22, 38, 22);
+        cv_text(8, 132, &FONT_T, "HOME NEXT / HOLD+SELECT PAGE", C_GRAY);
+    } else {
+        text_cat(title, page_name(active_page));
+        if (IS_FX_PAGE(active_page)) {
+            cv_text(8, 132, &FONT_T, fx_seed_auto ? "SEED AUTO" : "SEED MANUAL", C_GRAY);
+            cv_text(178, 132, &FONT_T, fx_wanted() ? "FX ON" : "FX OFF", C_HI);
         }
-        if (active_page == PAGE_FX_MIX && i == 2u) {
-            cv_text(x, y0 + 24, &FONT_S, QUALITY_NAME[fx_quality], C_WHITE);
-            for (int32_t q = 0; q < GRAV_FX_QUALITIES; q++)
-                cv_rect(x + q * 18, y0 + 58, 14, 3, q == fx_quality ? C_HI : C_LINE);
-            continue;
-        }
-        int32_t value = *param_of(active_page, i);
-        param_text(active_page, i, value, t);
-        cv_text(x, y0 + 20, &FONT_M, t, C_WHITE);
-        cv_rect(x, y0 + 58, 68, 3, C_LINE);
-        if (param_centred(active_page, i)) { /* from the middle, its mark there */
-            int32_t at = value * 68 / 100;
-            int32_t a = at < 34 ? at : 34, b = at < 34 ? 34 : at;
-            if (b > a)
-                cv_rect(x + a, y0 + 58, b - a, 3, C_HI);
-            cv_rect(x + 33, y0 + 55, 2, 9, C_GRAY);
-        } else if (value > 0)
-            cv_rect(x, y0 + 58, value * 68 / 100, 3, C_HI);
     }
-    if (IS_FX_PAGE(active_page)) {           /* the effect's state: SEED's way and on or off */
-        cv_text(8, 116, &FONT_XS, "SEED", C_GRAY);
-        cv_text(40, 116, &FONT_XS, fx_seed_auto ? "AUTO" : "MANUAL", C_WHITE);
-        cv_text(164, 116, &FONT_XS, "FX", C_GRAY);
-        cv_text(184, 116, &FONT_XS, fx_wanted() ? "ON" : "OFF", fx_wanted() ? C_HI : C_WHITE);
+    cv_text(8, 24, &FONT_XS, title, C_HI);
+    draw_dials(46, 7u, 0);
+}
+static int animate_dials(uint32_t now)
+{
+    if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page)) ||
+        ui.splash_until || ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown) return 0;
+    const uint32_t dt = now - ui.dial_at, period = plat_cpu_pct() >= 75u ? 96u : 30u;
+    if (dt < period) return 0;
+    uint32_t hot = 0;
+    for (uint32_t i = 0; i < 3; i++) hot |= (plat_ms() - ui.turned_at[EN_K1 + i] < 450u) << i;
+    ui.dial_dirty |= (uint8_t)(hot ^ ui.dial_hot);
+    for (uint32_t i = 0; i < 3; i++) {
+        const int32_t target = dial_target(i), delta = target - ui.dial_q8[i];
+        if (delta > 12 || delta < -12) {
+            ui.dial_q8[i] += delta * (int32_t)(dt < 60u ? dt : 60u) / 80;
+            ui.dial_dirty |= (uint8_t)(1u << i);
+        } else ui.dial_q8[i] = target;
     }
+    ui.dial_at = now;
+    if (!ui.dial_dirty) return 0;
+    /* One 80x84 tile per frame (~2.4 ms SPI), even when a preset changes all three values at once. */
+    uint32_t dial = ui.dial_next;
+    for (uint32_t n = 0; n < 3; n++, dial = (dial + 1u) % 3u)
+        if (ui.dial_dirty & 1u << dial) break;
+    ui.dial_next = (uint8_t)((dial + 1u) % 3u);
+    cv_begin(80, 84, C_BLACK);
+    draw_dials(0, 1u << dial, (int32_t)dial * 80);
+    cv_blit(dial * 80, 36 + 46);
+    ui.dial_frames++;
+    return 1;
 }
 
 /* SEQ's steps: the 16 of the page shown, from y0 (52 high): a step on fills to its velocity, a tick at its note's
@@ -2099,7 +2445,7 @@ static void draw_preset_slots(void)
         if (!held) cv_rect(x + 1, y + 1, 51, 18, C_BLACK);
         int_text(slot + 1, t);
         cv_text(x + 6, y + 2, &FONT_S, t, held ? C_BLACK : used ? C_WHITE : C_DIM);
-        if (used) cv_text(x + 39, y + 5, &FONT_XS, user_presets.slot[slot].drum ? "D" : "S",
+        if (used) cv_text(x + 39, y + 5, &FONT_XS, preset_user(&user_presets, slot)->drum ? "D" : "S",
                           held ? C_BLACK : C_HI);
     }
     cv_text(10, 128, &FONT_T, "OCT-/+ PAGE  KEY: SAVE/REPLACE", C_GRAY);
@@ -2150,7 +2496,9 @@ static void draw_glo(void)
         int32_t x = 8 + (int32_t)i * 78;
         cv_text(x, 42, &FONT_XS, PARAM_NAME[PAGE_GLO][i], C_GRAY);
         if (i == 2u) {                       /* (the small font: a version has dots) */
-            cv_text(x, 66, &FONT_S, APP_VERSION, C_WHITE);
+            const felucca_font_t *font = text_w(&FONT_S, APP_VERSION) <= 68 ? &FONT_S :
+                                        text_w(&FONT_XS, APP_VERSION) <= 68 ? &FONT_XS : &FONT_T;
+            cv_text(x, font == &FONT_T ? 68 : 66, font, APP_VERSION, C_WHITE);
             continue;
         }
         const uint32_t voices = SYNTH_IS_DRUM(track_sel) ? 1u : set.trk_voices[track_sel];
@@ -2312,7 +2660,17 @@ static void draw(void)
     cv_text(30, 36, &FONT_XS, t, C_HI);
     cv_text(54, 36, &FONT_XS, "PRESET", C_GRAY);
     cv_text(98, 36, &FONT_XS, preset_label(track_sel), C_HI);
-    if (active_page == PAGE_DEBUG) {
+    if (preset_import_failed || preset_dirty || (ui.msg_until && plat_ms() < ui.msg_until)) {
+        char message[48];
+        message[0] = 0;
+        if (preset_import_failed) text_cat(message, "PRESET IMPORT: REBOOT TO RETRY");
+        else if (ui.msg_until && plat_ms() < ui.msg_until) {
+            text_cat(message, ui.msg[0]);
+            if (ui.msg[1][0]) { text_cat(message, " "); text_cat(message, ui.msg[1]); }
+            if (text_w(&FONT_T, message) > 170) { message[0] = 0; text_cat(message, ui.msg[0]); }
+        } else text_cat(message, preset_write_req ? "PRESET PENDING: STOP / RELEASE" : "PRESET UNSAVED: TAP SAVE");
+        cv_text(4, 48, &FONT_T, message, preset_dirty || preset_import_failed ? C_HI : C_GRAY);
+    } else if (active_page == PAGE_DEBUG) {
         debug_number(4, 48, "QUEUE", synth_queue_overflows, 0);
     } else if (midi_count) {                        /* the last MIDI message in, and where from */
         static const char *const PORT[NPORTS] = {"USB", "BLE", "TRS"};
@@ -2351,6 +2709,7 @@ void app_ui_init(void)
     touch_on(1);                             /* velocity and pressure: the keys' readings on */
     lcd_fill(0, 0, 240, 240, C_BLACK);
     ui.redraw = 1;
+    if (preset_import_failed) app_say("PRESET IMPORT FAILED", "REBOOT TO RETRY");
 }
 
 void app_frame(void)
@@ -2438,6 +2797,8 @@ void app_frame(void)
     } else if (ui.redraw_grid) {
         ui.redraw_grid = 0;
         draw_seq_grid();
+    } else if (animate_dials(now)) {
+        /* only the dial strip changed */
     } else if (ui.live_w && now - ui.live_at >= (plat_cpu_pct() >= 75u ? 96u : 30u)) {   /* (frames: 16 ms) */
         ui.live_at = now;                    /* the icon alive: its area alone */
         ui.live_frames++;
@@ -2498,6 +2859,8 @@ void app_host_reboot(void)
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
 {
     (void)a; (void)b; (void)c; (void)d;
+    if (!strcmp(cmd, "preset_fail")) { preset_store_test_fail(atoi(a)); return 1; }
+    if (!strcmp(cmd, "soundpage")) { sound_activate((uint32_t)atoi(a)); return 1; }
     if (!strcmp(cmd, "save_moddest")) {
         settings_capture();
         settings_t legacy = set;
@@ -2520,11 +2883,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
             plat_data_erase(off);
         return 1;
     }
-    if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016") || !strcmp(cmd, "save018")) {   /* the settings as 0.12,
+    if (!strcmp(cmd, "save012") || !strcmp(cmd, "save016") || !strcmp(cmd, "save018") || !strcmp(cmd, "save021")) {   /* the settings as 0.12,
                                                                                                 * 0.16, 0.18 saved them */
         settings_capture();
         plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 :
-                                            !strcmp(cmd, "save016") ? SET_SIZE_016 : SET_SIZE_018);
+                                            !strcmp(cmd, "save016") ? SET_SIZE_016 : !strcmp(cmd, "save018") ? SET_SIZE_018 : SET_SIZE_021);
         return 1;
     }
     return 0;
@@ -2584,6 +2947,20 @@ int app_expect(const char *what, int *got)
         *got = preset_id[track_sel];
     else if (!strcmp(what, "preset_dirty"))
         *got = preset_dirty;
+    else if (!strcmp(what, "preset_seq"))
+        *got = (int)user_presets.seq;
+    else if (!strcmp(what, "preset_pending"))
+        *got = user_presets.n_pending;
+    else if (!strcmp(what, "sound_page"))
+        *got = ui.sound_page[track_sel];
+    else if (!strcmp(what, "sound_pages"))
+        *got = (int)sound_pages();
+    else if (!strcmp(what, "dial_frames"))
+        *got = (int)ui.dial_frames;
+    else if (!strncmp(what, "param", 5))
+        *got = (int)param_value(active_page, (uint32_t)atoi(what + 5) % 3u);
+    else if (!strcmp(what, "fm_custom"))
+        *got = !!(set.controls[track_sel].flags & GRAV_CUSTOM_FM);
     else if (!strcmp(what, "preset_grid"))
         *got = ui.preset_shown;
     else if (!strcmp(what, "preset_page"))

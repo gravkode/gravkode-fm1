@@ -44,13 +44,13 @@ expect step0 0
 expect bank_live 1
 expect pattern_dirty 0
 said PATTERN 2
-# HOME tapped: its pages as before (OSC, then SEQ)
+# HOME tapped: OSC, then the first extra sound page
 tap HOME
 wait 30
 expect page 0
 tap HOME
 wait 30
-expect page 8
+expect page 10
 # pattern 2's own steps (3 and 7) and swing (60)
 tap SEQ
 wait 30

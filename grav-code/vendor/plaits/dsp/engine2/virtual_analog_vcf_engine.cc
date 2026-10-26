@@ -74,9 +74,12 @@ void VirtualAnalogVCFEngine::Render(
     pw = 2.5f - parameters.morph * 2.0f;
   }
   CONSTRAIN(pw, 0.5f, 0.98f);
+  if (parameters.extra && parameters.extra[0] != 255) pw = 0.5f + 0.48f * GravExtra(parameters, 0, 0.5f);
+  shape = GravExtra(parameters, 4, shape);
   
   float sub_gain = max(fabsf(parameters.morph - 0.5f) - 0.3f, 0.0f) * 5.0f;
 
+  sub_gain = GravExtra(parameters, 1, sub_gain);
   oscillator_.Render(f0, pw, shape, out, size);
   sub_oscillator_.Render(f0 * 0.501f, 0.5f, 1.0f, aux, size);
   
@@ -85,6 +88,7 @@ void VirtualAnalogVCFEngine::Render(
 
   float stage2_gain = 1.0f - (parameters.harmonics - 0.4f) * 4.0f;
   CONSTRAIN(stage2_gain, 0.0f, 1.0f);
+  stage2_gain = GravExtra(parameters, 2, stage2_gain);
   
   const float resonance = 2.667f * \
       max(fabsf(parameters.harmonics - 0.5f) - 0.125f, 0.0f);
@@ -92,6 +96,7 @@ void VirtualAnalogVCFEngine::Render(
   const float q = resonance_sqr * resonance_sqr * 48.0f;
   float gain = (parameters.harmonics - 0.7f) + 0.85f;
   CONSTRAIN(gain, 0.7f - resonance_sqr * 0.3f, 1.0f);
+  gain = GravExtra(parameters, 3, gain);
 
   ParameterInterpolator sub_gain_modulation(
       &previous_sub_gain_, sub_gain, size);

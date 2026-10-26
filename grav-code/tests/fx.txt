@@ -105,6 +105,7 @@ turn K3 5
 wait 30
 said QUALITY DIRTY TAPE
 expect quality 3
+expect param2 3
 # a tape plays too: DRY/WET up, a note, its grains
 turn K1 70
 wait 30

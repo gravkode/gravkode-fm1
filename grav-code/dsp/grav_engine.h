@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "../synth/synth.h"
 #include "grav_beads.h"
+#include "../sound/controls.h"
 
 typedef struct {
     uint32_t voice_us[2], fx_us, wait_us, jobs;
@@ -28,6 +29,7 @@ typedef struct {
     float pitch;                         /* semitones on its notes (the LFO's; a drum's TUNE), beside the render's
                                           * pitch_offset */
     float shape[3];                      /* a drum's SHAPE knobs, 0..1 (dsp/grav_drums.h) */
+    const grav_controls_t *controls;
 } grav_sound_t;
 
 void grav_engine_init(grav_engine_t *e);

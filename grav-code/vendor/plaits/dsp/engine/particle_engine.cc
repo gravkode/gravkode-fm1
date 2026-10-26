@@ -61,13 +61,12 @@ void ParticleEngine::Render(
   const float q_sqrt = SemitonesToRatio(parameters.morph >= 0.5f
       ? (parameters.morph - 0.5f) * 120.0f
       : 0.0f);
-  const float q = 0.5f + q_sqrt * q_sqrt;
+  const float custom_q = SemitonesToRatio(60.0f * GravExtra(parameters, 0, 0.0f));
+  const float q = parameters.extra && parameters.extra[0] != 255 ? 0.5f + custom_q * custom_q : 0.5f + q_sqrt * q_sqrt;
   const float spread = 48.0f * parameters.harmonics * parameters.harmonics;
   const float raw_diffusion_sqrt = 2.0f * fabsf(parameters.morph - 0.5f);
   const float raw_diffusion = raw_diffusion_sqrt * raw_diffusion_sqrt;
-  const float diffusion = parameters.morph < 0.5f
-      ? raw_diffusion
-      : 0.0f;
+  const float diffusion = GravExtra(parameters, 1, parameters.morph < 0.5f ? raw_diffusion : 0.0f);
   const bool sync = parameters.trigger & TRIGGER_RISING_EDGE;
   
   fill(&out[0], &out[size], 0.0f);
@@ -91,7 +90,7 @@ void ParticleEngine::Render(
   
   diffuser_.Process(
       0.8f * diffusion * diffusion,
-      0.5f * diffusion + 0.25f,
+      GravExtra(parameters, 2, 0.5f * diffusion + 0.25f),
       out,
       size);
 }

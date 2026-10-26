@@ -80,7 +80,7 @@ From the top:
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
-| HOME | SEQ, the sequencer's page; again OSC: TIMBRE, MORPH, HARMONICS; again SEQ. A drum track: SEQ, DRUM, SHAPE. From another page, the one shown last. Held, with a white key: a pattern (section 5) |
+| HOME | SEQ → OSC → extra sound pages → OUTPUT → SEQ. A drum track: DRUM → SHAPE → OUTPUT. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, the version; again DEBUG (section 11) |
@@ -109,10 +109,10 @@ The sequencer's page, GRAV CODE's main one: section 5.
 
 ### OSC (HOME again)
 
-The engine's own three parameters, as on Plaits: **TIMBRE** (K1), **MORPH** (K2) and **HARMONICS** (K3). What each
+The first sound page retains the engine's three main parameters, as on Plaits: **TIMBRE** (K1), **MORPH** (K2) and **HARMONICS** (K3). What each
 does depends on the engine: section 6. They start at 65, 50 and 75.
 
-Above them, the engine's icon, alive, and a line on the engine. Each engine's icon is drawn by GRAV CODE and moves
+The controls use circular scales with eased movement; the page title and number and a compact live engine icon sit above them. Each engine's icon is drawn by GRAV CODE and moves
 with its knobs and its notes: WAVESHAPE's wave folds further as TIMBRE goes up, FM 2-OP's modulator orbits wider,
 CHORDS stacks its chord's notes, a kick's rings jump at each hit (all of them in section 6). A drum's DRUM and SHAPE
 pages show it the same way.
@@ -120,6 +120,20 @@ pages show it the same way.
 ![ALGO turned: SPEECH's splash, its icon alive, its name and its line](img/screen-splash.png "The engine's splash")
 
 **The splash:** turning ALGO shows the new engine for a moment over the page: its icon, its name and its line.
+
+### Advanced sound pages (0.22.0-sound preview)
+
+HOME advances through independent engine controls, then OUTPUT; hold HOME and turn SELECT for fast navigation.
+AUTO follows the original macro; turn left past zero to restore it. OUTPUT adds TUNE, LEVEL and AUX MIX. Dedicated
+drums instead get LEVEL, ACCENT and HOLD, alongside their existing DRUM/SHAPE pages.
+
+The three six-op banks have 57 sound pages each: 151 additional patch fields, including all operator levels,
+frequency/mode/detune, four envelope rates and levels, scaling, velocity and modulation, algorithm/feedback,
+internal LFO and pitch envelope. Changes reach held notes. Changing PATCH on OSC resets the operator edits to
+that patch. Native DX envelope values are 0–99, rather than milliseconds. [Full control reference](SOUND_CONTROLS.md).
+
+![Circular sound controls](img/sound-dials.png)
+![The first FM operator](img/sound-op1.png)
 
 ### DRUM, SHAPE (HOME again, on a drum track)
 
@@ -186,7 +200,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.21.0, ID FM-1_73002100, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.22.0-sound, ID FM-1_73002200, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -481,8 +495,8 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 ## 9. Saving
 
 **Sound presets (0.21).** ALGO chooses the engine; PRESET scrolls through its four factory starting points and
-user presets saved for the same engine and track kind. A synth preset stores its three engine knobs; a dedicated
-drum preset stores TUNE, DECAY, TONE and all three SHAPE controls. Track assignment, VOICES, ENV, LFO, FX, tempo and
+user presets saved for the same engine and track kind. A sound preset stores its main engine knobs, all additional controls (the full edited FM patch when applicable),
+OUTPUT, and on a dedicated drum TUNE, DECAY, TONE and all SHAPE controls. Track assignment, VOICES, ENV, LFO, FX, tempo and
 patterns are outside the preset. Synth-track drums and dedicated drums have separate preset lists because their
 controls differ. Factory starting points still need musical refinement by listening on the FM-1.
 
@@ -492,8 +506,9 @@ preset; S/D marks its track kind. Names are USER 01 through USER 64. Release SAV
 choosing a key closes without saving settings. The modifier keys never play or record notes.
 
 PRESET QUEUED means the new sound is still in RAM: stop playback and release the notes, then wait for
-**PRESET SAVED** before powering off. Flash writing waits until no voice is active; a write may briefly interrupt
-an effect tail. PRESET FAILED leaves SAVE lit; tap SAVE to retry. A firmware update preserves the bank. Preset
+**PRESET SAVED** before powering off. The pending queue holds eight different slots; QUEUE FULL asks you to stop before saving another.
+Flash writing waits until no voice is active; a write may briefly interrupt
+an effect tail. PRESET FAILED leaves SAVE lit; tap SAVE to retry. A firmware update preserves the bank; 0.21 presets import automatically, retaining their original copy. Preset
 saving is independent of saving the track settings: tap SAVE as well to keep the current track's sound at boot.
 
 ![Factory sound with engine-specific knob labels](img/preset-factory.png)

@@ -64,19 +64,23 @@ void ChiptuneEngine::Render(
     bool* already_enveloped) {
   const float f0 = NoteToFrequency(parameters.note);
   const float shape = parameters.morph * 0.995f;
-  const bool clocked = !(parameters.trigger & TRIGGER_UNPATCHED);
+  const bool clocked = GravFlag(parameters, 0, !(parameters.trigger & TRIGGER_UNPATCHED));
+  envelope_shape_ = parameters.extra && parameters.extra[1] != 255 ? (GravExtra(parameters, 1, 0.5f) - 0.5f) * 2.0f : NO_ENVELOPE;
   float root_transposition = 1.0f;
+  if (parameters.grav_strike) envelope_state_ = 1.0f;
   
   *already_enveloped = clocked;
   
   if (clocked) {
-    if (parameters.trigger & TRIGGER_RISING_EDGE) {
+    if (parameters.grav_strike || (parameters.trigger & TRIGGER_RISING_EDGE)) {
       chords_.set_chord(parameters.harmonics);
       chords_.Sort();
 
       int pattern = arpeggiator_pattern_selector_.Process(parameters.timbre);
-      arpeggiator_.set_mode(ArpeggiatorMode(pattern / 3));
-      arpeggiator_.set_range(1 << (pattern % 3));
+      const int mode = parameters.extra && parameters.extra[3] != 255 ? int(parameters.extra[3]) : pattern / 3;
+      arpeggiator_.set_mode(ArpeggiatorMode(mode));
+      const int range = parameters.extra && parameters.extra[4] != 255 ? int(parameters.extra[4]) : pattern % 3;
+      arpeggiator_.set_range(1 << range);
       arpeggiator_.Clock(chords_.num_notes());
       envelope_state_ = 1.0f;
     }
@@ -106,7 +110,7 @@ void ChiptuneEngine::Render(
   }
   
   // Render bass note.
-  bass_.Render(f0 * 0.5f * root_transposition, aux, size);
+  bass_.Render(f0 * 0.5f * root_transposition * SemitonesToRatio((GravExtra(parameters, 5, 0.5f) - 0.5f) * 48.0f), aux, size);
   
   // Apply envelope if necessary.
   if (envelope_shape_ != NO_ENVELOPE) {
@@ -115,6 +119,7 @@ void ChiptuneEngine::Render(
         2.0f / kSampleRate * SemitonesToRatio(60.0f * shape) * shape;
     float aux_envelope_amount = envelope_shape_ * 20.0f;
     CONSTRAIN(aux_envelope_amount, 0.0f, 1.0f);
+    aux_envelope_amount = GravExtra(parameters, 2, aux_envelope_amount);
     
     for (size_t i = 0; i < size; ++i) {
       ONE_POLE(aux_envelope_amount_, aux_envelope_amount, 0.01f);

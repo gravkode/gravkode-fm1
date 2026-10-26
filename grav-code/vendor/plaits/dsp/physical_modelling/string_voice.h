@@ -54,7 +54,7 @@ class StringVoice {
       float* temp,
       float* out,
       float* aux,
-      size_t size);
+      size_t size, const uint8_t* extra = NULL);
   
  private:
   stmlib::Svf excitation_filter_;

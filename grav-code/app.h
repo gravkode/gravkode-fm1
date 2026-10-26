@@ -15,9 +15,9 @@ void app_overload(void);
 #define APP_SYSEX                        /* read-only dual-core debug snapshot over USB-MIDI */
 int app_sysex(const uint8_t *p, uint32_t n);
 
-/* Object 2's A/B sectors DE000/DF000 now hold user presets (0.21). No radio since 0.10; an old BLE object has a
- * different size/magic and is ignored. Only an explicit preset save replaces it. Settings, panel calibration,
- * legacy SEQ/DRUMS and the 97000..D7000 pattern bank keep their addresses. */
+/* Object 2 holds the old 0.21 preset bank, retained for resumable migration. New expanded presets use their own
+ * log E5000..ED000 (presets/store.c). Settings, panel calibration, legacy SEQ/DRUMS and the pattern bank keep
+ * their addresses. No radio since 0.10: older BLE contents are rejected by size/magic. */
 enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_PRESETS, OBJ_SEQ, OBJ_DRUMS, OBJ_NOBJ };
 #define APP_STORE_MAP {0xFC000u, 0xDC000u, 0xDE000u, 0xDA000u, 0xD8000u}
 

@@ -16,6 +16,10 @@ extern "C" {
 }
 
 static thread_local uint32_t core_index;
+// The sound test uses factory/RAM presets only. Persistent flash behavior has its own fault-injection test.
+extern "C" const uint8_t *plat_data(uint32_t) { return nullptr; }
+extern "C" int plat_data_write(uint32_t, const void*, uint32_t) { return -1; }
+extern "C" int plat_data_erase(uint32_t) { return -1; }
 static std::thread worker;
 static bool enabled = true, accept_job = true;
 static std::atomic<bool> running(false);
@@ -44,7 +48,7 @@ extern "C" int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg) {
 extern "C" int plat_cpu2_wait(void) { worker.join(); return 0; }
 
 static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
-                                 bool dual, bool reject, bool offline, bool toggle, bool drums = false) {
+                                 bool dual, bool reject, bool offline, bool toggle, bool drums = false, bool extended = false) {
     stmlib::Random::Seed(0x21);
     synth_t synth;
     grav_engine_t dsp;
@@ -87,7 +91,8 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
             static const unsigned KIT[2][SYNTH_D_TRACKS] = {   // Plaits' first models; the second (0.19)
                 {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SNARE_DRUM, GRAV_ENGINE_HI_HAT, GRAV_ENGINE_HI_HAT},
                 {GRAV_ENGINE_SYN_KICK, GRAV_ENGINE_SYN_SNARE, GRAV_ENGINE_RING_HAT, GRAV_ENGINE_HI_HAT}};
-            grav_sound_t sound[SYNTH_TRACKS];
+            grav_sound_t sound[SYNTH_TRACKS] = {};
+            grav_controls_t controls[SYNTH_TRACKS];
             for (unsigned t = 0; t < SYNTH_TRACKS; ++t) {
                 const bool drum = t >= SYNTH_S_TRACKS;
                 sound[t].engine = drum ? KIT[engine & 1u][t - SYNTH_S_TRACKS] : current_engine;
@@ -98,6 +103,28 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
                 grav_drum_shape(sound[t].engine, sound[t].harmonics, sound[t].shape);
                 if (drum)
                     sound[t].shape[1] = 0.25f * float(t - SYNTH_S_TRACKS);   // (some DRIVE, SWEEP)
+                if (extended) {
+                    grav_controls_init(&controls[t]);
+                    controls[t].level = 70 + t;
+                    controls[t].tune = 45 + t;
+                    controls[t].aux = drum ? 0 : 35;
+                    controls[t].accent = 80;
+                    if (!drum && grav_controls_fm(current_engine)) {
+                        grav_fm_patch(current_engine, 75, controls[t].value);
+                        controls[t].flags = GRAV_CUSTOM_FM;
+                        controls[t].value[134] = 31;
+                        for (unsigned op = 0; op < 6; op++) controls[t].value[op * 21 + 16] = 60 + op;
+                    } else if (!drum) {
+                        for (unsigned page = 0; page < grav_control_pages(current_engine); page++)
+                            for (unsigned knob = 0; knob < 3; knob++) {
+                                grav_control_info_t info;
+                                if (grav_control_info(current_engine, page, knob, &info))
+                                    grav_control_write(&controls[t], &info, info.max == 1 ? 1 : info.max == 100 ?
+                                        20 + (page * 3 + knob) * 7 % 70 : (page * 3 + knob) % (info.max + 1));
+                            }
+                    }
+                    sound[t].controls = &controls[t];
+                }
             }
             grav_engine_render_tracks(&dsp, output, n, &synth, 3200, sound, 0.0f, &fx);
         } else
@@ -311,7 +338,139 @@ static bool preset_audio() {
     return true;
 }
 
+static std::vector<float> control_audio(unsigned e, grav_controls_t *c, unsigned context) {
+    grav_plaits_init();
+    grav_plaits_voice_engine(0, e);
+    grav_plaits_params_t p = {};
+    p.note = e == GRAV_ENGINE_BASS_DRUM ? 36 : 48 + context * 7;
+    p.timbre = context == 0 ? 0.17f : context == 1 ? 0.47f : 0.87f;
+    p.morph = 0.63f;
+    p.harmonics = e == GRAV_ENGINE_SPEECH ? 1.0f : 0.42f;
+    p.accent = 0.63f;
+    p.controls = c;
+    std::vector<float> result;
+    for (unsigned b = 0; b < 1100; ++b) {
+        p.strike = b % 200 == 0;
+        p.gate = b % 200 < 140;
+        float out[24], aux[24];
+        grav_plaits_render(0, &p, out, aux, 24);
+        for (unsigned j = 0; j < 24; ++j) {
+            assert(std::isfinite(out[j]) && std::isfinite(aux[j]));
+            result.push_back(out[j]); result.push_back(aux[j]);
+        }
+    }
+    return result;
+}
+static bool all_controls() {
+    unsigned checked = 0, failures = 0;
+    for (unsigned e = 0; e < GRAV_ENGINE_COUNT; ++e) {
+        grav_controls_t defaults;
+        grav_controls_init(&defaults);
+        const auto stock = control_audio(e, nullptr, 1);
+        const auto automatic = control_audio(e, &defaults, 1);
+        if (stock != automatic) {
+            std::fprintf(stderr, "AUTO changed stock engine=%u\n", e);
+            return false;
+        }
+        for (unsigned extreme = 0; extreme < 2; extreme++) {
+            grav_controls_t limits = defaults;
+            if (grav_controls_fm(e)) {
+                grav_fm_patch(e, 42, limits.value);
+                limits.flags = GRAV_CUSTOM_FM;
+            }
+            for (unsigned page = 0; page < grav_control_pages(e); page++)
+                for (unsigned knob = 0; knob < 3; knob++) {
+                    grav_control_info_t info;
+                    if (grav_control_info(e, page, knob, &info)) grav_control_write(&limits, &info, extreme ? info.max : 0);
+                }
+            assert(grav_controls_valid(e, &limits));
+            control_audio(e, &limits, 1);     // all minima/maxima together, including the FM envelopes/routing
+        }
+        if (grav_controls_fm(e)) continue;
+        for (unsigned page = 0; page < grav_control_pages(e); ++page)
+            for (unsigned knob = 0; knob < 3; ++knob) {
+                grav_control_info_t info;
+                if (!grav_control_info(e, page, knob, &info)) continue;
+                bool changed = false;
+                for (unsigned context = 0; context < 3 && !changed; ++context) {
+                    grav_controls_t low = defaults, high = defaults;
+                    if (e == GRAV_ENGINE_CHIPTUNE) { low.value[0] = high.value[0] = 1; low.value[1] = high.value[1] = 75; }
+                    if (e == GRAV_ENGINE_PARTICLE && info.offset == 2) low.value[1] = high.value[1] = 80;
+                    grav_control_write(&low, &info, info.max == 1 || info.kind == GC_STEP ? 0 : info.max / 10);
+                    grav_control_write(&high, &info, info.max == 1 || info.kind == GC_STEP ? info.max : info.max * 9 / 10);
+                    const auto a = control_audio(e, &low, context), b = control_audio(e, &high, context);
+                    double energy = 0, difference = 0;
+                    for (unsigned j = 0; j < a.size(); ++j) {
+                        energy += double(a[j]) * a[j] + double(b[j]) * b[j];
+                        difference += double(a[j] - b[j]) * (a[j] - b[j]);
+                    }
+                    changed = difference > 1e-12 && difference > energy * 1e-10;
+                }
+                if (!changed) {
+                    std::fprintf(stderr, "No audible control path engine=%u page=%u knob=%u %s\n", e, page, knob, info.name);
+                    ++failures;
+                }
+                ++checked;
+            }
+    }
+    // Every audible byte of the DX Patch is mapped, including all six enable bits. Names are not sound controls.
+    unsigned covered[156] = {}, fm_count = 0;
+    grav_controls_t c;
+    grav_controls_init(&c);
+    grav_fm_patch(GRAV_ENGINE_SIX_OP_2, 42, c.value);
+    c.flags = GRAV_CUSTOM_FM;
+    assert(grav_controls_valid(GRAV_ENGINE_SIX_OP_2, &c));
+    for (unsigned page = 0; page < grav_control_pages(GRAV_ENGINE_SIX_OP_2); ++page)
+        for (unsigned knob = 0; knob < 3; ++knob) {
+            grav_control_info_t info;
+            if (!grav_control_info(GRAV_ENGINE_SIX_OP_2, page, knob, &info)) continue;
+            const unsigned previous = grav_control_read(&c, &info);
+            grav_control_write(&c, &info, info.max);
+            assert(grav_control_read(&c, &info) == info.max && grav_controls_valid(GRAV_ENGINE_SIX_OP_2, &c));
+            grav_control_write(&c, &info, previous);
+            covered[info.offset]++;
+            fm_count++;
+        }
+    for (unsigned i = 0; i < 145; ++i) assert(covered[i] == 1);
+    assert(covered[155] == 6 && fm_count == 151);
+    auto loud = c, quiet = c;
+    loud.value[134] = quiet.value[134] = 31; // six parallel carriers
+    for (unsigned op = 0; op < 6; ++op) {
+        loud.value[21 * op + 16] = 99; quiet.value[21 * op + 16] = 0;
+    }
+    const auto a = control_audio(GRAV_ENGINE_SIX_OP_2, &loud, 1), b = control_audio(GRAV_ENGINE_SIX_OP_2, &quiet, 1);
+    double loud_energy = 0, quiet_energy = 0;
+    for (unsigned i = 0; i < a.size(); ++i) { loud_energy += double(a[i]) * a[i]; quiet_energy += double(b[i]) * b[i]; }
+    assert(loud_energy > quiet_energy * 10 && loud_energy > 0.001);
+    // Editing the first operator on an already-held factory note must switch to the editable patch immediately;
+    // subsequent edits refresh it, and returning PATCH to AUTO switches the held note back to the factory bank.
+    grav_plaits_init(); grav_plaits_voice_engine(0, GRAV_ENGINE_SIX_OP_2);
+    grav_controls_t live; grav_controls_init(&live);
+    grav_plaits_params_t held = {};
+    held.note = 60; held.timbre = 0.7f; held.morph = 0.5f; held.harmonics = 0.42f;
+    held.accent = 0.8f; held.gate = 1; held.controls = &live;
+    double edited_energy = 0, muted_energy = 0, restored_energy = 0;
+    for (unsigned block = 0; block < 450; block++) {
+        held.strike = block == 0;
+        if (block == 100) live = loud;
+        if (block == 200) live = quiet;
+        if (block == 320) grav_controls_init(&live);
+        float out[24], aux[24]; grav_plaits_render(0, &held, out, aux, 24);
+        for (unsigned j = 0; j < 24; j++) {
+            const double energy = double(out[j]) * out[j];
+            if (block > 110 && block < 190) edited_energy += energy;
+            if (block > 210 && block < 310) muted_energy += energy;
+            if (block > 330) restored_energy += energy;
+        }
+    }
+    assert(edited_energy > muted_energy * 10 && restored_energy > muted_energy * 10 && edited_energy > 0.001);
+    std::printf("%s: %u non-FM advanced controls have audible paths; all 151 FM fields mapped, operator levels reach DSP\n",
+                failures ? "FAIL" : "PASS", checked);
+    return failures == 0;
+}
+
 int main() {
+    if (!all_controls()) return 1;
     if (!preset_audio()) return 1;
     if (!shed_fade()) return 1;
     // Retrigger a still-audible envelope, then shorten a release which is already in progress.
@@ -349,7 +508,17 @@ int main() {
             }
         }
     }
+    for (unsigned e = 0; e < GRAV_ENGINE_COUNT; e++)
+        for (bool fx : {false, true}) {
+            const auto reference = render(e, 4, fx, false, false, false, false, true, true);
+            const auto actual = render(e, 4, fx, true, false, false, false, true, true);
+            if (reference != actual) {
+                std::fprintf(stderr, "Extended control dual-core mismatch engine=%u fx=%d\n", e, fx);
+                return 1;
+            }
+            ++comparisons;
+        }
     assert(dispatched > 0 && overlaps > 0);
-    std::printf("PASS: %u bit-exact comparisons across 24 engines, 1..4 voices and 4 + 4 drums, FX off/on; "
+    std::printf("PASS: %u bit-exact comparisons (960 stock + 48 extended controls) across 24 engines, 1..4 voices and 4 + 4 drums, FX off/on; "
                 "%u real worker jobs, %u overlap observations\n", comparisons, dispatched, overlaps.load());
 }

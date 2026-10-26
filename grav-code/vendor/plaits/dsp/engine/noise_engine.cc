@@ -60,9 +60,10 @@ void NoiseEngine::Render(
     float* aux,
     size_t size,
     bool* already_enveloped) {
-  const float f0 = NoteToFrequency(parameters.note);
+  const float root_f0 = NoteToFrequency(parameters.note);
+  const float f0 = NoteToFrequency(parameters.note + (GravExtra(parameters, 1, 0.5f) - 0.5f) * 96.0f);
   const float f1 = NoteToFrequency(
-      parameters.note + parameters.harmonics * 48.0f - 24.0f);
+      parameters.note + GravExtra(parameters, 2, parameters.harmonics) * 48.0f - 24.0f);
   const float clock_lowest_note = parameters.trigger & TRIGGER_UNPATCHED
       ? 0.0f
       : -24.0f;
@@ -71,13 +72,13 @@ void NoiseEngine::Render(
   const float q = 0.5f * SemitonesToRatio(parameters.morph * 120.0f);
   const bool sync = parameters.trigger & TRIGGER_RISING_EDGE;
   clocked_noise_[0].Render(sync, clock_f, aux, size);
-  clocked_noise_[1].Render(sync, clock_f * f1 / f0, temp_buffer_, size);
+  clocked_noise_[1].Render(sync, clock_f * f1 / root_f0, temp_buffer_, size);
   
   ParameterInterpolator f0_modulation(&previous_f0_, f0, size);
   ParameterInterpolator f1_modulation(&previous_f1_, f1, size);
   ParameterInterpolator q_modulation(&previous_q_, q, size);
   ParameterInterpolator mode_modulation(
-      &previous_mode_, parameters.harmonics, size);
+      &previous_mode_, GravExtra(parameters, 0, parameters.harmonics), size);
   
   const float* in_1 = aux;
   const float* in_2 = temp_buffer_;

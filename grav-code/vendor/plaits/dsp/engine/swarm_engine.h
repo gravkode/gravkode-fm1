@@ -207,7 +207,8 @@ class SwarmVoice {
       float size_ratio,
       float* saw,
       float* sine,
-      size_t size) {
+      size_t size,
+      float linear_spread) {
     envelope_.Step(density, burst_mode, start_burst);
     
     const float scale = 1.0f / kNumSwarmVoices;
@@ -216,7 +217,7 @@ class SwarmVoice {
     const float expo_amount = envelope_.frequency(size_ratio);
     f0 *= stmlib::SemitonesToRatio(48.0f * expo_amount * spread * rank_);
     
-    const float linear_amount = rank_ * (rank_ + 0.01f) * spread * 0.25f;
+    const float linear_amount = rank_ * (rank_ + 0.01f) * linear_spread * 0.25f;
     f0 *= 1.0f + linear_amount;
 
     saw_.Render(f0, amplitude, saw, size);

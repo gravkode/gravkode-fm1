@@ -29,6 +29,7 @@
 #include "plaits/dsp/engine2/six_op_engine.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include "plaits/resources.h"
 
@@ -85,6 +86,7 @@ void SixOpEngine::Init(BufferAllocator* allocator) {
   
   active_voice_ = kNumSixOpVoices - 1;
   rendered_voice_ = 0;
+  custom_valid_ = false;
 }
 
 void SixOpEngine::Reset() {
@@ -116,13 +118,21 @@ void SixOpEngine::Render(
     bool* already_enveloped) {
   int patch_index = patch_index_quantizer_.Process(
       parameters.harmonics * 1.02f);
+  if (parameters.fm_patch && (!custom_valid_ ||
+      std::memcmp(&custom_patch_, parameters.fm_patch, sizeof(custom_patch_)))) {
+    std::memcpy(&custom_patch_, parameters.fm_patch, sizeof(custom_patch_));
+    custom_valid_ = true;
+    for (int i = 0; i < kNumSixOpVoices; ++i)
+      if (voice_[i].patch() == &custom_patch_) voice_[i].RefreshPatch();
+  }
+  const fm::Patch* selected_patch = parameters.fm_patch ? &custom_patch_ : &patches_[patch_index];
   
   if (parameters.trigger & TRIGGER_UNPATCHED) {
     const float t = parameters.morph;
     voice_[0].mutable_lfo()->Scrub(2.0f * kCorrectedSampleRate * t);
 
     for (int i = 0; i < kNumSixOpVoices; ++i) {
-      voice_[i].LoadPatch(&patches_[patch_index]);
+      voice_[i].LoadPatch(selected_patch);
       Voice<6>::Parameters* p = voice_[i].mutable_parameters();
       p->sustain = i == 0 ? true : false;
       p->gate = false;
@@ -133,9 +143,14 @@ void SixOpEngine::Render(
       voice_[i].set_modulations(voice_[0].lfo());
     }
   } else {
+    // A knob edit must reach a currently held note too. Do not retarget a previous release on a new strike:
+    // that strike chooses its own internal voice below, preserving the other voice's old patch tail.
+    if (!(parameters.trigger & TRIGGER_RISING_EDGE) && (parameters.trigger & TRIGGER_HIGH) &&
+        voice_[active_voice_].patch() != selected_patch)
+      voice_[active_voice_].LoadPatch(selected_patch);
     if (parameters.trigger & TRIGGER_RISING_EDGE) {
       active_voice_ = (active_voice_ + 1) % kNumSixOpVoices;
-      voice_[active_voice_].LoadPatch(&patches_[patch_index]);
+      voice_[active_voice_].LoadPatch(selected_patch);
       voice_[active_voice_].mutable_lfo()->Reset();
     }
     Voice<6>::Parameters* p = voice_[active_voice_].mutable_parameters();

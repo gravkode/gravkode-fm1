@@ -1,6 +1,7 @@
 #pragma once
 /* Mutable Instruments Plaits' engines (grav_plaits.cpp), for the C side */
 #include <stdint.h>
+#include "../sound/controls.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,6 +54,7 @@ typedef struct {
     uint8_t gate;                        /* the voice's note is held */
     uint8_t strike;                      /* a new note began on it */
     float shape[3];                      /* a drum voice's SHAPE knobs, 0..1 (dsp/grav_drums.h) */
+    const grav_controls_t *controls;    /* optional per-track advanced settings; NULL keeps original Plaits */
 } grav_plaits_params_t;
 
 void grav_plaits_init(void);
@@ -79,6 +81,7 @@ uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* ALGO on a drum track
 void grav_drum_shape(uint32_t engine, float harmonics, float shape[3]);
 uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* ALGO: steps away in Plaits' order, round */
 uint32_t grav_plaits_ram_used(uint32_t voice);   /* bytes of a voice's RAM its engine's Init took */
+void grav_fm_patch(uint32_t engine, uint32_t harmonics, uint8_t raw[GRAV_CONTROL_BYTES]);
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,337 @@
+# Extended sound editor: navigation, circles, all-six-operator persistence, legacy settings.
+wait 600
+tap HOME
+wait 30
+expect page 0
+expect sound_pages 3
+expect param0 65
+turn K1 5 4
+wait 180
+expect param0 70
+expect dial_frames >0
+shot sound-dials.png
+tap HOME
+wait 30
+expect page 10
+expect sound_page 1
+expect param0 255
+turn K1 1
+turn K2 -1
+wait 30
+expect param0 51
+expect param1 49
+expect param2 -1
+turn K3 20 1
+expect param2 -1
+shot sound-shape.png
+tap HOME
+wait 30
+expect page 11
+turn K1 2
+turn K2 -20 1
+turn K3 25 1
+wait 30
+expect param0 52
+expect param1 80
+expect param2 25
+press SAVE
+wait 400
+key 0 down 100 0
+wait 30
+key 0 up
+release SAVE
+wait 300
+expect preset 4
+expect preset_dirty 0
+tap SAVE
+wait 200
+reboot
+wait 600
+tap HOME
+press HOME
+turn SELECT 2
+release HOME
+wait 30
+expect track 0
+expect page 11
+expect param0 52
+expect param1 80
+expect param2 25
+expect preset 4
+# Other tracks keep independent output settings across restart.
+turn SELECT 1
+wait 1600
+expect param1 100
+expect param2 0
+turn K2 -36 1
+turn K3 33 1
+tap SAVE
+wait 200
+reboot
+wait 600
+turn SELECT 1
+soundpage 3
+wait 30
+expect param1 64
+expect param2 33
+turn SELECT -1
+wait 1600
+expect param0 52
+expect param1 80
+expect param2 25
+# ALGO clears engine-specific overrides, retains track output settings.
+turn ALGO 18
+wait 1700
+expect wave 19
+expect fm_custom 0
+expect sound_pages 57
+press HOME
+turn SELECT 8
+release HOME
+wait 30
+expect sound_page 8
+expect page 10
+expect track 0
+shot sound-op1.png
+soundpage 8
+turn K1 -100 1
+turn K1 10 1
+turn K2 -100 1
+turn K2 1 1
+turn K3 -100 1
+turn K3 11 1
+wait 30
+expect param0 10
+expect param1 1
+expect param2 11
+expect fm_custom 1
+soundpage 16
+turn K1 -100 1
+turn K1 20 1
+turn K2 -100 1
+turn K2 2 1
+turn K3 -100 1
+turn K3 22 1
+wait 30
+expect param0 20
+expect param1 2
+expect param2 22
+expect fm_custom 1
+soundpage 24
+turn K1 -100 1
+turn K1 30 1
+turn K2 -100 1
+turn K2 3 1
+turn K3 -100 1
+turn K3 33 1
+wait 30
+expect param0 30
+expect param1 3
+expect param2 33
+expect fm_custom 1
+soundpage 32
+turn K1 -100 1
+turn K1 40 1
+turn K2 -100 1
+turn K2 4 1
+turn K3 -100 1
+turn K3 44 1
+wait 30
+expect param0 40
+expect param1 4
+expect param2 44
+expect fm_custom 1
+soundpage 40
+turn K1 -100 1
+turn K1 50 1
+turn K2 -100 1
+turn K2 5 1
+turn K3 -100 1
+turn K3 55 1
+wait 30
+expect param0 50
+expect param1 5
+expect param2 55
+expect fm_custom 1
+soundpage 48
+turn K1 -100 1
+turn K1 60 1
+turn K2 -100 1
+turn K2 6 1
+turn K3 -100 1
+turn K3 66 1
+wait 30
+expect param0 60
+expect param1 6
+expect param2 66
+expect fm_custom 1
+soundpage 1
+turn K1 100 1
+turn K2 100 1
+wait 30
+expect param0 31
+expect param1 7
+shot sound-routing.png
+press SAVE
+wait 400
+key 2 down 100 0
+wait 30
+key 2 up
+release SAVE
+wait 300
+expect preset 5
+expect preset_dirty 0
+tap SAVE
+wait 200
+reboot
+wait 600
+expect wave 19
+expect preset 5
+expect fm_custom 1
+soundpage 8
+wait 30
+expect param0 10
+expect param1 1
+expect param2 11
+soundpage 16
+wait 30
+expect param0 20
+expect param1 2
+expect param2 22
+soundpage 24
+wait 30
+expect param0 30
+expect param1 3
+expect param2 33
+soundpage 32
+wait 30
+expect param0 40
+expect param1 4
+expect param2 44
+soundpage 40
+wait 30
+expect param0 50
+expect param1 5
+expect param2 55
+soundpage 48
+wait 30
+expect param0 60
+expect param1 6
+expect param2 66
+soundpage 1
+expect param0 31
+expect param1 7
+soundpage 0
+turn K3 -1
+wait 30
+expect fm_custom 0
+turn PRESET -1
+wait 30
+expect preset 5
+expect fm_custom 1
+# Settings from 0.21 retain all old knobs and reset advanced controls to AUTO; extended user sounds survive.
+save021
+reboot
+wait 600
+expect wave 19
+expect fm_custom 0
+expect preset_used0 1
+expect preset_used1 1
+turn PRESET -1
+wait 30
+expect fm_custom 1
+soundpage 48
+expect param0 60
+expect param1 6
+expect param2 66
+# The drum's existing SHAPE is followed by output, independent accent and held-gate mode.
+turn SELECT 4
+wait 1600
+soundpage 2
+expect page 11
+expect param0 100
+expect param1 100
+expect param2 0
+turn K1 -30 1
+turn K2 -20 1
+turn K3 1
+wait 30
+expect param0 70
+expect param1 80
+expect param2 1
+shot sound-drum-output.png
+tap SAVE
+wait 200
+reboot
+wait 600
+turn SELECT 4
+soundpage 2
+expect param0 70
+expect param1 80
+expect param2 1
+# A full queue refuses the ninth distinct slot, preserving the eight sounds already queued.
+tap PLAY
+wait 30
+press SAVE
+wait 400
+listen
+key 0 down 100 0
+wait 20
+key 0 up
+wait 20
+key 2 down 100 0
+wait 20
+key 2 up
+wait 20
+key 4 down 100 0
+wait 20
+key 4 up
+wait 20
+key 6 down 100 0
+wait 20
+key 6 up
+wait 20
+key 7 down 100 0
+wait 20
+key 7 up
+wait 20
+key 9 down 100 0
+wait 20
+key 9 up
+wait 20
+key 11 down 100 0
+wait 20
+key 11 up
+wait 20
+key 12 down 100 0
+wait 20
+key 12 up
+wait 20
+key 14 down 100 0
+wait 20
+key 14 up
+wait 20
+expect preset_pending 8
+expect preset_used8 0
+said PRESET QUEUE FULL
+shot sound-queue-full.png
+release SAVE
+press PLAY
+wait 40
+key 7 down 100 0
+wait 100
+release PLAY
+expect preset_pending >0
+key 7 up
+wait 3000
+expect preset_pending 0
+expect preset_dirty 0
+# Changing the engine from another page returns to a valid base sound page.
+tap ENV
+turn ALGO 1
+wait 30
+expect wave 24
+tap HOME
+wait 30
+expect sound_page 0
+expect page 0

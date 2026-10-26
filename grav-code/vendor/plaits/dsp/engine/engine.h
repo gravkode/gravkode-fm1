@@ -56,7 +56,18 @@ struct EngineParameters {
   float morph;
   float harmonics;
   float accent;
+  // GRAV CODE: independent controls; 255 follows the original macro. Published for both cores before Render.
+  const uint8_t* extra;
+  const uint8_t* fm_patch;
+  bool grav_strike;
 };
+
+inline float GravExtra(const EngineParameters& p, size_t i, float fallback) {
+  return p.extra && p.extra[i] != 255 ? p.extra[i] * 0.01f : fallback;
+}
+inline bool GravFlag(const EngineParameters& p, size_t i, bool fallback) {
+  return p.extra && p.extra[i] != 255 ? p.extra[i] != 0 : fallback;
+}
 
 struct PostProcessingSettings {
   // A negative value indicates that a limiter must be used.

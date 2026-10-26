@@ -84,7 +84,7 @@ void StringEngine::Render(
         temp_buffer_,
         out,
         aux,
-        size);
+        size, parameters.extra);
   }
 }
 

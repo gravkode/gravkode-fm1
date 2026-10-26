@@ -68,7 +68,7 @@ void FMEngine::Render(
       parameters.harmonics,
       128.0f);
   
-  float modulator_note = note + ratio;
+  float modulator_note = note + ratio + (GravExtra(parameters, 0, 0.5f) - 0.5f) * 2.0f;
   float target_modulator_frequency = NoteToFrequency(modulator_note);
   CONSTRAIN(target_modulator_frequency, 0.0f, 0.5f);
 
@@ -96,6 +96,7 @@ void FMEngine::Render(
     const float amount = amount_modulation.Next();
     const float feedback = feedback_modulation.Next();
     float phase_feedback = feedback < 0.0f ? 0.5f * feedback * feedback : 0.0f;
+    phase_feedback = GravExtra(parameters, 1, phase_feedback * 2.0f) * 0.5f;
     const uint32_t carrier_increment = static_cast<uint32_t>(
         max_uint32 * carrier_frequency.Next());
     float _modulator_frequency = modulator_frequency.Next();
@@ -106,10 +107,11 @@ void FMEngine::Render(
       carrier_phase_ += carrier_increment;
       sub_phase_ += carrier_increment >> 1;
       float modulator_fb = feedback > 0.0f ? 0.25f * feedback * feedback : 0.0f;
+      modulator_fb = GravExtra(parameters, 2, modulator_fb * 4.0f) * 0.25f;
       float modulator = SinePM(
           modulator_phase_, modulator_fb * previous_sample_);
       float carrier = SinePM(carrier_phase_, amount * modulator);
-      float sub = SinePM(sub_phase_, amount * carrier * 0.25f);
+      float sub = SinePM(sub_phase_, amount * carrier * GravExtra(parameters, 3, 0.25f));
       ONE_POLE(previous_sample_, carrier, 0.05f);
       carrier_downsampler.Accumulate(j, carrier);
       sub_downsampler.Accumulate(j, sub);

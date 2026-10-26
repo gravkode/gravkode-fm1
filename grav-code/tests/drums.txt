@@ -101,10 +101,13 @@ turn SELECT 4
 wait 30
 expect osc0 50
 expect tune 53
-# HOME from the DRUM page: SHAPE, then SEQ
+# HOME from DRUM: SHAPE, OUTPUT, then SEQ
 tap HOME
 wait 30
 expect page 9
+tap HOME
+wait 30
+expect page 11
 tap HOME
 wait 30
 expect page 8

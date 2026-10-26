@@ -11,7 +11,7 @@ expect live_w 0
 tap HOME
 wait 30
 expect page 0
-expect live_w 98
+expect live_w 38
 key 7 down 100 0
 wait 1000
 expect live_frames >24
@@ -34,7 +34,7 @@ expect wave 1
 shot icon-splash.png
 wait 1500
 expect splash 0
-expect live_w 98
+expect live_w 38
 # FM 2-OP's knobs: INDEX, FEEDBACK, RATIO
 turn K1 1
 wait 30
@@ -53,7 +53,7 @@ wait 300
 expect live_w 0
 shot icon-list.png
 wait 1600
-expect live_w 98
+expect live_w 38
 turn SELECT -1
 wait 1600
 # HOME held: the patterns' grid over it, no live area
@@ -62,19 +62,23 @@ wait 400
 expect live_w 0
 release HOME
 wait 100
+expect page 10
+expect live_w 38
+tap SEQ
+tap SEQ
+wait 30
 expect page 8
-expect live_w 0
 # a drum's DRUM and SHAPE pages: the drum's icon
 turn SELECT 4
 wait 1600
 tap HOME
 wait 30
 expect page 0
-expect live_w 98
+expect live_w 38
 tap HOME
 wait 30
 expect page 9
-expect live_w 98
+expect live_w 38
 shot icon-shape.png
 # MOD, ENV, GLO, FX: none
 tap LFO

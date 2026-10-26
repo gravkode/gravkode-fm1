@@ -2,9 +2,7 @@
 #include "../dsp/grav_plaits.h"
 #include <string.h>
 
-#define PRESETS_MAGIC 0x47525031u
-_Static_assert(sizeof(preset_t) == 20, "preset record layout");
-_Static_assert(sizeof(preset_bank_t) == 1296, "preset bank layout");
+_Static_assert(sizeof(preset_t) == 184, "expanded preset record layout");
 
 typedef struct { char name[11]; uint8_t osc[3]; } factory_t;
 #define F(n,a,b,c) {n,{a,b,c}}
@@ -44,10 +42,11 @@ static const factory_t factory[GRAV_ENGINE_ALL][PRESET_FACTORY] = {
 #undef F
 
 static int drum_engine(uint32_t e) { return (e >= 13u && e <= 15u) || (e >= 24u && e < GRAV_ENGINE_ALL); }
-static int sound_valid(const preset_t *p)
+int preset_valid(const preset_t *p)
 {
     if (p->engine >= GRAV_ENGINE_ALL || p->drum > 1 ||
-        (p->drum ? !drum_engine(p->engine) : p->engine >= GRAV_ENGINE_COUNT) || p->tune > 100)
+        (p->drum ? !drum_engine(p->engine) : p->engine >= GRAV_ENGINE_COUNT) || p->tune > 100 ||
+        !grav_controls_valid(p->engine, &p->controls))
         return 0;
     for (uint32_t i = 0; i < 3; i++)
         if (p->osc[i] > 100 || p->shape[i] > 100) return 0;
@@ -60,25 +59,28 @@ static int sound_valid(const preset_t *p)
 void presets_init(preset_bank_t *b)
 {
     memset(b, 0, sizeof *b);
-    b->magic = PRESETS_MAGIC;
-    b->version = 1;
+    for (uint32_t s = 0; s < PRESET_USERS; s++) b->live[s] = -1;
 }
 int preset_used(const preset_bank_t *b, uint32_t slot)
 {
-    return slot < PRESET_USERS && (b->used[slot / 32u] >> (slot % 32u) & 1u);
+    return preset_user(b, slot) != 0;
 }
 int presets_valid(const preset_bank_t *b)
 {
-    if (b->magic != PRESETS_MAGIC || b->version != 1 || b->reserved) return 0;
+    if (b->n_pending > PRESET_PENDING) return 0;
     for (uint32_t i = 0; i < PRESET_USERS; i++)
-        if (preset_used(b, i) && !sound_valid(&b->slot[i])) return 0;
+        if (preset_used(b, i) && !preset_valid(preset_user(b, i))) return 0;
     return 1;
 }
 int preset_put(preset_bank_t *b, uint32_t slot, const preset_t *p)
 {
-    if (slot >= PRESET_USERS || !sound_valid(p)) return 0;
-    b->slot[slot] = *p;
-    b->used[slot / 32u] |= 1u << (slot % 32u);
+    if (slot >= PRESET_USERS || !preset_valid(p)) return 0;
+    uint32_t n;
+    for (n = 0; n < b->n_pending; n++) if (b->pending_slot[n] == slot) break;
+    if (n == PRESET_PENDING) return 0;
+    if (n == b->n_pending) b->n_pending++;
+    b->pending_slot[n] = (uint8_t)slot;
+    b->pending[n] = *p;
     return 1;
 }
 int preset_get(const preset_bank_t *b, uint32_t e, int drum, int id, preset_t *p)
@@ -86,6 +88,7 @@ int preset_get(const preset_bank_t *b, uint32_t e, int drum, int id, preset_t *p
     if (e >= GRAV_ENGINE_ALL || (drum ? !drum_engine(e) : e >= GRAV_ENGINE_COUNT) || id < 0) return 0;
     if (id < (int)PRESET_FACTORY) {
         memset(p, 0, sizeof *p);
+        grav_controls_init(&p->controls);
         p->engine = (uint8_t)e;
         p->drum = !!drum;
         p->tune = 50;
@@ -105,8 +108,9 @@ int preset_get(const preset_bank_t *b, uint32_t e, int drum, int id, preset_t *p
         return 1;
     }
     const uint32_t slot = (uint32_t)id - PRESET_FACTORY;
-    if (!preset_used(b, slot) || b->slot[slot].engine != e || b->slot[slot].drum != !!drum) return 0;
-    *p = b->slot[slot];
+    const preset_t *saved = preset_user(b, slot);
+    if (!saved || saved->engine != e || saved->drum != !!drum) return 0;
+    *p = *saved;
     return 1;
 }
 int preset_next(const preset_bank_t *b, uint32_t e, int drum, int id, int32_t delta)
@@ -131,6 +135,7 @@ int preset_match(const preset_bank_t *b, const preset_t *p)
     for (int k = 0; k < (int)(PRESET_USERS + PRESET_FACTORY); k++) {
         const int id = k < (int)PRESET_USERS ? k + (int)PRESET_FACTORY : k - (int)PRESET_USERS;
         if (preset_get(b, p->engine, p->drum, id, &q) && !memcmp(p->osc, q.osc, 3) &&
+            !memcmp(&p->controls, &q.controls, sizeof p->controls) &&
             (!p->drum || (p->tune == q.tune && !memcmp(p->shape, q.shape, 3)))) return id;
     }
     return PRESET_CUSTOM;

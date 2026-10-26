@@ -48,6 +48,7 @@ class FMVoice {
   
   void Init(fm::Algorithms<6>* algorithms, float sample_rate);
   void LoadPatch(const fm::Patch* patch);
+  void RefreshPatch() { if (patch_) { voice_.SetPatch(patch_); lfo_.Set(patch_->modulations); } }
   void Render(float* buffer, size_t size);
   
   inline void UnloadPatch() {
@@ -104,6 +105,8 @@ class SixOpEngine : public Engine {
   stmlib::HysteresisQuantizer2 patch_index_quantizer_;
   fm::Algorithms<6> algorithms_;
   fm::Patch* patches_;
+  fm::Patch custom_patch_;
+  bool custom_valid_;
   FMVoice voice_[kNumSixOpVoices];
   float* temp_buffer_;
   float* acc_buffer_;

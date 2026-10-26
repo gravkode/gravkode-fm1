@@ -124,7 +124,7 @@ void AdditiveEngine::Render(
 
   const float centroid = parameters.timbre;
   const float raw_bumps = parameters.harmonics;
-  const float raw_slope = (1.0f - 0.6f * raw_bumps) * parameters.morph;
+  const float raw_slope = GravExtra(parameters, 0, (1.0f - 0.6f * raw_bumps) * parameters.morph);
   const float slope = 0.01f + 1.99f * raw_slope * raw_slope * raw_slope;
   const float bumps = 16.0f * raw_bumps * raw_bumps;
   UpdateAmplitudes(
@@ -134,8 +134,10 @@ void AdditiveEngine::Render(
       &amplitudes_[0],
       integer_harmonics,
       24);
-  harmonic_oscillator_[0].Render<1>(f0, &amplitudes_[0], out, size);
-  harmonic_oscillator_[1].Render<13>(f0, &amplitudes_[12], out, size);
+  float amplitudes[24];
+  for (int j = 0; j < 24; ++j) amplitudes[j] = amplitudes_[j] * GravExtra(parameters, j & 1 ? 1 : 2, 1.0f);
+  harmonic_oscillator_[0].Render<1>(f0, &amplitudes[0], out, size);
+  harmonic_oscillator_[1].Render<13>(f0, &amplitudes[12], out, size);
 
   UpdateAmplitudes(
       centroid,

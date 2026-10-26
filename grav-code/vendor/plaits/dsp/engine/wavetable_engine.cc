@@ -126,9 +126,10 @@ void WavetableEngine::Render(
   const float y = y_pre_lp_;
   const float z = z_pre_lp_;
   
-  const float quantization = min(max(z - 3.0f, 0.0f), 1.0f);
-  const float lp_coefficient = min(
+  const float quantization = GravExtra(parameters, 0, min(max(z - 3.0f, 0.0f), 1.0f));
+  const float lp_macro = min(
       max(2.0f * f0 * (4.0f - 3.0f * quantization), 0.01f), 0.1f);
+  const float lp_coefficient = GravExtra(parameters, 1, lp_macro);
   
   MAKE_INTEGRAL_FRACTIONAL(x);
   MAKE_INTEGRAL_FRACTIONAL(y);
@@ -170,7 +171,9 @@ void WavetableEngine::Render(
       phase_ -= 1.0f;
     }
     
-    const float p = phase_ * kTableSizeF;
+    float read_phase = phase_ + GravExtra(parameters, 2, 0.0f);
+    if (read_phase >= 1.0f) read_phase -= 1.0f;
+    const float p = read_phase * kTableSizeF;
     MAKE_INTEGRAL_FRACTIONAL(p);
     
     {

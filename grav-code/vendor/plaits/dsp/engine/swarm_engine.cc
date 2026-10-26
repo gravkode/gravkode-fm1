@@ -62,8 +62,8 @@ void SwarmEngine::Render(
   float size_ratio = 0.25f * SemitonesToRatio(
       (1.0f - parameters.morph) * 84.0f);
   
-  const bool burst_mode = !(parameters.trigger & TRIGGER_UNPATCHED);
-  const bool start_burst = parameters.trigger & TRIGGER_RISING_EDGE;
+  const bool burst_mode = GravFlag(parameters, 0, !(parameters.trigger & TRIGGER_UNPATCHED));
+  const bool start_burst = (burst_mode && parameters.grav_strike) || (parameters.trigger & TRIGGER_RISING_EDGE);
 
   fill(&out[0], &out[size], 0.0f);
   fill(&aux[0], &aux[size], 0.0f);
@@ -78,8 +78,9 @@ void SwarmEngine::Render(
         size_ratio,
         out,
         aux,
-        size);
-    size_ratio *= 0.97f;
+        size,
+        GravExtra(parameters, 2, spread));
+    size_ratio *= parameters.extra && parameters.extra[1] != 255 ? GravExtra(parameters, 1, 0.85f) * 0.2f + 0.8f : 0.97f;
   }
 }
 

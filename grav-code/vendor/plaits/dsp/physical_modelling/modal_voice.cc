@@ -31,6 +31,7 @@
 // of the module is not patched.
 
 #include "plaits/dsp/physical_modelling/modal_voice.h"
+#include "plaits/dsp/engine/engine.h"
 
 #include <algorithm>
 
@@ -60,18 +61,21 @@ void ModalVoice::Render(
     float* temp,
     float* out,
     float* aux,
-    size_t size) {
-  const float density = brightness * brightness;
+    size_t size, const uint8_t* extra) {
+  EngineParameters controls = {};
+  controls.extra = extra;
+  const float density = GravExtra(controls, 0, brightness * brightness);
   
-  brightness += 0.25f * accent * (1.0f - brightness);
-  damping += 0.25f * accent * (1.0f - damping);
+  brightness += GravExtra(controls, 3, 0.25f) * accent * (1.0f - brightness);
+  damping += GravExtra(controls, 3, 0.25f) * accent * (1.0f - damping);
   
   const float range = sustain ? 36.0f : 60.0f;
   const float f = sustain ? 4.0f * f0 : 2.0f * f0;
-  const float cutoff = min(
+  const float macro_cutoff = min(
       f * SemitonesToRatio((brightness * (2.0f - brightness) - 0.5f) * range),
       0.499f);
-  const float q = sustain ? 0.7f : 1.5f;
+  const float cutoff = extra && extra[1] != 255 ? min(f0 * SemitonesToRatio(GravExtra(controls, 1, 0.5f) * 120.0f - 24.0f), 0.499f) : macro_cutoff;
+  const float q = extra && extra[2] != 255 ? 0.1f + 7.9f * GravExtra(controls, 2, 0.0f) : (sustain ? 0.7f : 1.5f);
   
   // Synthesize excitation signal.
   if (sustain) {

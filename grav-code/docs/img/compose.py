@@ -29,7 +29,8 @@ print("readme-playing.png, readme-pages.png")
 
 icons = sorted(HERE.glob("icon-*.png"))   # tests/icon_sheet.txt's: each engine's track line, icon and line
 if icons:
-    tiles = [Image.open(p).convert("RGB").crop((0, 36, 240, 114)) for p in icons]
+    # The 0.22 sound header has the compact live icon beside the page title; keep partial dials out of the atlas.
+    tiles = [Image.open(p).convert("RGB").crop((0, 36, 240, 82)) for p in icons]
     tw, th = tiles[0].size
     sheet = Image.new("RGB", (3 * tw + 2 * GAP, 9 * th + 8 * GAP), BACK)
     for i, im in enumerate(tiles):

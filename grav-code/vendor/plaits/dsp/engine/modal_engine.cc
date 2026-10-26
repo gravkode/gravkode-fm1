@@ -67,7 +67,7 @@ void ModalEngine::Render(
       temp_buffer_,
       out,
       aux,
-      size);
+      size, parameters.extra);
 }
 
 }  // namespace plaits

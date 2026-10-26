@@ -21,6 +21,8 @@ o2 = [
     "seq/seq.c",
     "seq/bank.c",                               # the patterns in the flash (main loop)
     "presets/presets.c",
+    "presets/store.c",
+    "sound/controls.c",
     "dsp/grav_plaits.cpp",
     "dsp/grav_beads.cpp",
     "vendor/stmlib/dsp/units.cc",

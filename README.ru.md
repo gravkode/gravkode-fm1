@@ -13,8 +13,12 @@
 
 ---
 
-Текущая версия: **0.21.0** — свои подписи ручек, четыре заводских пресета на движок и 64 пользовательские
-ячейки. ALGO выбирает движок, PRESET — его звук; SAVE зажат + белая клавиша сохраняет свой пресет.
+Предварительная версия **0.22.0-sound** — дополнительные настройки всех движков, полный редактор шести
+операторов FM, круглые анимированные ручки и расширенные пресеты. HOME листает страницы; HOME зажат + SELECT
+переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md). Прослушивание и нагрузку
+на самом FM-1 ещё предстоит проверить.
+
+<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Sound-page dial animation in the simulator"></p>
 
 ## Возможности
 
@@ -59,7 +63,8 @@
 SELECT выбирает дорожку (S1–S4, D1–D4), для неё работают клавиши, ALGO, PRESET, OSC, VOICES и шаги. Ручка ALGO
 выбирает её движок (на барабанной дорожке: бочка, малый барабан, хай-хэт), OCT- и OCT+ — октаву (от -2 до +2),
 MASTER — громкость, короткий SAVE сохраняет настройки и паттерн. PRESET перебирает четыре заводских звука
-и пользовательские пресеты этого движка. Удержание SAVE открывает 64 ячейки (четыре страницы, OCT-/+); белая
+и пользовательские пресеты этого движка. HOME открывает дополнительные страницы и OUTPUT (строй, уровень, AUX);
+удержание HOME + поворот SELECT быстро выбирает страницу. Удержание SAVE открывает 64 ячейки (четыре страницы, OCT-/+); белая
 клавиша сохраняет или заменяет ячейку. Запись ждёт остановки и отпускания нот; перед выключением дождись
 PRESET SAVED. SEQ включает режим шагов (белые клавиши — шаги;
 зажал шаг и крутишь K1..K3 — его нота, сила, длина; чёрные клавиши 1–8 — дорожки; OCT- / OCT+ — страницы; SEQ
@@ -115,7 +120,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.21.0.fwsc 0.21.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0-sound.fwsc 0.22.0-sound grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -130,7 +135,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.21.0      # grav-code/build/grav_code-0.21.0.fwsc
+python3 tools/build.py grav-code --release 0.22.0-sound      # grav-code/build/grav_code-0.22.0-sound.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

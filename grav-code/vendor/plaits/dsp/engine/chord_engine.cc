@@ -114,7 +114,7 @@ void ChordEngine::Render(
 
   float harmonics[kChordNumHarmonics * 2 + 2];
   float note_amplitudes[kChordNumVoices];
-  float registration = max(1.0f - morph_lp_ * 2.15f, 0.0f);
+  float registration = GravExtra(parameters, 0, max(1.0f - morph_lp_ * 2.15f, 0.0f));
   
   ComputeRegistration(registration, harmonics);
   harmonics[kChordNumHarmonics * 2] = 0.0f;
@@ -134,6 +134,8 @@ void ChordEngine::Render(
   for (int note = 0; note < kChordNumVoices; ++note) {
     float wavetable_amount = 50.0f * (morph_lp_ - fade_point[note]);
     CONSTRAIN(wavetable_amount, 0.0f, 1.0f);
+    wavetable_amount = GravExtra(parameters, 1, wavetable_amount);
+    note_amplitudes[note] *= GravExtra(parameters, 2 + note, 1.0f);
 
     float divide_down_amount = 1.0f - wavetable_amount;
     float* destination = (1 << note) & aux_note_mask ? aux : out;

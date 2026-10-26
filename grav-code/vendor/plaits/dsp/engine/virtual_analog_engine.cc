@@ -170,7 +170,7 @@ void VirtualAnalogEngine::Render(
   // OUT = 1 + 2.
   // AUX = dual variable waveshape controlled by MORPH, self sync by TIMBRE.
   
-  const float sync_amount = parameters.timbre * parameters.timbre;
+  const float sync_amount = GravExtra(parameters, 5, parameters.timbre * parameters.timbre);
   const float auxiliary_detune = ComputeDetuning(parameters.harmonics);
   const float primary_f = NoteToFrequency(parameters.note);
   const float auxiliary_f = NoteToFrequency(parameters.note + auxiliary_detune);
@@ -195,12 +195,14 @@ void VirtualAnalogEngine::Render(
   // Render double varishape to OUT.
   float square_pw = 1.3f * parameters.timbre - 0.15f;
   CONSTRAIN(square_pw, 0.005f, 0.5f);
+  if (parameters.extra && parameters.extra[0] != 255) square_pw = 0.005f + GravExtra(parameters, 0, 0.5f) * 0.495f;
   
-  const float square_sync_ratio = parameters.timbre < 0.5f
+  const float square_sync_macro = parameters.timbre < 0.5f
       ? 0.0f
       : (parameters.timbre - 0.5f) * (parameters.timbre - 0.5f) * 4.0f * 48.0f;
   
-  const float square_gain = min(parameters.timbre * 8.0f, 1.0f);
+  const float square_sync_ratio = parameters.extra && parameters.extra[1] != 255 ? 48.0f * GravExtra(parameters, 1, 0.0f) : square_sync_macro;
+  const float square_gain = GravExtra(parameters, 4, min(parameters.timbre * 8.0f, 1.0f));
   
   float saw_pw = parameters.morph < 0.5f
       ? parameters.morph + 0.5f
@@ -210,9 +212,11 @@ void VirtualAnalogEngine::Render(
     
   float saw_shape = 10.0f - 21.0f * parameters.morph;
   CONSTRAIN(saw_shape, 0.0f, 1.0f);
+  saw_shape = GravExtra(parameters, 2, saw_shape);
   
   float saw_gain = 8.0f * (1.0f - parameters.morph);
   CONSTRAIN(saw_gain, 0.02f, 1.0f);
+  saw_gain = GravExtra(parameters, 3, saw_gain);
   
   const float square_sync_f = NoteToFrequency(
       parameters.note + square_sync_ratio);
@@ -221,7 +225,7 @@ void VirtualAnalogEngine::Render(
       primary_f, square_sync_f, square_pw, 1.0f, temp_buffer_, size);
   variable_saw_.Render(auxiliary_f, saw_pw, saw_shape, out, size);
   
-  float norm = 1.0f / (std::max(square_gain, saw_gain));
+  float norm = 1.0f / (std::max(0.02f, std::max(square_gain, saw_gain)));
   
   ParameterInterpolator square_gain_modulation(
       &auxiliary_amount_,

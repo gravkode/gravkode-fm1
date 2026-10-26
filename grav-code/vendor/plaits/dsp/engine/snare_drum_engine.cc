@@ -68,9 +68,9 @@ void SnareDrumEngine::Render(
       parameters.trigger & TRIGGER_RISING_EDGE,
       parameters.accent,
       f0,
-      parameters.timbre,
-      parameters.morph,
-      parameters.harmonics,
+      GravExtra(parameters, 0, parameters.timbre),
+      GravExtra(parameters, 1, parameters.morph),
+      GravExtra(parameters, 2, parameters.harmonics),
       aux,
       size);
 }

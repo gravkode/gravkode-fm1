@@ -65,6 +65,8 @@ void SpeechEngine::Render(
   const float f0 = NoteToFrequency(parameters.note);
   
   const float group = parameters.harmonics * 6.0f;
+  speed_ = (GravExtra(parameters, 0, 0.5f) - 0.5f) * 2.0f;
+  prosody_amount_ = GravExtra(parameters, 1, 0.0f);
   
   // Interpolates between the 3 models: naive, SAM, LPC.
   if (group <= 2.0f) {
@@ -115,11 +117,11 @@ void SpeechEngine::Render(
     }
   } else {
     // Change phonemes/words for LPC.
-    const int word_bank = word_bank_quantizer_.Process(
-        (group - 2.0f) * 0.275f) - 1;
+    const int word_bank = parameters.extra && parameters.extra[3] != 255 ? int(parameters.extra[3]) - 1 :
+        word_bank_quantizer_.Process((group - 2.0f) * 0.275f) - 1;
     
-    const bool replay_prosody = word_bank >= 0 && \
-        !(parameters.trigger & TRIGGER_UNPATCHED);
+    const bool replay_prosody = GravFlag(parameters, 2, word_bank >= 0 && \
+        !(parameters.trigger & TRIGGER_UNPATCHED));
     
     *already_enveloped = replay_prosody;
     

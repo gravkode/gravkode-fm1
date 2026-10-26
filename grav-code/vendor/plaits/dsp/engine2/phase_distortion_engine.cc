@@ -58,7 +58,7 @@ void PhaseDistortionEngine::Render(
     size_t size,
     bool* already_enveloped) {
   const float f0 = 0.5f * NoteToFrequency(parameters.note);
-  const float modulator_f = min(0.25f, f0 * SemitonesToRatio(Interpolate(
+  const float modulator_f = min(0.25f, f0 * SemitonesToRatio((GravExtra(parameters, 3, 0.5f) - 0.5f) * 2.0f + Interpolate(
       lut_fm_frequency_quantizer,
       parameters.harmonics,
       128.0f)));
@@ -70,9 +70,10 @@ void PhaseDistortionEngine::Render(
   float* synced = &temp_buffer_[0];
   float* free_running = &temp_buffer_[2 * size];
   shaper_.Render<true, true>(
-      f0, modulator_f, pw, 0.0f, amount, synced, 2 * size);
+      f0, modulator_f, pw, GravExtra(parameters, 0, 0.0f), amount, synced, 2 * size);
   modulator_.Render<false, true>(
-      f0, modulator_f, pw, 0.0f, amount, free_running, 2 * size);
+      f0, modulator_f, 0.5f + 0.49f * GravExtra(parameters, 2, parameters.morph), GravExtra(parameters, 0, 0.0f),
+      8.0f * GravExtra(parameters, 1, parameters.timbre * parameters.timbre) * (1.0f - modulator_f * 3.8f), free_running, 2 * size);
   
   for (size_t i = 0; i < size; ++i) {
     // Naive 0.5x downsampling.

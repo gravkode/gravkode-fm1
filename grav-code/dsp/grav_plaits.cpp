@@ -1,6 +1,7 @@
 /* Mutable Instruments Plaits' engines for GRAV CODE: built, chosen and rendered here for the C side (grav_plaits.h) */
 #include <new>
 #include <cstring>
+#include <cstddef>
 
 #include "grav_plaits.h"
 #include "grav_drums.h"
@@ -33,6 +34,9 @@
 #include "stmlib/utils/random.h"
 
 static_assert(GRAV_PLAITS_BLOCK >= plaits::kBlockSize, "grav_plaits.h: a chunk renders a block at least");
+static_assert(sizeof(plaits::fm::Patch) == GRAV_CONTROL_BYTES && offsetof(plaits::fm::Patch, algorithm) == 134 &&
+              offsetof(plaits::fm::Patch, transpose) == 144 && offsetof(plaits::fm::Patch, active_operators) == 155,
+              "sound/controls.c: FM patch byte layout");
 
 #ifdef PLAT_HOST
 #define GRAV_POOL
@@ -347,6 +351,16 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
   p.morph = in->morph;
   p.harmonics = in->harmonics;
   p.accent = in->accent;
+  p.extra = in->controls ? in->controls->value : nullptr;
+  p.fm_patch = in->controls && (in->controls->flags & GRAV_CUSTOM_FM) ? in->controls->value : nullptr;
+  p.grav_strike = in->strike;
+  if (v.drum && in->controls) {
+    p.accent *= in->controls->accent * 0.01f;
+    if ((in->controls->flags & GRAV_DRUM_HOLD) && in->gate) {
+      p.trigger |= plaits::TRIGGER_UNPATCHED;
+      held |= plaits::TRIGGER_UNPATCHED;
+    }
+  }
 
   for (uint32_t i = 0; i < size; ++i) {
     if (v.fifo_read == plaits::kBlockSize) {
@@ -360,10 +374,18 @@ extern "C" int grav_plaits_render(uint32_t voice, const grav_plaits_params_t* in
       }
       v.fifo_enveloped = already_enveloped;
       p.trigger = held;
+      p.grav_strike = false;
       v.fifo_read = 0;
     }
     out[i] = v.fifo_out[v.fifo_read];
     aux[i] = v.fifo_aux[v.fifo_read];
+    if (in->controls) {
+      if (!v.drum && in->controls->aux)
+        out[i] += (aux[i] - out[i]) * (in->controls->aux * 0.01f);
+      const float level = in->controls->level * 0.01f;
+      out[i] *= level;
+      aux[i] *= level;
+    }
     ++v.fifo_read;
   }
   v.random_state = stmlib::Random::state();
@@ -421,4 +443,13 @@ extern "C" uint32_t grav_engine_step(uint32_t engine, int32_t steps) {
 
 extern "C" uint32_t grav_plaits_ram_used(uint32_t voice) {
   return voices[voice % GRAV_VOICES].ram_used;
+}
+
+extern "C" void grav_fm_patch(uint32_t engine, uint32_t harmonics, uint8_t raw[GRAV_CONTROL_BYTES]) {
+  if (engine < GRAV_ENGINE_SIX_OP_1 || engine > GRAV_ENGINE_SIX_OP_3) return;
+  uint32_t index = harmonics * 3264u / 10000u;
+  if (index > 31) index = 31;
+  plaits::fm::Patch patch;
+  patch.Unpack(info[engine].user_data + index * plaits::fm::Patch::SYX_SIZE);
+  std::memcpy(raw, &patch, sizeof patch);
 }

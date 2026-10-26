@@ -109,15 +109,16 @@ void StringMachineEngine::Render(
     divide_down_voice_[note].Render(
         note_f0,
         harmonics,
-        0.25f * divide_down_gain,
+        0.25f * divide_down_gain * GravExtra(parameters, 5 + note, 1.0f),
         note & 1 ? aux : out,
         size);
   }
   
   // Pass through VCF.
-  const float cutoff = 2.2f * f0 * SemitonesToRatio(120.0f * parameters.timbre);
-  svf_[0].set_f_q<FREQUENCY_DIRTY>(cutoff, 1.0f);
-  svf_[1].set_f_q<FREQUENCY_DIRTY>(cutoff * 1.5f, 1.0f);
+  const float cutoff = 2.2f * f0 * SemitonesToRatio(120.0f * GravExtra(parameters, 0, parameters.timbre));
+  const float q = parameters.extra && parameters.extra[3] != 255 ? 0.5f + 7.5f * GravExtra(parameters, 3, 0.0f) : 1.0f;
+  svf_[0].set_f_q<FREQUENCY_DIRTY>(cutoff, q);
+  svf_[1].set_f_q<FREQUENCY_DIRTY>(cutoff * (0.5f + 2.5f * GravExtra(parameters, 4, 0.4f)), q);
 
   // Mixdown.
   for (size_t i = 0; i < size; ++i) {
@@ -130,8 +131,8 @@ void StringMachineEngine::Render(
   // Ensemble FX.
   const float amount = fabsf(parameters.timbre - 0.5f) * 2.0f;
   const float depth = 0.35f + 0.65f * parameters.timbre;
-  ensemble_.set_amount(amount);
-  ensemble_.set_depth(depth);
+  ensemble_.set_amount(GravExtra(parameters, 1, amount));
+  ensemble_.set_depth(GravExtra(parameters, 2, depth));
   ensemble_.Process(out, aux, size);
 }
 

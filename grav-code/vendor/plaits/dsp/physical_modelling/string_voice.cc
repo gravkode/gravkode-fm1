@@ -27,6 +27,7 @@
 // Extended Karplus-Strong, with all the niceties from Rings.
 
 #include "plaits/dsp/physical_modelling/string_voice.h"
+#include "plaits/dsp/engine/engine.h"
 
 #include <algorithm>
 
@@ -61,21 +62,24 @@ void StringVoice::Render(
     float* temp,
     float* out,
     float* aux,
-    size_t size) {
-  const float density = brightness * brightness;
+    size_t size, const uint8_t* extra) {
+  EngineParameters controls = {};
+  controls.extra = extra;
+  const float density = GravExtra(controls, 0, brightness * brightness);
 
-  brightness += 0.25f * accent * (1.0f - brightness);
-  damping += 0.25f * accent * (1.0f - damping);
+  brightness += GravExtra(controls, 4, 0.25f) * accent * (1.0f - brightness);
+  damping += GravExtra(controls, 4, 0.25f) * accent * (1.0f - damping);
   
   // Synthesize excitation signal.
   if (trigger || sustain) {
     const float range = 72.0f;
     const float f = 4.0f * f0;
-    const float cutoff = min(
+    const float macro_cutoff = min(
         f * SemitonesToRatio((brightness * (2.0f - brightness) - 0.5f) * range),
         0.499f);
-    const float q = sustain ? 1.0f : 0.5f;
-    remaining_noise_samples_ = static_cast<size_t>(1.0f / f0);
+    const float cutoff = extra && extra[1] != 255 ? min(f0 * SemitonesToRatio(GravExtra(controls, 1, 0.5f) * 120.0f - 24.0f), 0.499f) : macro_cutoff;
+    const float q = extra && extra[2] != 255 ? 0.1f + 7.9f * GravExtra(controls, 2, 0.0f) : (sustain ? 1.0f : 0.5f);
+    remaining_noise_samples_ = static_cast<size_t>((extra && extra[3] != 255 ? 0.1f + 3.9f * GravExtra(controls, 3, 0.0f) : 1.0f) / f0);
     excitation_filter_.set_f_q<FREQUENCY_DIRTY>(cutoff, q);
   }
 
@@ -107,6 +111,7 @@ void StringVoice::Render(
   float non_linearity = structure < 0.24f
       ? (structure - 0.24f) * 4.166f
       : (structure > 0.26f ? (structure - 0.26f) * 1.35135f : 0.0f);
+  if (extra && extra[5] != 255) non_linearity = GravExtra(controls, 5, 0.5f) * 2.0f - 1.0f;
   string_.Process(f0, non_linearity, brightness, damping, temp, out, size);
 }
 

@@ -53,9 +53,9 @@ void BassDrumEngine::Render(
     bool* already_enveloped) {
   const float f0 = NoteToFrequency(parameters.note);
   
-  const float attack_fm_amount = min(parameters.harmonics * 4.0f, 1.0f);
-  const float self_fm_amount = max(min(parameters.harmonics * 4.0f - 1.0f, 1.0f), 0.0f);
-  const float drive = max(parameters.harmonics * 2.0f - 1.0f, 0.0f) * \
+  const float attack_fm_amount = GravExtra(parameters, 0, min(parameters.harmonics * 4.0f, 1.0f));
+  const float self_fm_amount = GravExtra(parameters, 1, max(min(parameters.harmonics * 4.0f - 1.0f, 1.0f), 0.0f));
+  const float drive = GravExtra(parameters, 2, max(parameters.harmonics * 2.0f - 1.0f, 0.0f)) * \
       max(1.0f - 16.0f * f0, 0.0f);
   
   const bool sustain = parameters.trigger & TRIGGER_UNPATCHED;
@@ -82,13 +82,11 @@ void BassDrumEngine::Render(
       parameters.trigger & TRIGGER_RISING_EDGE,
       parameters.accent,
       f0,
-      parameters.timbre,
-      parameters.morph,
-      sustain
-          ? parameters.harmonics
-          : 0.4f - 0.25f * parameters.morph * parameters.morph,
-      min(parameters.harmonics * 2.0f, 1.0f),
-      max(parameters.harmonics * 2.0f - 1.0f, 0.0f),
+      GravExtra(parameters, 3, parameters.timbre),
+      GravExtra(parameters, 4, parameters.morph),
+      GravExtra(parameters, 5, sustain ? parameters.harmonics : 0.4f - 0.25f * parameters.morph * parameters.morph),
+      GravExtra(parameters, 6, min(parameters.harmonics * 2.0f, 1.0f)),
+      GravExtra(parameters, 7, max(parameters.harmonics * 2.0f - 1.0f, 0.0f)),
       aux,
       size);
 }

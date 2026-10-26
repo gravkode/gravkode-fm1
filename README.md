@@ -13,8 +13,11 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.21.0** — engine-specific knob labels, four factory presets per engine and 64 user slots.
-ALGO selects the engine, PRESET selects its sound; hold SAVE and press a white key to save a user preset.
+Sound-editor preview: **0.22.0-sound** — independent engine controls, a complete six-operator FM editor,
+circular animated dials and extended presets. HOME advances pages; hold HOME and turn SELECT to jump.
+[All sound controls](grav-code/docs/SOUND_CONTROLS.md). Hardware listening/load validation is still pending.
+
+<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Sound-page dial animation in the simulator"></p>
 
 ## What it does
 
@@ -59,7 +62,8 @@ ALGO selects the engine, PRESET selects its sound; hold SAVE and press a white k
 
 SELECT picks the track (S1–S4, D1–D4) the keys, ALGO, PRESET, OSC, VOICES and the steps are for; ALGO picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
-stores the settings and pattern. PRESET browses four factory sounds and the user presets for this engine.
+stores the settings and pattern. Sound pages include the engine's extra controls and OUTPUT (tune, level, AUX mix);
+PRESET browses four factory sounds and the user presets for this engine.
 Hold SAVE for the 64 user slots (four pages, OCT-/+); a white key saves or replaces that slot. A queued preset
 is written after stopping and releasing the notes; wait for PRESET SAVED before powering off. SEQ turns step mode on (the white keys are the steps; hold one and turn K1..K3 for its note,
 velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length), PLAY
@@ -113,7 +117,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.21.0.fwsc 0.21.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0-sound.fwsc 0.22.0-sound grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -128,7 +132,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.21.0      # grav-code/build/grav_code-0.21.0.fwsc
+python3 tools/build.py grav-code --release 0.22.0-sound      # grav-code/build/grav_code-0.22.0-sound.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -136,7 +140,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

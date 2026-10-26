@@ -54,7 +54,7 @@ class ModalVoice {
       float* temp,
       float* out,
       float* aux,
-      size_t size);
+      size_t size, const uint8_t* extra = NULL);
   
  private:
   ResonatorSvf<1> excitation_filter_;

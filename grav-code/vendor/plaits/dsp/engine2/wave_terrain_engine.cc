@@ -206,6 +206,9 @@ void WaveTerrainEngine::Render(
       min(parameters.harmonics * 1.05f, 1.0f) * float(num_terrains - 1.0001f),
       size);
   
+  const float rotation = GravExtra(parameters, 3, 0.0f);
+  const float cs = Sine(1.25f + rotation), sn = Sine(1.0f + rotation);
+  const bool edited = parameters.extra && (parameters.extra[0] != 255 || parameters.extra[1] != 255 || parameters.extra[2] != 255 || parameters.extra[3] != 255);
   size_t ij = 0;
   for (size_t i = 0; i < size; ++i) {
     const float x_offset = offset.Next();
@@ -217,8 +220,14 @@ void WaveTerrainEngine::Render(
     float aux_s = 0.0f;
     
     for (size_t j = 0; j < kOversampling; ++j) {
-      const float x = path_x[ij] * (1.0f - fabsf(x_offset)) + x_offset;
-      const float y = path_y[ij];
+      const float px = path_x[ij] * cs - path_y[ij] * sn;
+      const float py = path_x[ij] * sn + path_y[ij] * cs;
+      float x = px * GravExtra(parameters, 2, 1.0f - fabsf(x_offset)) + x_offset;
+      float y = py * GravExtra(parameters, 1, 1.0f) + (GravExtra(parameters, 0, 0.5f) - 0.5f) * 1.9f;
+      if (edited) {
+        CONSTRAIN(x, -0.999f, 0.999f);
+        CONSTRAIN(y, -0.999f, 0.999f);
+      }
       ++ij;
       
       const float z0 = Terrain(x, y, z_integral);

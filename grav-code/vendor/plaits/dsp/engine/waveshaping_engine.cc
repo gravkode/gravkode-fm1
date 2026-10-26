@@ -99,7 +99,7 @@ void WaveshapingEngine::Render(
   const float overtone_gain = parameters.timbre * (2.0f - parameters.timbre);
   ParameterInterpolator overtone_gain_modulation(
       &previous_overtone_gain_,
-      overtone_gain * (2.0f - overtone_gain),
+      GravExtra(parameters, 0, overtone_gain * (2.0f - overtone_gain)),
       size);
   
   for (size_t i = 0; i < size; ++i) {
@@ -123,6 +123,10 @@ void WaveshapingEngine::Render(
     
     float mix = x + (y - x) * shape_fractional;
     float index = mix * wf_gain_modulation.Next() + 0.5f;
+    if (parameters.extra && parameters.extra[1] != 255) {
+      index += (GravExtra(parameters, 1, 0.5f) - 0.5f) * 0.48f;
+      CONSTRAIN(index, 0.001f, 0.999f);
+    }
     float fold = InterpolateHermite(
         lut_fold + 1, index, 512.0f);
     float fold_2 = -InterpolateHermite(
