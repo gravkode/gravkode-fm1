@@ -121,7 +121,7 @@ pages show it the same way.
 
 **The splash:** turning ALGO shows the new engine for a moment over the page: its icon, its name and its line.
 
-### Advanced sound pages (0.22.0-sound preview)
+### Advanced sound pages (0.22)
 
 HOME advances through independent engine controls, then OUTPUT; hold HOME and turn SELECT for fast navigation.
 AUTO follows the original macro; turn left past zero to restore it. OUTPUT adds TUNE, LEVEL and AUX MIX. Dedicated
@@ -200,7 +200,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.22.0-sound, ID FM-1_73002200, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.22.0, ID FM-1_73002200, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 

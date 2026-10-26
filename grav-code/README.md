@@ -58,13 +58,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.22.0-sound    # grav-code/build/grav_code-0.22.0-sound.fwsc, identity FM-1_73002200
+    python3 tools/build.py grav-code --release 0.22.0    # grav-code/build/grav_code-0.22.0.fwsc, identity FM-1_73002200
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0-sound.fwsc 0.22.0-sound grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0.fwsc 0.22.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.22.0-sound   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.22.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 
@@ -77,7 +77,7 @@ Python with Pillow (the fonts).
   Beads' delay (96 KiB) and reverb (64 KiB) are there too, its processor (25 KB) in `.bss`: the pool is 333 KB of
   336, the RAM about 89 KiB of 96 (including the 8 KiB CPU1 stack, the eight voices' block buffers and the four drum
   voices: their slots and 512 bytes of RAM each, in `.bss`).
-- Expanded user presets (0.22 sound preview) use a 32 KiB log at `0xE5000..0xED000`, indexed in place.
+- Expanded user presets (0.22) use a 32 KiB log at `0xE5000..0xED000`, indexed in place.
   A sound is 184 bytes; each 256-byte record commits its CRC header last. Fifteen records per sector leave the
   final page erased for loader compatibility. Eight RAM pending slots; compaction evacuates before erasing.
   The old object 2 bank at `0xDE000/DF000` stays intact for resumable import. Settings append eight control

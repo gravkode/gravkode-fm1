@@ -1,8 +1,8 @@
-# GRAV CODE 0.22.0-sound — sound editor preview
+# GRAV CODE 0.22.0 — the sound editor
 
-Package: `grav_code-0.22.0-sound.fwsc`, identity `FM-1_73002200`. Based on 0.21 commit `05fb85f`.
+Package: `grav_code-0.22.0.fwsc`, identity `FM-1_73002200`. After 0.21 (`05fb85f`: ALGO, presets).
 
-Plaits' three macro knobs combine several musical settings. This preview adds independent controls on sound
+Plaits' three macro knobs combine several musical settings. This version adds independent controls on sound
 pages while retaining AUTO for the original macro behavior, plus a full editor for all three six-op FM banks.
 
 - **Sound pages:** HOME advances OSC → engine details → OUTPUT → SEQ; held HOME + SELECT jumps pages without
@@ -19,6 +19,12 @@ pages while retaining AUTO for the original macro behavior, plus a full editor f
 - **Expanded persistence:** every new engine control, FM patch, drum setting and OUTPUT travels with the sound
   preset and current track settings. Common ENV/LFO/FX remain project settings. Sixty-four user slots, four factory
   starting points per engine, eight pending RAM slots; a full queue explicitly refuses the next distinct save.
+- **WAVETABLE no longer clicks when chosen.** Built afresh, it started its pitch at A0 and its differentiator
+  empty, and its first samples peaked about 30 times over its level (since 0.10): a click as it was chosen, or on
+  its first note. A few silent blocks now bring it to where it runs, as on Plaits, where the engine runs from
+  power-on. No other engine changes; a new check builds each of the 30 engines anew and finds no start click.
+- **Plaits' changed files are each marked "GRAV CODE"** (vendor/README.md). With every advanced control at AUTO,
+  all 30 engines render sample for sample as in 0.20.0 (checked against a build of `4f2db52`).
 
 Expanded sounds use a 184-byte record in an indexed 32 KiB flash log at E5000..ED000. CRC headers commit last;
 compaction copies live records before erasing. The final page of each sector stays erased for update-loader
@@ -39,14 +45,15 @@ Validation on 26 October 2026:
 - DSP: all 96 non-FM extra controls have audio effects in applicable contexts; all 151 FM fields map to native
   patch bytes; operator levels, first edit on a held factory note, subsequent edits and restoring its factory
   patch affect live output. AUTO agrees with the stock path; combined minima/maxima remain finite.
+- No engine starts with a click: each of the 30 built anew, its first two blocks against its level.
 - **1008 bit-exact concurrent comparisons**: 960 stock plus 48 with advanced controls, four synth/four drum
   voices and FX off/on; existing six-op ENV/LFO and overload-fade regressions pass. Sequencer timing and pattern
   bank fault/wear tests pass.
-- Device build/compiler checks pass: image **394276 B**, RAM **91512 / 98304 B** (**6792 B free**), pool
+- Device build/compiler checks pass: image **394436 B**, RAM **91512 / 98304 B** (**6792 B free**), pool
   **332968 / 344064 B** (**11096 B free**). Package **611496 B**; no soft-double helpers, unsafe instruction
   patterns or direct register access introduced.
 
-Package SHA-256: `fbba1ff6b4af705464ae5b8cc076f5d49ad0bf1b0d39c94854a5d6b0ff1aee25`.
+Package SHA-256: `e489a60816e040a29afd998a94a20f00c5b5bcb4eb895e21c007f8d91713de59`.
 
 Not installed on the FM-1 in this change. Listening, physical encoder feel and real CPU/XRUN measurements during
 editing with eight tracks and FX still require hardware validation. The GIF is a simulator capture.

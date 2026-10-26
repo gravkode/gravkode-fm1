@@ -33,6 +33,9 @@
 #include "stmlib/dsp/cosine_oscillator.h"
 #include "plaits/dsp/oscillator/sine_oscillator.h"
 
+// GRAV CODE: the sound editor's independent controls in Render (engine.h GravExtra, GravFlag): each 255, AUTO,
+// keeps Plaits' own value, so a sound left alone renders as on Plaits.
+
 namespace plaits {
 
 using namespace std;

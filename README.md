@@ -13,9 +13,9 @@ FM-1's own panel and screen.
 
 ---
 
-Sound-editor preview: **0.22.0-sound** — independent engine controls, a complete six-operator FM editor,
-circular animated dials and extended presets. HOME advances pages; hold HOME and turn SELECT to jump.
-[All sound controls](grav-code/docs/SOUND_CONTROLS.md). Hardware listening/load validation is still pending.
+Current version: **0.22.0**, the sound editor — independent engine controls, a complete six-operator FM editor,
+circular animated dials and extended presets (0.21: ALGO picks the engine, PRESET its sounds). HOME advances
+pages; hold HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Sound-page dial animation in the simulator"></p>
 
@@ -117,7 +117,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0-sound.fwsc 0.22.0-sound grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0.fwsc 0.22.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -132,7 +132,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.22.0-sound      # grav-code/build/grav_code-0.22.0-sound.fwsc
+python3 tools/build.py grav-code --release 0.22.0      # grav-code/build/grav_code-0.22.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)

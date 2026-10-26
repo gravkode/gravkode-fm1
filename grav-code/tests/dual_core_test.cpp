@@ -225,6 +225,42 @@ static bool six_op_controls() {
 
 // The overload protection: a lone voice is kept; a voice taken fades out over GRAV_SHED_FADE (128) samples,
 // from where it was (no step at the cut), then sleeps.
+// No engine may start with a click: its first two blocks after it is built peak no higher than twice what it does
+// after (WAVETABLE's peaked 30 times over until 0.22). Each engine anew, in a synth voice and the drums in a drum one.
+static bool start_clicks() {
+    static const unsigned drums[6] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SYN_KICK, GRAV_ENGINE_SNARE_DRUM,
+                                      GRAV_ENGINE_SYN_SNARE, GRAV_ENGINE_HI_HAT, GRAV_ENGINE_RING_HAT};
+    for (unsigned k = 0; k < GRAV_ENGINE_COUNT + 6u; ++k) {
+        const unsigned voice = k < GRAV_ENGINE_COUNT ? 0u : GRAV_BIG_VOICES;
+        const unsigned engine = k < GRAV_ENGINE_COUNT ? k : drums[k - GRAV_ENGINE_COUNT];
+        grav_plaits_voice_engine(voice, voice ? GRAV_ENGINE_HI_HAT : GRAV_ENGINE_FM);   // (anew from another)
+        grav_plaits_voice_engine(voice, voice ? GRAV_ENGINE_BASS_DRUM : GRAV_ENGINE_WAVESHAPING);
+        grav_plaits_voice_engine(voice, engine);
+        grav_plaits_params_t p;
+        std::memset(&p, 0, sizeof p);
+        p.note = voice ? 40.0f : 60.0f;
+        p.timbre = 0.65f;
+        p.morph = 0.5f;
+        p.harmonics = 0.75f;
+        p.accent = 0.8f;
+        grav_drum_shape(engine, p.harmonics, p.shape);
+        float out[24], aux[24], first = 0.0f, after = 0.0f;
+        for (unsigned b = 0; b < 44100u / 24u; ++b) {
+            p.gate = 1;
+            p.strike = b == 0;
+            grav_plaits_render(voice, &p, out, aux, 24);
+            for (unsigned i = 0; i < 24; ++i)
+                (b < 2 ? first : after) = std::fmax(b < 2 ? first : after, std::fabs(out[i]));
+        }
+        if (first > 2.0f * after && first > 1.5f) {
+            std::fprintf(stderr, "%s starts with a click: %.2f, then %.2f\n", grav_engine_name(engine), first, after);
+            return false;
+        }
+    }
+    std::printf("PASS: no engine starts with a click (24 engines, six drums)\n");
+    return true;
+}
+
 static bool shed_fade() {
     for (unsigned voices = 2; voices <= 4; voices += 2) {
         std::vector<int32_t> runs[2];
@@ -472,6 +508,7 @@ static bool all_controls() {
 int main() {
     if (!all_controls()) return 1;
     if (!preset_audio()) return 1;
+    if (!start_clicks()) return 1;
     if (!shed_fade()) return 1;
     // Retrigger a still-audible envelope, then shorten a release which is already in progress.
     envelope_t envelope;

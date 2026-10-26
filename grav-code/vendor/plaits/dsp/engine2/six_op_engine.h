@@ -37,6 +37,9 @@
 #include "plaits/dsp/fm/voice.h"
 #include "plaits/dsp/fm/patch.h"
 
+// GRAV CODE: an edited patch (custom_patch_) and FMVoice::RefreshPatch, for the sound editor's 6-OP fields
+// (six_op_engine.cc).
+
 namespace plaits {
 
 const int kNumSixOpVoices = 2;

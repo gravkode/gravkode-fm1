@@ -8,7 +8,7 @@ morph or pitch; Mutable Instruments Beads, its granular processor, delay, tape a
 of eight tracks, four synth tracks each its own engine and four drum tracks, 64 steps on the white keys and sixteen
 patterns, plays it, with swing and MIDI clock; the settings and the pattern save; MIDI goes out
 and comes in over USB and TRS. ALGO chooses the engine, PRESET its sound: four factory starting points per
-engine and 64 user slots, saved with held SAVE and a white key. The sound-editor preview adds independent engine
+engine and 64 user slots, saved with held SAVE and a white key. The sound editor (0.22) adds independent engine
 controls, all six FM operators, circular animated dials and extended preset storage; HOME advances pages, held
 HOME with SELECT jumps between them.
 

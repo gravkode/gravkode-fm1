@@ -118,6 +118,7 @@ void SixOpEngine::Render(
     bool* already_enveloped) {
   int patch_index = patch_index_quantizer_.Process(
       parameters.harmonics * 1.02f);
+  // GRAV CODE: the sound editor's patch (parameters.fm_patch) replaces the bank's, for held notes too.
   if (parameters.fm_patch && (!custom_valid_ ||
       std::memcmp(&custom_patch_, parameters.fm_patch, sizeof(custom_patch_)))) {
     std::memcpy(&custom_patch_, parameters.fm_patch, sizeof(custom_patch_));
@@ -143,7 +144,7 @@ void SixOpEngine::Render(
       voice_[i].set_modulations(voice_[0].lfo());
     }
   } else {
-    // A knob edit must reach a currently held note too. Do not retarget a previous release on a new strike:
+    // GRAV CODE: a knob edit must reach a currently held note too. Do not retarget a previous release on a new strike:
     // that strike chooses its own internal voice below, preserving the other voice's old patch tail.
     if (!(parameters.trigger & TRIGGER_RISING_EDGE) && (parameters.trigger & TRIGGER_HIGH) &&
         voice_[active_voice_].patch() != selected_patch)

@@ -34,6 +34,9 @@
 
 #include "plaits/dsp/physical_modelling/string.h"
 
+// GRAV CODE: parameters passed down for the sound editor's independent controls (engine/engine.h GravExtra);
+// AUTO keeps Plaits' own values.
+
 namespace plaits {
 
 class StringVoice {

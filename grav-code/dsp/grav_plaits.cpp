@@ -256,6 +256,19 @@ void choose(uint32_t i, uint32_t engine) {
   v.ram_used = v.ram_size - allocator.free();
   v.engine->LoadUserData(info[engine].user_data);
   v.engine->Reset();
+  if (engine == GRAV_ENGINE_WAVETABLE) {
+    // WAVETABLE built afresh starts its pitch at A0 (its gain is 1 / pitch) and its differentiator empty: its first
+    // samples peaked at 30 times its level, a click as it was chosen or on its first note. On Plaits the engine runs
+    // from power-on and never shows it; a few silent blocks here bring it to where it runs.
+    plaits::EngineParameters warm = {};
+    bool enveloped = false;
+    warm.trigger = plaits::TRIGGER_UNPATCHED;
+    warm.note = 60.0f;
+    warm.timbre = warm.morph = warm.harmonics = 0.5f;
+    for (int i = 0; i < 4; ++i) {
+      v.engine->Render(warm, v.fifo_out, v.fifo_aux, plaits::kBlockSize, &enveloped);
+    }
+  }
   v.fifo_read = plaits::kBlockSize;
   v.fifo_enveloped = info[engine].own_envelope;
   v.random_state = stmlib::Random::state();

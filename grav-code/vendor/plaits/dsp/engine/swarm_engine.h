@@ -39,6 +39,9 @@
 #include "plaits/dsp/oscillator/sine_oscillator.h"
 #include "plaits/resources.h"
 
+// GRAV CODE: parameters passed down for the sound editor's independent controls (engine/engine.h GravExtra);
+// AUTO keeps Plaits' own values.
+
 namespace plaits {
 
 const int kNumSwarmVoices = 8;
