@@ -104,7 +104,8 @@ enum {
     PAGE_MOD,
     PAGE_ENV,
     PAGE_GLO,                            /* the firmware and its global settings: VOICES, VELOCITY */
-    PAGE_FX_GRAIN,                       /* the effect (FX, again for the next): DENSITY, TIME, SIZE */
+    PAGE_FX_GRAIN,                       /* the effect (FX: MIX first since 0.26.2, again GRAIN, SHAPE): DENSITY, TIME,
+                                          * SIZE */
     PAGE_FX_SHAPE,                       /* SHAPE, PITCH, FEEDBACK */
     PAGE_FX_MIX,                         /* DRY/WET, REVERB, QUALITY */
     PAGE_DEBUG,                          /* GLO again: dual-core diagnostics */
@@ -120,7 +121,7 @@ enum {
 #define IS_SOUND_PAGE(p) ((p) == PAGE_OSC || (p) == PAGE_SHAPE || (p) == PAGE_SOUND || (p) == PAGE_OUTPUT)
 
 static uint8_t active_page = PAGE_SEQ;
-static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back to it */
+static uint8_t fx_page = PAGE_FX_MIX;    /* the FX page shown last: FX goes back to it (0.26.2: FX MIX first) */
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG",
@@ -165,6 +166,7 @@ static volatile uint8_t fx_freeze;       /* EDIT: the recording held */
 static volatile uint8_t fx_seed;         /* SEL held */
 static volatile uint8_t fx_seed_auto = 1;   /* grains on their own (DENSITY's); SEL pressed: by hand, held 2 s: back */
 #define SEED_AUTO_MS 2000u
+#define SEED_HOLD_MS 400u                    /* (0.26.2) SEL held this long on an FX page: SEED (a tap: the mixer) */
 static const char *const QUALITY_NAME[GRAV_FX_QUALITIES] = {"DIGITAL", "VINTAGE", "CLEAN TAPE", "DIRTY TAPE"};
 
 /* Plaits' three knobs (OSC), each track's: 0..100% */
@@ -835,7 +837,9 @@ static struct {
     uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
     uint32_t key_mix;                    /* (0.26) the keys pressed on the mixer (mutes, tracks: let go as such) */
     uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
-    uint8_t seed_down;                   /* SEL pressed as SEED (on an FX page) and still held */
+    uint8_t seed_down;                   /* SEL held as SEED (on an FX page) */
+    uint8_t sel_down, sel_used;          /* SEL held; and as SEED meanwhile (let go: no mixer) */
+    uint32_t sel_at;                     /* SEL pressed, when */
     uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
     uint8_t solo;                        /* (0.26.1) the tracks soloed, a bit each (black keys 1..8 on the mixer; not
                                           * saved): some, and only they sound, whatever their mutes */
@@ -1974,11 +1978,11 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
            page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL : B_FX;
 }
 
-/* its blink's period: the first of a button's pages slow, the next faster (FX: GRAIN, SHAPE, MIX) */
+/* its blink's period: the first of a button's pages slow, the next faster (FX: MIX, GRAIN, SHAPE) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_SHAPE ? 500u :
-           page == PAGE_FX_MIX || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
+    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_GRAIN ? 500u :
+           page == PAGE_FX_SHAPE || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
 }
 
 /* the lights: the buttons (the open page's blinking, PLAY green on the beat, red recording) and, in step mode, the
@@ -2147,7 +2151,8 @@ static void lights(uint32_t btn, uint32_t keys)
 static void page_open(uint32_t k)            /* a page's button: its page (HOME, GLO, FX again: the next one) */
 {
     if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
-        fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
+        fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : active_page == PAGE_FX_GRAIN ? PAGE_FX_SHAPE :
+                  PAGE_FX_MIX;            /* (0.26.2: MIX, GRAIN, SHAPE) */
     if (k == B_HOME && ui.step_mode) {       /* from step mode (every track): HOME's own view, the one track */
         ui.step_mode = 0;
         ui.step_held = -1;
@@ -2339,22 +2344,11 @@ static void input(void)
         } else if (k == B_EDIT) {            /* FREEZE: the effect's recording held, or let go */
             fx_freeze = !fx_freeze;
             app_say("FREEZE", fx_freeze ? "ON" : "OFF");
-        } else if (k == B_SEL && IS_FX_PAGE(active_page)) {   /* on the effect's pages: SEED, a grain now, and
-                                                               * grains by hand from here on */
-            ui.seed_at = plat_ms();
-            ui.seed_down = 1;
-            fx_seed = 1;
-            app_say("SEED", fx_seed_auto ? "MANUAL" : "");
-            fx_seed_auto = 0;
-        } else if (k == B_SEL) {             /* (0.26) the mixer; SEL again: back to the page it was opened on */
-            if (active_page == PAGE_MIXER)
-                active_page = ui.mixer_from;
-            else {
-                ui.mixer_from = active_page;
-                active_page = PAGE_MIXER;
-            }
-            app_say("PAGE", page_name(active_page));
-            ui.redraw = 1;
+        } else if (k == B_SEL) {             /* the mixer when let go, from every page (0.26.2); held on an FX page:
+                                              * SEED (below) */
+            ui.sel_down = 1;
+            ui.sel_used = 0;
+            ui.sel_at = plat_ms();
         } else if ((k == B_OCTDN || k == B_OCTUP) && ui.preset_down) {
             ui.preset_page = (uint8_t)clamp((int32_t)ui.preset_page + (k == B_OCTUP ? 1 : -1), 0, 3);
             ui.preset_used = ui.preset_shown = ui.redraw = 1;
@@ -2416,9 +2410,29 @@ static void input(void)
             ui.redraw = 1;
         }
     }
-    if (!(btn & 1u << B_SEL))                /* SEL let go; held 2 s (as SEED): the grains on their own again */
+    if (ui.sel_down && !(btn & 1u << B_SEL)) {   /* SEL let go: the mixer (SEL again: back to the page it was opened
+                                                  * on), unless it was held as SEED */
+        ui.sel_down = 0;
         fx_seed = ui.seed_down = 0;
-    else if (ui.seed_down && !fx_seed_auto && plat_ms() - ui.seed_at >= SEED_AUTO_MS) {
+        if (!ui.sel_used) {
+            if (active_page == PAGE_MIXER)
+                active_page = ui.mixer_from;
+            else {
+                ui.mixer_from = active_page;
+                active_page = PAGE_MIXER;
+            }
+            app_say("PAGE", page_name(active_page));
+            ui.redraw = 1;
+        }
+    } else if (ui.sel_down && !ui.seed_down && IS_FX_PAGE(active_page) && plat_ms() - ui.sel_at >= SEED_HOLD_MS) {
+        ui.sel_used = 1;                     /* held on an FX page: SEED, grains by hand while it is held, and from
+                                              * here on (held 2 s more: on their own again) */
+        ui.seed_down = 1;
+        ui.seed_at = plat_ms();
+        fx_seed = 1;
+        app_say("SEED", fx_seed_auto ? "MANUAL" : "");
+        fx_seed_auto = 0;
+    } else if (ui.seed_down && !fx_seed_auto && plat_ms() - ui.seed_at >= SEED_AUTO_MS) {
         fx_seed_auto = 1;
         app_say("SEED", "AUTO");
     }
@@ -3776,7 +3790,7 @@ void app_host_reboot(void)
     track_sel = 0;
     active_page = home_page = PAGE_SEQ;
     glo_page = PAGE_GLO;
-    fx_page = PAGE_FX_GRAIN;
+    fx_page = PAGE_FX_MIX;
     fx_freeze = fx_seed = 0;
     fx_seed_auto = 1;
     memset(seq_midi_sent, 0, sizeof seq_midi_sent);   /* (every track's) */

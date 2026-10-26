@@ -87,9 +87,9 @@ From the top:
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
-| FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
+| FX | The effect's pages, again for the next: FX MIX (DRY/WET first, since 0.26.2), FX GRAIN, FX SHAPE. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
-| SEL | The MIXER (section 4); SEL again: back to the page it was opened on. On the FX pages: SEED, a grain by hand; held 2 s, the grains on their own again (lit while they come on their own) |
+| SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on. Held on an FX page: SEED, grains by hand; held 2 s more, the grains on their own again (lit while they come on their own) |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording; playing: live recording (section 5). Held SEQ, then REC: the selected track cleared |
@@ -208,7 +208,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ![The mixer playing: the eight tracks a strip each, S1 selected; each with its fader, its meter moving, its send bar, its M and S; LEVEL, SEND, RETURN below](img/screen-mixer.png "The mixer")
 
-SEL opens the mixer (from any page but the FX pages, where SEL is SEED); SEL again goes back to the page it was
+SEL opens the mixer, from every page (SEL held on an FX page is SEED); SEL again goes back to the page it was
 opened on. Each track is a strip, S1 to S4 then D1 to D4:
 
 - **its name**, the selected track's in the theme's colour;
@@ -233,7 +233,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002601, version 0.26.1](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002602, version 0.26.2](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -255,7 +255,7 @@ The splash at power-on keeps its teal: it is drawn before the settings are read.
 
 GLO once more opens DEBUG, the two cores' timings (section 11).
 
-### FX GRAIN, FX SHAPE, FX MIX (FX)
+### FX MIX, FX GRAIN, FX SHAPE (FX)
 
 The effect's three pages: section 7.
 
@@ -495,7 +495,8 @@ GRAV CODE's effect is Mutable Instruments Beads, its whole processor: a granular
 voices' recent sound, a delay, Beads' tape and digital colours, and its reverb. All the voices go through it, then
 MASTER. It records in mono (twice Beads' time) and plays in stereo: the grains spread left and right.
 
-FX shows its pages, and pressed again the next: FX GRAIN, FX SHAPE, FX MIX, round. From another page, FX goes back
+FX shows its pages, and pressed again the next: FX MIX (DRY/WET, REVERB, QUALITY: first since 0.26.2), FX GRAIN,
+FX SHAPE, round. From another page, FX goes back
 to the one shown last.
 
 **On and off:** with DRY/WET and REVERB both at 0, the effect is off and costs nothing (as it starts). Turn either up
@@ -546,11 +547,12 @@ EDIT freezes the recording: nothing new goes in, and the grains play what it hol
 EDIT is lit and FREEZE shows beside the engine, on every page. EDIT again lets go. Frozen, the effect stays on even
 with DRY/WET and REVERB at 0, so that what it holds is kept.
 
-### SEED (SEL on the FX pages)
+### SEED (SEL held on an FX page)
 
-Beads' SEED button: SEL, while an FX page is open (elsewhere SEL opens the mixer). At first the grains come on their own, at DENSITY's rate: AUTO, and SEL is lit while the effect
-runs. Press SEL and they come by hand (MANUAL): a grain each press, and grains at DENSITY's rate while it is held
-(with DENSITY at the middle, one a press). Hold SEL for 2 s and they come on their own again. The FX pages show
+Beads' SEED button: SEL held for 0.4 s while an FX page is open (a tap opens the mixer). At first the grains come
+on their own, at DENSITY's rate: AUTO, and SEL is lit while the effect runs. Hold SEL and they come by hand
+(MANUAL): grains at DENSITY's rate while it is held (with DENSITY at the middle, one each hold). Hold it for 2 s more
+and they come on their own again. The FX pages show
 which: SEED AUTO or SEED MANUAL.
 
 ### The delay (SIZE at 100)

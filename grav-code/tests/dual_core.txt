@@ -49,9 +49,7 @@ expect shed 0
 shot debug.png
 tap HOME
 wait 30
-# Turn on reverb, keep it running through DEBUG and one/two-core switches.
-tap FX
-tap FX
+# Turn on reverb, keep it running through DEBUG and one/two-core switches. (FX MIX: FX's first page since 0.26.2)
 tap FX
 wait 30
 expect page 6

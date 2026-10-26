@@ -111,16 +111,24 @@ expect send 100
 expect level 100
 wait 900
 expect meter 0
-# SEL again: back to SEQ's page; on an FX page SEL is SEED
+# SEL again: back to SEQ's page; from an FX page too (0.26.2), SEL held there: SEED
 tap SEL
 wait 30
 expect page 8
 tap FX
 wait 30
-expect page 4
+expect page 6
 tap SEL
 wait 30
-expect page 4
+expect page 13
+tap SEL
+wait 30
+expect page 6
+press SEL
+wait 500
+release SEL
+wait 30
+expect page 6
 said SEED
 # white key 2 (key 2): S2 muted; saved; a restart: as it was
 turn SELECT -4

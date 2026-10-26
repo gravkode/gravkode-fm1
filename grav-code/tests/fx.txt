@@ -9,7 +9,11 @@ expect fx7 0
 expect quality 0
 expect seed_auto 1
 expect freeze 0
-# FX: GRAIN, then SHAPE, MIX and GRAIN again; from HOME, FX goes back to the FX page shown last
+# FX: MIX (first since 0.26.2: DRY/WET), then GRAIN, SHAPE and MIX again; from HOME, FX goes back to the FX page
+# shown last
+tap FX
+wait 30
+expect page 6
 tap FX
 wait 30
 expect page 4
@@ -21,7 +25,6 @@ wait 30
 expect page 6
 tap FX
 wait 30
-expect page 4
 tap FX
 wait 30
 tap HOME
@@ -116,17 +119,29 @@ wait 300
 expect peak_db_min -40
 midi 80 3C 00
 wait 30
-# SEL: SEED by hand (a grain each press); held 2 s, the grains on their own again
-tap SEL
-wait 30
+# SEL held on an FX page (0.26.2; a tap opens the mixer): SEED by hand, grains while it is held; held 2 s more, the
+# grains on their own again
+press SEL
+wait 500
 said SEED MANUAL
 expect seed_auto 0
+release SEL
+wait 30
+expect page 6
 press SEL
-wait 2100
+wait 2600
 said SEED AUTO
 expect seed_auto 1
 release SEL
 wait 30
+expect page 6
+# a tap: the mixer, from an FX page too; again: back
+tap SEL
+wait 30
+expect page 13
+tap SEL
+wait 30
+expect page 6
 # SAVE, a reboot: the effect as it was (on), FREEZE and SEED's way not kept
 tap SAVE
 wait 30

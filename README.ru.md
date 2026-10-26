@@ -13,11 +13,12 @@
 
 ---
 
-Текущая версия: **0.26.1**, микшер: SEL открывает полосы восьми дорожек — у каждой фейдер LEVEL, индикатор уровня в
-такт игре, SEND (сколько идёт в эффект) мьют на белых клавишах 1–8 и соло на чёрных 1–8; K3 — RETURN эффекта. До
-этого: 0.25.1 — экран в бирюзовом, цвета выбираются на второй странице GLO; 0.25 — доводка записи (свинг дорожек,
-отсчёт, запись с MIDI-клавиатуры, стирание); 0.24 — живая запись с метрономом; 0.23 — экран секвенсора. HOME листает
-страницы; HOME зажат + SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
+Текущая версия: **0.26.2**, микшер (SEL — с любой страницы; FX открывается на DRY/WET): SEL открывает полосы восьми
+дорожек — у каждой фейдер LEVEL, индикатор уровня в такт игре, SEND (сколько идёт в эффект) мьют на белых клавишах
+1–8 и соло на чёрных 1–8; K3 — RETURN эффекта. До этого: 0.25.1 — экран в бирюзовом, цвета выбираются на второй
+странице GLO; 0.25 — доводка записи (свинг дорожек, отсчёт, запись с MIDI-клавиатуры, стирание); 0.24 — живая запись
+с метрономом; 0.23 — экран секвенсора. HOME листает страницы; HOME зажат + SELECT переключает их быстро. [Все
+параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: piano roll одной дорожки на HOME и сетка всех восьми в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
@@ -57,9 +58,9 @@
 | ENV | ENV | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
 | GLO | GLO | VOICES дорожки (OFF, MONO, 2, 3, 4; всего четыре) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
 | GLO ещё раз | SCREEN | THEME: цвета экрана (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | — | — |
-| FX | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
+| FX | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
+| FX ещё раз | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
 | FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
-| FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO ещё раз | DEBUG | одно/два ядра | сброс пиков и счётчиков | — |
 | SEL | MIXER | LEVEL (выбранной дорожки) | SEND (доля в эффект) | RETURN (DRY/WET эффекта); белые клавиши 1–8 — мьют дорожек, чёрные 1–8 — соло |
 
@@ -74,8 +75,8 @@ PRESET SAVED. SEQ включает режим шагов (белые клави�
 зажат + шаг — длина), PLAY запускает и останавливает, REC (на стопе) записывает ноты и аккорды по шагу. HOME зажат +
 белая клавиша или ручка K4 — паттерн (при игре — в конце текущего). Кнопка открытой страницы мигает, на следующей её
 странице быстрее; PLAY мигает зелёным в долю. EDIT
-замораживает запись эффекта (FREEZE); SEL открывает микшер, а на страницах FX запускает гранулу вручную (держать 2 с — гранулы
-снова идут сами: SEED). При DRY/WET и REVERB на 0 эффект выключен и не тратит процессор.
+замораживает запись эффекта (FREEZE); SEL открывает микшер с любой страницы, а зажатый на странице FX запускает гранулы вручную
+(держать ещё 2 с — гранулы снова идут сами: SEED). При DRY/WET и REVERB на 0 эффект выключен и не тратит процессор.
 
 По умолчанию работают два ядра. Переключение режима в DEBUG временное, через SAVE оно не сохраняется.
 При тяжёлых настройках FX защита всё ещё может отключать голоса на пиках выше 90% времени аудиоблока,
@@ -123,7 +124,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.1.fwsc 0.26.1 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.2.fwsc 0.26.2 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -138,7 +139,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.26.1      # grav-code/build/grav_code-0.26.1.fwsc
+python3 tools/build.py grav-code --release 0.26.2      # grav-code/build/grav_code-0.26.2.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
