@@ -53,7 +53,7 @@ your own risk.
 
 From the top:
 
-- **The header:** GRAV CODE; in the middle the tempo, the whole song's, in BPM (amber while a MIDI clock coming in
+- **The header:** GRAV CODE; in the middle the tempo, the whole song's, in BPM (in the theme's teal while a MIDI clock coming in
   leads, section 5); the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1
   runs on USB power. The page you are on is the one whose button blinks (faster on its second and third pages).
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
@@ -206,7 +206,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002500, version 0.25.0](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002501, version 0.25.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -228,9 +228,9 @@ The effect's three pages: section 7.
 
 ## 5. The sequencer
 
-![The SEQ page (HOME) playing S1 (CHORDS) as a piano roll: its notes as amber bars at their pitch, A3 to D5 named at the left with a line at C4, a chord stacked on step 3, the line playing on step 13 and its notes flashing white; steps 1, 5, 9, 13 numbered; the four pages, the first shown; TEMPO 120, SWING 58 %, LENGTH 16 as small knobs; PLAY, P1, CPU](img/screen-seq.png "The SEQ page: one track")
+![The SEQ page (HOME) playing S1 (CHORDS) as a piano roll: its notes as teal bars at their pitch, A3 to D5 named at the left with a line at C4, a chord stacked on step 3, the line playing on step 13 and its notes flashing white; steps 1, 5, 9, 13 numbered; the four pages, the first shown; TEMPO 120, SWING 58 %, LENGTH 16 as small knobs; PLAY, P1, CPU](img/screen-seq.png "The SEQ page: one track")
 
-![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, S1 on an amber ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
+![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, S1 on a teal ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
 
 ![One bar playing, in the simulator: HOME's piano roll at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
 
@@ -263,7 +263,7 @@ The page shows the selected track alone, as a piano roll:
 - **It shows the page playing** (stopped, or recording: the page shown). As it plays, the step's column lights, a
   white line sweeps across in time, and the notes flash white as they begin. Recording, the step the next chord goes
   to is marked red under the roll.
-- **The pages:** four bars under it, the one shown amber, with a white mark travelling through all four where the
+- **The pages:** four bars under it, the one shown in colour, with a white mark travelling through all four where the
   track plays.
 - **In the bottom band**, small: **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's),
   **K2 SWING** (the selected track's, 50 % straight to 75 %: grey while it follows the pattern's; with SEQ held, the
@@ -286,8 +286,8 @@ HOME turns it off and shows SEQ's own view, the selected track alone; another pa
 turns it off and opens that page.
 
 The screen shows every track then, as the keys do: eight rows, S1 to S4 then D1 to D4, named at the left, the
-selected one on an amber ground; the 16 steps of the page shown across (the white keys), in beats of four. A step on
-is lit, brighter the harder it plays (the selected track's amber, the others' grey); a notch at its corner marks a
+selected one on a teal ground; the 16 steps of the page shown across (the white keys), in beats of four. A step on
+is lit, brighter the harder it plays (the selected track's in the theme's teal, the others' grey); a notch at its corner marks a
 chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
 note flashing white as it begins. A held step is framed in white. The pages are under the rows, as on HOME.
 

@@ -3194,7 +3194,7 @@ static void draw(void)
     /* Header */
     cv_begin(240, 32, C_BLACK);
     cv_text(6, 6, &FONT_B, "GRAV CODE", C_WHITE);
-    {                                        /* the song's tempo in the middle (amber: a MIDI clock in's, leading) */
+    {                                        /* the song's tempo in the middle (the theme's colour: a MIDI clock in's, leading) */
         const int32_t w = text_w(&FONT_B, ui.bpm_text) + 3 + text_w(&FONT_T, "BPM"), x = 120 - w / 2;
         cv_text(x, 6, &FONT_B, ui.bpm_text, ui.shown_ext ? C_HI : C_WHITE);
         cv_text(x + w - text_w(&FONT_T, "BPM"), 10, &FONT_T, "BPM", C_GRAY);
@@ -3529,7 +3529,7 @@ int app_expect(const char *what, int *got)
         *got = (int)grav_debug.masks[1];
     else if (!strcmp(what, "fx_core"))       /* the core the effect ran on: 1 CPU1, a chunk behind the voices */
         *got = (int)grav_debug.fx_core;
-    else if (!strcmp(what, "header_bpm"))    /* the tempo the header shows, and whether a clock in's (amber) */
+    else if (!strcmp(what, "header_bpm"))    /* the tempo the header shows, and whether a clock in's (in colour) */
         *got = (int)ui.shown_bpm;
     else if (!strcmp(what, "header_ext"))
         *got = ui.shown_ext;

@@ -7,7 +7,8 @@
 #include "plat.h"
 
 #define APP_NAME "GRAV CODE"
-#define APP_SPLASH_RGB RGB(242, 120, 72)
+#define APP_SPLASH_RGB RGB(60, 210, 185)   /* (0.25.1) the name on the splash screen, in the theme's teal */
+#define APP_PALETTE 6u                   /* (0.25.1) device/gfx.c PALETTES: TEAL (amber until 0.25) */
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_OVERLOAD                     /* app_overload: the render ran long, a voice falls silent */
