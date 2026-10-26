@@ -112,7 +112,10 @@ The sequencer's page, GRAV CODE's main one: section 5.
 The first sound page retains the engine's three main parameters, as on Plaits: **TIMBRE** (K1), **MORPH** (K2) and **HARMONICS** (K3). What each
 does depends on the engine: section 6. They start at 65, 50 and 75.
 
-The controls use circular scales with eased movement; the page title and number and a compact live engine icon sit above them. Each engine's icon is drawn by GRAV CODE and moves
+K1 to K3 are drawn as small knobs, in the Octatrack's manner: a thin ring, nine ticks over its travel (lighter up to the
+value; a centred control's middle tick longer), a pointer that eases to the value; the name above, the value under,
+and a mode under that when it matters (AUX, WORDS, DX). They are grey and white; the knob being turned lights in the
+theme's colour for a moment. The page title and number and a compact live engine icon sit above them. Each engine's icon is drawn by GRAV CODE and moves
 with its knobs and its notes: WAVESHAPE's wave folds further as TIMBRE goes up, FM 2-OP's modulator orbits wider,
 CHORDS stacks its chord's notes, a kick's rings jump at each hit (all of them in section 6). A drum's DRUM and SHAPE
 pages show it the same way.
@@ -132,7 +135,7 @@ frequency/mode/detune, four envelope rates and levels, scaling, velocity and mod
 internal LFO and pitch envelope. Changes reach held notes. Changing PATCH on OSC resets the operator edits to
 that patch. Native DX envelope values are 0–99, rather than milliseconds. [Full control reference](SOUND_CONTROLS.md).
 
-![Circular sound controls](img/sound-dials.png)
+![The sound page's knobs](img/sound-dials.png)
 ![The first FM operator](img/sound-op1.png)
 
 ### DRUM, SHAPE (HOME again, on a drum track)

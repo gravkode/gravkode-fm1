@@ -14,10 +14,10 @@ FM-1's own panel and screen.
 ---
 
 Current version: **0.22.0**, the sound editor — independent engine controls, a complete six-operator FM editor,
-circular animated dials and extended presets (0.21: ALGO picks the engine, PRESET its sounds). HOME advances
+small animated knobs in the Octatrack's manner and extended presets (0.21: ALGO picks the engine, PRESET its sounds). HOME advances
 pages; hold HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Sound-page dial animation in the simulator"></p>
+<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
 ## What it does
 

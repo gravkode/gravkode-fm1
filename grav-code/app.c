@@ -2190,15 +2190,39 @@ static const char *dial_hint(uint32_t i)
     if (active_page == PAGE_FX_SHAPE && i == 1) return "st";
     return "%";
 }
+/* a ring of radius r about (cx, cy), pixel by pixel (midpoint circle) */
+static void dial_ring(int32_t cx, int32_t cy, int32_t r, uint16_t c)
+{
+    int32_t x = r, y = 0, err = 1 - r;
+    while (x >= y) {
+        cv_pset(cx + x, cy + y, c); cv_pset(cx - x, cy + y, c); cv_pset(cx + x, cy - y, c); cv_pset(cx - x, cy - y, c);
+        cv_pset(cx + y, cy + x, c); cv_pset(cx - y, cy + x, c); cv_pset(cx + y, cy - x, c); cv_pset(cx - y, cy - x, c);
+        y++;
+        if (err < 0)
+            err += 2 * y + 1;
+        else {
+            x--;
+            err += 2 * (y - x) + 1;
+        }
+    }
+}
+
+/* K1..K3 as knobs, in the manner of the Octatrack's: a thin ring, nine ticks over its 270 degrees (those up to the
+ * value lighter; a centred one's middle tick longer), a pointer easing to the value; the name above, the value under,
+ * a unit or a mode (AUX, WORDS, DX) under that when it says something. Grey and white; the theme's hue only on the
+ * knob being turned. 80 x 84 a knob: animate_dials redraws one such tile a frame. */
+#define DIAL_R 14
 static void draw_dials(int32_t y0, uint32_t mask, int32_t xoffset)
 {
     dials_sync();
     ui.dial_hot &= (uint8_t)~mask;
     ui.dial_dirty &= (uint8_t)~mask;
     for (uint32_t i = 0; i < 3u; i++) {
-        if (!(mask & 1u << i)) continue;
-        const int32_t x = 40 + (int32_t)i * 80 - xoffset, y = y0 + 49;
+        if (!(mask & 1u << i))
+            continue;
+        const int32_t x = 40 + (int32_t)i * 80 - xoffset, y = y0 + 35;
         const int32_t v = param_value(active_page, i);
+        const int set_v = v >= 0 && v != GRAV_AUTO, centred = param_centred(active_page, i);
         const uint32_t progress = (uint32_t)clamp(ui.dial_q8[i], 0, 25600) * 48u;
         const uint32_t at = progress / 25600u, fraction = progress % 25600u;
         const int hot = plat_ms() - ui.turned_at[EN_K1 + i] < 450u;
@@ -2207,27 +2231,31 @@ static void draw_dials(int32_t y0, uint32_t mask, int32_t xoffset)
         param_text(active_page, i, v, value);
         const char *name = param_name(active_page, i);
         cv_text(x - text_w(&FONT_XS, name) / 2, y0, &FONT_XS, name, hot ? C_HI : C_GRAY);
-        for (uint32_t j = 0; j < 48; j++) {
-            const int filled = v >= 0 && v != GRAV_AUTO && (param_centred(active_page, i) ?
-                (j >= (at < 24 ? at : 24) && j < (at < 24 ? 24 : at)) : j < at);
-            for (int32_t r = 25; r <= 26; r++)
-                cv_line(x + DIAL_POINT[j][0] * r / 127, y + DIAL_POINT[j][1] * r / 127,
-                        x + DIAL_POINT[j + 1][0] * r / 127, y + DIAL_POINT[j + 1][1] * r / 127,
-                        filled ? C_HI : C_LINE);
+        for (uint32_t j = 0; j <= 48; j += 6) {   /* the scale: lighter up to the value (from the middle if centred) */
+            const int lit = set_v && (centred ? (j >= (at < 24 ? at : 24) && j <= (at < 24 ? 24 : at)) : j <= at);
+            const int32_t r1 = centred && j == 24 ? 21 : 19;
+            cv_line(x + DIAL_POINT[j][0] * 17 / 127, y + DIAL_POINT[j][1] * 17 / 127,
+                    x + DIAL_POINT[j][0] * r1 / 127, y + DIAL_POINT[j][1] * r1 / 127, lit ? C_GRAY : C_LINE);
         }
-        for (uint32_t j = 0; j <= 48; j += 6)
-            cv_line(x + DIAL_POINT[j][0] * 29 / 127, y + DIAL_POINT[j][1] * 29 / 127,
-                    x + DIAL_POINT[j][0] * 31 / 127, y + DIAL_POINT[j][1] * 31 / 127, C_DIM);
-        if (v >= 0 && v != GRAV_AUTO) {
+        dial_ring(x, y, DIAL_R, hot ? C_GRAY : C_DIM);
+        if (set_v) {                         /* the pointer, where the value has eased to */
             const uint32_t next = at < 48 ? at + 1 : at;
-            const int32_t dx = (DIAL_POINT[at][0] * (int32_t)(25600u - fraction) + DIAL_POINT[next][0] * (int32_t)fraction) / 25600;
-            const int32_t dy = (DIAL_POINT[at][1] * (int32_t)(25600u - fraction) + DIAL_POINT[next][1] * (int32_t)fraction) / 25600;
-            cv_line(x + dx * 18 / 127, y + dy * 18 / 127, x + dx * 23 / 127, y + dy * 23 / 127, C_WHITE);
+            const int32_t dx = (DIAL_POINT[at][0] * (int32_t)(25600u - fraction) +
+                                DIAL_POINT[next][0] * (int32_t)fraction) / 25600;
+            const int32_t dy = (DIAL_POINT[at][1] * (int32_t)(25600u - fraction) +
+                                DIAL_POINT[next][1] * (int32_t)fraction) / 25600;
+            const uint16_t c = hot ? C_HI : C_WHITE;
+            const int32_t ox = dy > dx ? (dy > -dx ? 1 : 0) : (dy < -dx ? 1 : 0), oy = 1 - ox;   /* (two pixels wide) */
+            cv_line(x + dx * 3 / 127, y + dy * 3 / 127, x + dx * (DIAL_R - 3) / 127, y + dy * (DIAL_R - 3) / 127, c);
+            cv_line(x + ox + dx * 3 / 127, y + oy + dy * 3 / 127, x + ox + dx * (DIAL_R - 3) / 127,
+                    y + oy + dy * (DIAL_R - 3) / 127, c);
         }
-        const felucca_font_t *font = text_w(&FONT_M, value) <= 44 ? &FONT_M : text_w(&FONT_S, value) <= 46 ? &FONT_S : &FONT_XS;
-        cv_text(x - text_w(font, value) / 2, y - (font == &FONT_M ? 12 : 8), font, value, v == GRAV_AUTO ? C_GRAY : C_WHITE);
+        cv_rect(x - 1, y - 1, 2, 2, C_DIM);   /* the knob's centre */
+        const felucca_font_t *font = text_w(&FONT_S, value) <= 70 ? &FONT_S : &FONT_XS;
+        cv_text(x - text_w(font, value) / 2, y + DIAL_R + 6, font, value, set_v ? C_WHITE : C_GRAY);
         const char *hint = dial_hint(i);
-        cv_text(x - text_w(&FONT_T, hint) / 2, y0 + 72, &FONT_T, hint, C_GRAY);
+        if (hint[0] && !(hint[0] == '%' && hint[1] == 0))   /* (a percentage goes without saying) */
+            cv_text(x - text_w(&FONT_T, hint) / 2, y0 + 72, &FONT_T, hint, C_DIM);
     }
 }
 static void draw_knobs(void)

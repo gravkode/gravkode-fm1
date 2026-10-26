@@ -14,11 +14,11 @@
 ---
 
 Текущая версия: **0.22.0**, редактор звука — дополнительные настройки всех движков, полный редактор шести
-операторов FM, круглые анимированные ручки и расширенные пресеты (0.21: ALGO выбирает движок, PRESET — его звуки).
+операторов FM, небольшие анимированные ручки в духе Octatrack и расширенные пресеты (0.21: ALGO выбирает движок, PRESET — его звуки).
 HOME листает страницы; HOME зажат + SELECT переключает их быстро.
 [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Sound-page dial animation in the simulator"></p>
+<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
 ## Возможности
 

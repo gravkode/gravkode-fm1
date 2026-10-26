@@ -9,7 +9,7 @@ of eight tracks, four synth tracks each its own engine and four drum tracks, 64 
 patterns, plays it, with swing and MIDI clock; the settings and the pattern save; MIDI goes out
 and comes in over USB and TRS. ALGO chooses the engine, PRESET its sound: four factory starting points per
 engine and 64 user slots, saved with held SAVE and a white key. The sound editor (0.22) adds independent engine
-controls, all six FM operators, circular animated dials and extended preset storage; HOME advances pages, held
+controls, all six FM operators, small animated knobs and extended preset storage; HOME advances pages, held
 HOME with SELECT jumps between them.
 
 ![GRAV CODE on the FM-1's screen: a chord on CHORDS, three keys held, each filled to its velocity and its pressure](manual/img/screen-playing.png "A chord on CHORDS")
