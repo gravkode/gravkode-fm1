@@ -715,6 +715,10 @@ static struct {
     uint8_t key_track[NKEYS];            /* the track each held key plays (its note-off goes there) */
     uint32_t tracks_until;               /* SELECT turned: the tracks' list shown until then */
     uint32_t shown_hits[SEQ_TRACKS], hit_at[SEQ_TRACKS];   /* each track's last note begun: its light flashes */
+    int32_t lane_step;                   /* SEQ: the selected track's step playing, and when it began (its flash) */
+    uint32_t step_at, grid_at;           /* (and the steps' strip's last frame, the whole page's or its own) */
+    uint32_t grid_frames, grid_alone_at; /* the strip's frames drawn alone, the last one's time (the tests) */
+    uint32_t vol_at;                     /* the volume last moved (SEQ's band shows it a moment) */
     /* the patterns (0.18) */
     uint8_t home_down, home_used, home_shown;   /* HOME held; a pattern picked meanwhile (no page change); the grid shown */
     uint32_t home_at;                    /* when HOME went down */
@@ -1658,6 +1662,10 @@ static void lights(uint32_t btn, uint32_t keys)
             ui.shown_hits[t] = seq.hits[t];
             ui.hit_at[t] = now;
         }
+    if (seq.step[track_sel] != ui.lane_step) {   /* (the selected track's step moved: its flash begins) */
+        ui.lane_step = seq.step[track_sel];
+        ui.step_at = now;
+    }
     uint32_t lit = (btn & ~play) | (set_dirty || preset_dirty || seq.edits != seq.saved ? 1u << B_SAVE : 0u) |
                    (fx_freeze ? 1u << B_EDIT : 0u) |
                    (ui.step_mode ? 1u << B_SEQ : 0u);
@@ -2286,14 +2294,9 @@ static void dials_sync(void)
 }
 
 /* the knobs' row on this page: its top, its height (a knob redraws alone in an 80-wide tile of it) and the knobs'
- * radius; SEQ's under the steps, smaller */
+ * radius. (SEQ's are small, in the bottom band: draw_chips) */
 static int32_t knob_row(int32_t *h, int32_t *r)
 {
-    if (active_page == PAGE_SEQ) {
-        *h = 76;
-        *r = 13;
-        return 68;
-    }
     *h = active_page == PAGE_GLO ? 84 : 96;
     *r = 17;
     return 46;
@@ -2311,6 +2314,35 @@ static int32_t knob_grow(uint32_t i, int32_t full)
     return t < 250u ? full : t < 450u ? full * (int32_t)(450u - t) / 200 : 0;
 }
 
+/* a knob's face at (x, y), its ring rr: the scale's nine ticks from rr + t0 to rr + t1 (lighter up to the value; a
+ * centred one's middle tick longer), the ring, the pointer where the value has eased to (two pixels wide), the centre */
+static void dial_face(int32_t x, int32_t y, int32_t rr, const knob_t *k, uint32_t i, int hot, int32_t t0, int32_t t1)
+{
+    const int set_v = k->frac >= 0;
+    const uint32_t progress = (uint32_t)clamp(ui.dial_q8[i], 0, 25600) * 48u;
+    const uint32_t at = progress / 25600u, fraction = progress % 25600u;
+    for (uint32_t j = 0; j <= 48; j += 6) {   /* the scale: lighter up to the value (from the middle if centred) */
+        const int lit = set_v && (k->centred ? (j >= (at < 24 ? at : 24) && j <= (at < 24 ? 24 : at)) : j <= at);
+        const int32_t r0 = rr + t0, r1 = k->centred && j == 24 ? rr + t1 + 2 : rr + t1;
+        cv_line(x + DIAL_POINT[j][0] * r0 / 127, y + DIAL_POINT[j][1] * r0 / 127,
+                x + DIAL_POINT[j][0] * r1 / 127, y + DIAL_POINT[j][1] * r1 / 127, lit ? C_GRAY : C_LINE);
+    }
+    dial_ring(x, y, rr, hot ? C_GRAY : C_DIM);
+    if (set_v) {                         /* the pointer, where the value has eased to; two pixels wide */
+        const uint32_t next = at < 48 ? at + 1 : at;
+        const int32_t dx = (DIAL_POINT[at][0] * (int32_t)(25600u - fraction) +
+                            DIAL_POINT[next][0] * (int32_t)fraction) / 25600;
+        const int32_t dy = (DIAL_POINT[at][1] * (int32_t)(25600u - fraction) +
+                            DIAL_POINT[next][1] * (int32_t)fraction) / 25600;
+        const uint16_t c = hot ? C_HI : C_WHITE;
+        const int32_t ox = dy > dx ? (dy > -dx ? 1 : 0) : (dy < -dx ? 1 : 0), oy = 1 - ox;
+        cv_line(x + dx * 3 / 127, y + dy * 3 / 127, x + dx * (rr - 3) / 127, y + dy * (rr - 3) / 127, c);
+        cv_line(x + ox + dx * 3 / 127, y + oy + dy * 3 / 127, x + ox + dx * (rr - 3) / 127,
+                y + oy + dy * (rr - 3) / 127, c);
+    }
+    cv_rect(x - 1, y - 1, 2, 2, C_DIM);
+}
+
 /* K1..K3 as knobs, in the manner of the Octatrack's: a thin ring, nine ticks over its 270 degrees (lighter up to
  * the value; a centred one's middle tick longer), a pointer easing to the value; the name above, the value under,
  * a mode under that when it says something. Grey and white; the knob being turned grows a little and takes the
@@ -2319,7 +2351,7 @@ static void draw_dials(int32_t y0, uint32_t mask, int32_t xoffset)
 {
     int32_t h, r;
     knob_row(&h, &r);
-    const int32_t full = r >= 17 ? 3 : 2, cy0 = 17 + r + 5 + full;   /* (room above for a grown knob's ticks) */
+    const int32_t full = 3, cy0 = 17 + r + 5 + full;   /* (room above for a grown knob's ticks) */
     (void)h;
     dials_sync();
     ui.dial_hot &= (uint8_t)~mask;
@@ -2341,33 +2373,35 @@ static void draw_dials(int32_t y0, uint32_t mask, int32_t xoffset)
             cv_text(x - text_w(font, k.value) / 2, y - 8, font, k.value, C_WHITE);
             continue;
         }
-        const int set_v = k.frac >= 0;
-        const uint32_t progress = (uint32_t)clamp(ui.dial_q8[i], 0, 25600) * 48u;
-        const uint32_t at = progress / 25600u, fraction = progress % 25600u;
-        for (uint32_t j = 0; j <= 48; j += 6) {   /* the scale: lighter up to the value (from the middle if centred) */
-            const int lit = set_v && (k.centred ? (j >= (at < 24 ? at : 24) && j <= (at < 24 ? 24 : at)) : j <= at);
-            const int32_t r0 = rr + 3, r1 = k.centred && j == 24 ? rr + 7 : rr + 5;
-            cv_line(x + DIAL_POINT[j][0] * r0 / 127, y + DIAL_POINT[j][1] * r0 / 127,
-                    x + DIAL_POINT[j][0] * r1 / 127, y + DIAL_POINT[j][1] * r1 / 127, lit ? C_GRAY : C_LINE);
-        }
-        dial_ring(x, y, rr, hot ? C_GRAY : C_DIM);
-        if (set_v) {                         /* the pointer, where the value has eased to; two pixels wide */
-            const uint32_t next = at < 48 ? at + 1 : at;
-            const int32_t dx = (DIAL_POINT[at][0] * (int32_t)(25600u - fraction) +
-                                DIAL_POINT[next][0] * (int32_t)fraction) / 25600;
-            const int32_t dy = (DIAL_POINT[at][1] * (int32_t)(25600u - fraction) +
-                                DIAL_POINT[next][1] * (int32_t)fraction) / 25600;
-            const uint16_t c = hot ? C_HI : C_WHITE;
-            const int32_t ox = dy > dx ? (dy > -dx ? 1 : 0) : (dy < -dx ? 1 : 0), oy = 1 - ox;
-            cv_line(x + dx * 3 / 127, y + dy * 3 / 127, x + dx * (rr - 3) / 127, y + dy * (rr - 3) / 127, c);
-            cv_line(x + ox + dx * 3 / 127, y + oy + dy * 3 / 127, x + ox + dx * (rr - 3) / 127,
-                    y + oy + dy * (rr - 3) / 127, c);
-        }
-        cv_rect(x - 1, y - 1, 2, 2, C_DIM);   /* the knob's centre */
+        dial_face(x, y, rr, &k, i, hot, 3, 5);
         const felucca_font_t *font = text_w(&FONT_S, k.value) <= 70 ? &FONT_S : &FONT_XS;
-        cv_text(x - text_w(font, k.value) / 2, y + r + 6, font, k.value, set_v ? C_WHITE : C_GRAY);
+        cv_text(x - text_w(font, k.value) / 2, y + r + 6, font, k.value, k.frac >= 0 ? C_WHITE : C_GRAY);
         if (k.hint[0])
             cv_text(x - text_w(&FONT_T, k.hint) / 2, y + r + 24, &FONT_T, k.hint, C_DIM);
+    }
+}
+/* SEQ's knobs (TEMPO, SWING, LENGTH; a step held: its NOTE, VELOCITY, LENGTH), small, in the bottom band's first
+ * CHIP_H rows: each in an 80-wide tile, its knob at the left, its name and value beside it. They grow as they turn,
+ * as the others do. */
+#define CHIP_Y 2                             /* (in the bottom band) */
+#define CHIP_H 38
+static void draw_chips(int32_t y0, uint32_t mask, int32_t xoffset)
+{
+    dials_sync();
+    ui.dial_hot &= (uint8_t)~mask;
+    ui.dial_dirty &= (uint8_t)~mask;
+    for (uint32_t i = 0; i < 3u; i++) {
+        if (!(mask & 1u << i))
+            continue;
+        knob_t k;
+        knob_get(i, &k);
+        const int32_t x = 18 + (int32_t)i * 80 - xoffset, y = y0 + 19;
+        const int hot = knob_since(i) < 450u;
+        ui.dial_hot |= (uint8_t)(hot << i);
+        dial_face(x, y, 10 + knob_grow(i, 2), &k, i, hot, 2, 4);
+        cv_text(x + 17, y0 + 2, &FONT_T, k.name, hot ? C_HI : C_GRAY);
+        const felucca_font_t *font = text_w(&FONT_S, k.value) <= 46 ? &FONT_S : &FONT_XS;
+        cv_text(x + 17, y0 + 16, font, k.value, C_WHITE);
     }
 }
 static void draw_knobs(void)
@@ -2413,87 +2447,143 @@ static int animate_dials(uint32_t now)
     for (uint32_t n = 0; n < 3; n++, dial = (dial + 1u) % 3u)
         if (ui.dial_dirty & 1u << dial) break;
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
-    int32_t h, r;
-    const int32_t top = knob_row(&h, &r);
-    cv_begin(80, (uint32_t)h, C_BLACK);
-    draw_dials(0, 1u << dial, (int32_t)dial * 80);
-    cv_blit(dial * 80, 36u + (uint32_t)top);
+    if (active_page == PAGE_SEQ) {           /* (SEQ's small ones: in the bottom band) */
+        cv_begin(80, CHIP_H, C_BLACK);
+        draw_chips(0, 1u << dial, (int32_t)dial * 80);
+        cv_blit(dial * 80, 180u + CHIP_Y);
+    } else {
+        int32_t h, r;
+        const int32_t top = knob_row(&h, &r);
+        cv_begin(80, (uint32_t)h, C_BLACK);
+        draw_dials(0, 1u << dial, (int32_t)dial * 80);
+        cv_blit(dial * 80, 36u + (uint32_t)top);
+    }
     ui.dial_frames++;
     return 1;
 }
 
-/* SEQ's steps: the 16 of the page shown, from y0 (52 high): a step on fills to its velocity, a tick at its note's
- * height among the pattern's notes; the one playing on a light ground; the one held or recorded at marked; past the
- * length a dot. Under them the four pages (the one shown amber, the one playing white) and the step playing */
-#define GRID_H 46
-static void draw_grid(int32_t y0)
+/* SEQ, the sequencer's page, under the track's line:
+ *   the selected track's 16 steps of the page shown, in four groups of four: a step on is a bar as tall as its
+ *   velocity, a tick at its note's height among the track's notes (a drum's: none), a dot for each further note of a
+ *   chord; the step playing flashes white and leaps a little as it begins, then settles; a cursor glides under them;
+ *   the pattern's four pages, the one shown lit, the place playing travelling across them;
+ *   every track's steps as they play (S1..S4, then D1..D4): the 16 of the page its step playing is in (stopped: of
+ *   the page shown, or its last if shorter), each with its own length and step playing (polymeters shown as they
+ *   go), a note flashing as it begins, the selected track's in the theme's colour.
+ * TEMPO, SWING and LENGTH are knobs in the bottom band. While it plays the strip under the track's line redraws alone,
+ * ~25 times a second (10 while the sound is busy). */
+#define LANE_Y 22                            /* the steps' bars: rows 22..73 */
+#define LANE_H 52
+#define CURSOR_Y 77                          /* the cursor under them */
+#define POS_Y 84                             /* the pages, and where in them it plays */
+#define MAP_Y 93                             /* every track's steps: 8 rows, to 141 */
+#define STRIP_Y LANE_Y                       /* the strip redrawn as it plays: from here to the page's end */
+
+static int32_t step_x(uint32_t i) { return 6 + (int32_t)i * 14 + (int32_t)(i / 4u) * 2; }   /* (16: to 234) */
+
+static uint16_t mix565(uint16_t a, uint16_t b, int32_t t)   /* a to b, t 0..256 */
 {
-    char t[12];
-    const uint32_t length = TRK.length, page = ui.view_page;
-    const int32_t playing = seq.playing ? seq.step[track_sel] : -1;
+    const int32_t ar = a >> 11, ag = (a >> 5) & 63, ab = a & 31, br = b >> 11, bg = (b >> 5) & 63, bb = b & 31;
+    return (uint16_t)(((ar + (br - ar) * t / 256) << 11) | ((ag + (bg - ag) * t / 256) << 5) | (ab + (bb - ab) * t / 256));
+}
+
+static int32_t flash256(uint32_t since, uint32_t ms)   /* a flash's strength: 256 as it begins, 0 ms later */
+{
+    return since < ms ? 256 - (int32_t)(since * 256u / ms) : 0;
+}
+
+static void draw_seq_body(int32_t dy)        /* the strip (rows STRIP_Y on), drawn dy rows up or down */
+{
+    const uint32_t now = plat_ms(), length = TRK.length, page = ui.view_page;
+    const int32_t playing = seq.playing ? seq.step[track_sel] : -1, drum = SYNTH_IS_DRUM(track_sel);
+    const uint16_t off_cell = RGB(24, 24, 30), bar_lo = mix565(C_LINE, C_AMB, 80);
+    const int32_t flash = playing >= 0 ? flash256(now - ui.step_at, 180u) : 0;
+    const uint32_t step_ms = 15000u / (seq_bpm(&seq) ? seq_bpm(&seq) : 120u);
+    const int32_t frac = playing >= 0 ? clamp((int32_t)((now - ui.step_at) * 256u / step_ms), 0, 256) : 0;
     int32_t lo = 127, hi = 0;
-    for (uint32_t s = 0; s < length; s++)    /* the notes' range, for the ticks' heights */
+    for (uint32_t s = 0; s < length; s++)    /* the track's notes' range, for the ticks' heights */
         if (TRK.step[s].on) {
             if (TRK.step[s].note[0] < lo) lo = TRK.step[s].note[0];
             if (TRK.step[s].note[0] > hi) hi = TRK.step[s].note[0];
         }
-    for (uint32_t i = 0; i < SEQ_PAGE; i++) {
+    for (uint32_t i = 0; i < SEQ_PAGE; i++) {   /* the selected track's steps */
         const uint32_t s = page * SEQ_PAGE + i;
         const seq_step_t *st = &TRK.step[s];
-        const int32_t x = 8 + (int32_t)i * 14, y = y0 + 2, h = 30;
-        if (s >= length) {                   /* past the length */
-            cv_rect(x + 5, y + h - 3, 3, 3, C_DIM);
+        const int32_t x = step_x(i), y = LANE_Y + dy, here = playing == (int32_t)s;
+        if (s >= length) {                   /* past the length: a dot */
+            cv_rect(x + 5, y + LANE_H - 2, 2, 2, C_LINE);
             continue;
         }
-        if (playing == (int32_t)s)
-            cv_rect(x - 1, y - 1, 14, h + 2, C_LINE);
-        if (ui.step_held == (int8_t)s || (ui.rec && ui.rec_pos == s))
-            cv_rect(x - 1, y - 2, 14, 2, ui.rec ? RGB(240, 55, 45) : C_WHITE);
-        if (st->on) {
-            const int32_t v = 6 + (int32_t)st->vel * (h - 6) / 127;
-            cv_rect(x, y + h - v, 12, v, playing == (int32_t)s ? C_WHITE : C_GRAY);
-            const int32_t at = hi > lo ? (int32_t)(st->note[0] - lo) * (h - 4) / (hi - lo) : (h - 4) / 2;
-            cv_rect(x, y + h - 3 - at, 12, 2, C_HI);
-            if (st->n > 1u)                  /* a chord: a dot for each note over the first */
-                for (uint32_t k = 1; k < st->n; k++)
-                    cv_rect(x + 1 + (int32_t)(k - 1) * 4, y + 1, 2, 2, C_HI);
-        } else {
-            cv_rect(x, y + h - 2, 12, 2, C_LINE);
+        /* its slot, rounded: a beat's first a little lighter; the one playing lit, brighter as it begins */
+        cv_rect(x, y, 12, LANE_H, here ? mix565(C_LINE, RGB(78, 78, 90), flash) : i % 4u ? RGB(15, 15, 19) : RGB(22, 22, 28));
+        cv_pset(x, y, C_BLACK); cv_pset(x + 11, y, C_BLACK);
+        cv_pset(x, y + LANE_H - 1, C_BLACK); cv_pset(x + 11, y + LANE_H - 1, C_BLACK);
+        if (st->on) {                        /* the bar: dark to the theme's colour as it rises; the one playing white */
+            const int32_t leap = here ? 6 * flash / 256 : 0;
+            const int32_t v = clamp(8 + (int32_t)st->vel * (LANE_H - 12) / 127 + leap, 4, LANE_H);
+            for (int32_t r = 0; r < v; r++) {
+                const uint16_t c = mix565(bar_lo, C_AMB, r * 256 / (LANE_H - 4));
+                cv_rect(x + 1, y + LANE_H - 1 - r, 10, 1, here ? mix565(c, C_WHITE, flash) : c);
+            }
+            cv_rect(x + 1, y + LANE_H - v, 10, 2, here ? mix565(C_HI, C_WHITE, flash) : C_HI);   /* its top */
+            if (!drum) {                     /* its note's height among the track's */
+                const int32_t at = hi > lo ? (int32_t)(st->note[0] - lo) * (LANE_H - 10) / (hi - lo) : (LANE_H - 10) / 2;
+                cv_rect(x + 2, y + LANE_H - 5 - at, 8, 2, C_WHITE);
+            }
+            for (uint32_t k = 1; k < st->n && k < SEQ_NOTES; k++)   /* a chord: a dot for each further note */
+                cv_rect(x + 2 + (int32_t)(k - 1) * 3, y + 3, 2, 2, C_HI);
+        } else
+            cv_rect(x + 3, y + LANE_H - 3, 6, 1, here ? C_GRAY : C_LINE);
+        if (ui.step_held == (int8_t)s) {     /* the step held: framed */
+            cv_rect(x - 1, y - 1, 14, 1, C_WHITE);
+            cv_rect(x - 1, y + LANE_H, 14, 1, C_WHITE);
+            cv_rect(x - 1, y, 1, LANE_H, C_WHITE);
+            cv_rect(x + 12, y, 1, LANE_H, C_WHITE);
+        }
+        if (ui.rec && ui.rec_pos == s)       /* the step recording goes to */
+            cv_rect(x, CURSOR_Y + dy, 12, 2, RGB(240, 55, 45));
+    }
+    {                                        /* the cursor: under the step playing, gliding to the next */
+        const uint32_t last = length > page * SEQ_PAGE ? (length - page * SEQ_PAGE < SEQ_PAGE ?
+                              length - page * SEQ_PAGE : SEQ_PAGE) : 0u;
+        if (last)
+            cv_rect(step_x(0), CURSOR_Y + dy + 1, step_x(last - 1) + 12 - step_x(0), 1, C_LINE);
+        if (playing >= 0 && (uint32_t)playing / SEQ_PAGE == page) {
+            const uint32_t i = (uint32_t)playing % SEQ_PAGE;
+            const int32_t x = step_x(i) + (i + 1u < last ? (step_x(i + 1u) - step_x(i)) * frac / 256 : 0);
+            cv_rect(x, CURSOR_Y + dy, 12, 3, mix565(C_GRAY, C_WHITE, 128 + flash / 2));
         }
     }
-    for (uint32_t p = 0; p < SEQ_PAGES; p++) {
-        const int32_t x = 8 + (int32_t)p * 22;
-        const uint16_t c = p == page ? C_HI : playing >= 0 && (uint32_t)playing / SEQ_PAGE == p ? C_WHITE :
-                           p * SEQ_PAGE < length ? C_LINE : C_DIM;
-        cv_rect(x, y0 + 36, 18, 4, c);
+    for (uint32_t p = 0; p < SEQ_PAGES; p++) {   /* the pages: the one shown lit; where it plays, travelling */
+        const int32_t x = step_x(p * 4u), w = step_x(p * 4u + 3u) + 12 - x;
+        cv_rect(x, POS_Y + dy, w, 3, p * SEQ_PAGE >= length ? off_cell : p == page ? C_HI : C_DIM);
     }
-    {                                        /* the tracks (S1..S4, then D1..D4): the selected framed, a note flashes */
-        const uint32_t now = plat_ms();
-        for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
-            const int32_t x = 100 + (int32_t)t * 10 + (SYNTH_IS_DRUM(t) ? 4 : 0);
-            if (t == track_sel)
-                cv_rect(x - 1, y0 + 32, 9, 10, C_WHITE);
-            cv_rect(x, y0 + 33, 7, 8, now - ui.hit_at[t] < 100u ? C_HI :
-                    SYNTH_IS_DRUM(t) || set.trk_voices[t] ? C_LINE : C_DIM);
+    if (playing >= 0) {
+        const int32_t x = step_x(0) + (playing * 256 + frac) * (step_x(15) + 12 - step_x(0)) / (int32_t)(SEQ_STEPS * 256u);
+        cv_rect(x - 1, POS_Y + dy - 2, 3, 7, C_WHITE);
+    }
+    for (uint32_t t = 0; t < SEQ_TRACKS; t++) {   /* every track's steps as they play */
+        const seq_track_t *tr = &seq.pat.track[t];
+        const int32_t y = MAP_Y + dy + (int32_t)t * 6 + (t >= SEQ_S_TRACKS ? 2 : 0);
+        const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
+        const uint32_t last = (tr->length - 1u) / SEQ_PAGE;
+        const uint32_t its = at >= 0 ? (uint32_t)at / SEQ_PAGE : page < last ? page : last;
+        if (t == track_sel)
+            cv_rect(1, y, 3, 4, C_HI);
+        for (uint32_t i = 0; i < SEQ_PAGE; i++) {
+            const uint32_t s = its * SEQ_PAGE + i;
+            if (s >= tr->length)
+                continue;
+            const uint16_t base = tr->step[s].on ? (t == track_sel ? C_HI : C_GRAY) : off_cell;
+            const uint16_t c = at == (int32_t)s ? (tr->step[s].on ? mix565(base, C_WHITE, 96 + hit * 160 / 256) : C_DIM) : base;
+            cv_rect(step_x(i), y, 12, 4, c);
         }
-    }
-    if (playing >= 0) {                      /* the step playing, of the length */
-        int_text(playing + 1, t);
-        text_cat(t, "/");
-        char l[4];
-        int_text((int32_t)length, l);
-        text_cat(t, l);
-        cv_text(190, y0 + 30, &FONT_XS, t, C_WHITE);
     }
 }
 
-/* SEQ: the steps; under them TEMPO, SWING, LENGTH as knobs (a step held: its NOTE, VELOCITY, LENGTH); the state in
- * the bottom band (draw_status) */
 static void draw_seq(void)
 {
-    int32_t h, r;
-    draw_grid(22);
-    draw_dials(knob_row(&h, &r), 7u, 0);
+    draw_seq_body(0);
 }
 
 /* HOME held, K4 turned: the 16 patterns for a moment, over the page: the one playing lit, the next one framed
@@ -2581,12 +2671,12 @@ static void draw_splash(void)
     draw_wrapped(engine_desc(e), 10, 111, 220, 2u, 1, C_GRAY);
 }
 
-/* only the steps (the step playing moved): their strip, not the whole screen */
+/* only the strip under the track's line (the steps moved, a flash, the cursor): not the whole screen */
 static void draw_seq_grid(void)
 {
-    cv_begin(240, GRID_H, C_BLACK);
-    draw_grid(0);
-    cv_blit(0, 36 + 22);
+    cv_begin(240, 144u - STRIP_Y, C_BLACK);
+    draw_seq_body(-STRIP_Y);
+    cv_blit(0, 36 + STRIP_Y);
 }
 
 /* GLO: VOICES and VELOCITY as the other pages' knobs are drawn, the version beside them, the identity below */
@@ -2650,30 +2740,74 @@ static void draw_debug(void)
     cv_text(8, 132, &FONT_T, "K1 CORES   K2 RESET   us", C_HI);
 }
 
-/* the page's state, in the bottom band's first line: SEQ's PLAY or STOP, MIDI CLOCK, STEP or REC and its step, the
- * pattern and the next one (blinking); a sound page's HOME; the effect's SEED and whether it is on */
-static void draw_status(int32_t y)
+/* the bottom band's message: a moment's (app_say), the preset's state, an import failed; 0: none. Shorter if it
+ * would be wider than w */
+static int band_message(char *m, int32_t w)
 {
-    char t[16];
-    if (active_page == PAGE_SEQ) {
+    m[0] = 0;
+    if (preset_import_failed) text_cat(m, "PRESET IMPORT: REBOOT TO RETRY");
+    else if (ui.msg_until && plat_ms() < ui.msg_until) {
+        text_cat(m, ui.msg[0]);
+        if (ui.msg[1][0]) { text_cat(m, " "); text_cat(m, ui.msg[1]); }
+        if (text_w(&FONT_T, m) > w) { m[0] = 0; text_cat(m, ui.msg[0]); }
+    } else if (preset_dirty)
+        text_cat(m, preset_write_req ? "PRESET PENDING: STOP / RELEASE" : "PRESET UNSAVED: TAP SAVE");
+    return m[0] != 0;
+}
+
+static void draw_cpu(int32_t x, int32_t y)   /* the render's load; red once a render ran late (heard: a crackle) */
+{
+    char t[8];
+    cv_text(x, y, &FONT_XS, "CPU", C_GRAY);
+    int_text((int32_t)ui.cpu, t);
+    text_cat(t, "%");
+    cv_text(x + 26, y, &FONT_XS, t, ui.xruns ? RGB(240, 55, 45) : C_HI);
+}
+
+/* SEQ's bottom band: its three knobs, small; under them PLAY or STOP, REC and its step / STEP / a MIDI clock in,
+ * the pattern and the next one (blinking), the preset unsaved, the load. A moment's message (OCTAVE, PATTERN, the
+ * volume ...) over the left of that line */
+static void draw_seq_band(void)
+{
+    char t[48];
+    const int32_t y = 43;
+    draw_chips(CHIP_Y, 7u, 0);
+    if ((ui.msg_until && plat_ms() < ui.msg_until) || preset_import_failed) {
+        band_message(t, 160);
+        cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
+    } else if (plat_ms() - ui.vol_at < 1300u && ui.vol_at) {
+        cv_text(8, y, &FONT_XS, "VOL", C_GRAY);
+        int_text((int32_t)(plat_master() * 100u / 4096u), t);
+        text_cat(t, "%");
+        cv_text(36, y, &FONT_XS, t, C_HI);
+    } else {
         cv_text(8, y, &FONT_XS, seq.playing ? "PLAY" : "STOP", seq.playing ? C_HI : C_GRAY);
-        if (seq.ext)
-            cv_text(44, y, &FONT_XS, "MIDI CLOCK", C_WHITE);
         if (ui.rec) {
+            cv_text(48, y, &FONT_XS, "REC", RGB(240, 55, 45));
             int_text(ui.rec_pos + 1, t);
-            cv_text(122, y, &FONT_XS, "REC", RGB(240, 55, 45));
-            cv_text(148, y, &FONT_XS, t, C_WHITE);
+            cv_text(74, y, &FONT_XS, t, C_WHITE);
         } else if (ui.step_mode)
-            cv_text(122, y, &FONT_XS, "STEP", C_HI);
+            cv_text(48, y, &FONT_XS, "STEP", C_HI);
+        else if (seq.ext)
+            cv_text(48, y, &FONT_XS, "CLOCK", C_WHITE);
         t[0] = 'P';                          /* the pattern; the next one, blinking */
         int_text(seq.pattern + 1, t + 1);
-        cv_text(196, y, &FONT_XS, t, C_WHITE);
+        cv_text(104, y, &FONT_XS, t, C_WHITE);
         if (seq.next != SEQ_NO_PATTERN && (plat_ms() / 250u) & 1u) {
             t[0] = '>';
             int_text(seq.next + 1, t + 1);
-            cv_text(214, y, &FONT_XS, t, C_HI);
+            cv_text(104 + text_w(&FONT_XS, "P16") + 2, y, &FONT_XS, t, C_HI);
         }
-    } else if (IS_SOUND_PAGE(active_page)) {
+        if (preset_dirty)
+            cv_text(144, y + 2, &FONT_T, preset_write_req ? "PENDING" : "UNSAVED", C_HI);
+    }
+    draw_cpu(178, y);
+}
+
+/* the page's state, in the bottom band's first line: a sound page's HOME; the effect's SEED and whether it is on */
+static void draw_status(int32_t y)
+{
+    if (IS_SOUND_PAGE(active_page)) {
         cv_text(8, y + 2, &FONT_T, "HOME  NEXT PAGE", C_GRAY);
         cv_text(232 - text_w(&FONT_T, "HOLD HOME + SELECT  JUMP"), y + 2, &FONT_T, "HOLD HOME + SELECT  JUMP", C_DIM);
     } else if (IS_FX_PAGE(active_page)) {
@@ -2686,7 +2820,7 @@ static void draw_status(int32_t y)
 
 static void draw(void)
 {
-    char t[24];
+    char t[48];
     uint32_t pct = plat_master() * 100u / 4096u;
     int batt = plat_battery();
 
@@ -2768,22 +2902,19 @@ static void draw(void)
      * last MIDI message in or DEBUG's queue, and the load. No keys drawn: the FM-1's own are under the screen */
     cv_begin(240, 60, C_BLACK);
     cv_rect(8, 0, 224, 1, C_LINE);
+    if (active_page == PAGE_SEQ) {
+        draw_seq_band();
+        cv_blit(0, 180);
+        return;
+    }
     draw_status(6);
     octave_text(t);
     cv_text(8, 23, &FONT_XS, "OCT", C_GRAY);
     cv_text(34, 23, &FONT_XS, t, C_HI);
     cv_text(62, 23, &FONT_XS, "PRESET", C_GRAY);
     cv_text(106, 23, &FONT_XS, preset_label(track_sel), C_HI);
-    if (preset_import_failed || preset_dirty || (ui.msg_until && plat_ms() < ui.msg_until)) {
-        char message[48];
-        message[0] = 0;
-        if (preset_import_failed) text_cat(message, "PRESET IMPORT: REBOOT TO RETRY");
-        else if (ui.msg_until && plat_ms() < ui.msg_until) {
-            text_cat(message, ui.msg[0]);
-            if (ui.msg[1][0]) { text_cat(message, " "); text_cat(message, ui.msg[1]); }
-            if (text_w(&FONT_T, message) > 170) { message[0] = 0; text_cat(message, ui.msg[0]); }
-        } else text_cat(message, preset_write_req ? "PRESET PENDING: STOP / RELEASE" : "PRESET UNSAVED: TAP SAVE");
-        cv_text(8, 43, &FONT_T, message, preset_dirty || preset_import_failed ? C_HI : C_GRAY);
+    if (band_message(t, 170)) {
+        cv_text(8, 43, &FONT_T, t, preset_dirty || preset_import_failed ? C_HI : C_GRAY);
     } else if (active_page == PAGE_DEBUG) {
         debug_number(8, 43, "QUEUE", synth_queue_overflows, 0);
     } else if (midi_count) {                        /* the last MIDI message in, and where from */
@@ -2805,10 +2936,7 @@ static void draw(void)
     int_text((int32_t)pct, t);
     text_cat(t, "%");
     cv_text(204, 23, &FONT_XS, t, C_HI);
-    cv_text(178, 41, &FONT_XS, "CPU", C_GRAY);   /* the render's load; red once a render ran late (heard: a crackle) */
-    int_text((int32_t)ui.cpu, t);
-    text_cat(t, "%");
-    cv_text(204, 41, &FONT_XS, t, ui.xruns ? RGB(240, 55, 45) : C_HI);
+    draw_cpu(178, 41);
     cv_blit(0, 180);
 }
 
@@ -2865,6 +2993,10 @@ void app_frame(void)
         ui.redraw = 1;
     }
     if (pct != last_pct || (ui.msg_until && now >= ui.msg_until)) {
+        static uint8_t seen;
+        if (pct != last_pct && seen)
+            ui.vol_at = now ? now : 1u;      /* (SEQ's band: the volume a moment) */
+        seen = 1;
         last_pct = pct;
         if (now >= ui.msg_until)
             ui.msg_until = 0;
@@ -2880,25 +3012,25 @@ void app_frame(void)
         ui.tracks_until = 0;
         ui.redraw = 1;
     }
-    {                                        /* the tracks' lights on SEQ: a flash begun or over */
-        static uint32_t flashing;
-        uint32_t f = 0;
-        for (uint32_t t = 0; t < SEQ_TRACKS; t++)
-            f |= (now - ui.hit_at[t] < 100u) << t;
-        if (f != flashing && active_page == PAGE_SEQ)
+    if (active_page == PAGE_SEQ) {           /* the sequencer's strip: a step moved; while it plays, its flashes and
+                                              * the cursor, ~30 times a second (10 while the sound is busy) */
+        if (seq.playing != ui.shown_playing) {
+            ui.shown_playing = seq.playing;
+            ui.redraw = 1;                   /* (PLAY or STOP, below) */
+        }
+        if (seq.step[track_sel] != ui.shown_step) {
+            ui.shown_step = seq.step[track_sel];
             ui.redraw_grid = 1;
-        flashing = f;
-    }
-    if (active_page == PAGE_SEQ && (seq.step[track_sel] != ui.shown_step || seq.playing != ui.shown_playing)) {
-        ui.shown_step = seq.step[track_sel];            /* the step playing moved: its strip, or (stopped) the whole page */
-        if (seq.playing != ui.shown_playing)
+        }
+        if (seq.playing && now - ui.grid_at >= (plat_cpu_pct() >= 75u ? 96u : 30u))
+            ui.redraw_grid = 1;
+        if (ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown || ui.splash_until)
+            ui.redraw_grid = 0;              /* (a list over the strip: left as it is until the list goes) */
+        if (ui.vol_at && now - ui.vol_at >= 1300u) {   /* the volume's moment over */
+            ui.vol_at = 0;
             ui.redraw = 1;
-        ui.shown_playing = seq.playing;
-        ui.redraw_grid = 1;
+        }
     }
-    if (ui.redraw_grid && (ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown))   /* (a list over the steps: the
-                                                                                         * whole page, not the strip) */
-        ui.redraw = 1;
     if (ui.splash_until && now >= ui.splash_until) {   /* the splash goes */
         ui.splash_until = 0;
         ui.redraw = 1;
@@ -2906,10 +3038,13 @@ void app_frame(void)
     if (ui.redraw) {
         ui.redraw = 0;
         ui.redraw_grid = 0;
+        ui.grid_at = now;
         draw();
         ui.live_at = now;
     } else if (ui.redraw_grid) {
         ui.redraw_grid = 0;
+        ui.grid_at = ui.grid_alone_at = now;
+        ui.grid_frames++;
         draw_seq_grid();
     } else if (animate_dials(now)) {
         /* only the dial strip changed */
@@ -3071,6 +3206,10 @@ int app_expect(const char *what, int *got)
         *got = (int)sound_pages();
     else if (!strcmp(what, "dial_frames"))
         *got = (int)ui.dial_frames;
+    else if (!strcmp(what, "grid_frames"))   /* SEQ's strip drawn alone (as it plays), and since its last frame, ms */
+        *got = (int)ui.grid_frames;
+    else if (!strcmp(what, "grid_since"))
+        *got = (int)(plat_ms() - ui.grid_alone_at);
     else if (!strncmp(what, "param", 5))
         *got = (int)param_value(active_page, (uint32_t)atoi(what + 5) % 3u);
     else if (!strcmp(what, "fm_custom"))

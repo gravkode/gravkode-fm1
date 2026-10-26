@@ -65,7 +65,8 @@ tap GLO
 wait 400
 shot screen-debug.png
 # SEQ (HOME, the one shown last of SEQ and OSC, then again): a pattern playing. Step mode: steps 1, 5, 9, 13 on, step
-# 9 a fifth up and softer; step recording: a chord on step 3; swing 58 %; PLAY, the shot on step 6
+# 9 a fifth up and softer; step recording: a chord on step 3; swing 58 %; PLAY, the shot as step 13 begins (its
+# flash; PLAY's message gone)
 tap HOME
 wait 30
 tap HOME
@@ -170,7 +171,7 @@ tap SEQ
 wait 1600
 turn K2 8
 tap PLAY
-wait 640
+wait 1476
 shot screen-seq.png
 tap PLAY
 wait 30

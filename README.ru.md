@@ -13,12 +13,14 @@
 
 ---
 
-Текущая версия: **0.22.0**, редактор звука — дополнительные настройки всех движков, полный редактор шести
-операторов FM, небольшие анимированные ручки в духе Octatrack и расширенные пресеты (0.21: ALGO выбирает движок, PRESET — его звуки).
-HOME листает страницы; HOME зажат + SELECT переключает их быстро.
+Текущая версия: **0.23.0**, экран секвенсора: шаги выбранной дорожки — высокие янтарные столбики, которые вспыхивают
+при проигрывании, курсор плавно идёт под ними в такт, страницы паттерна и карта шагов всех восьми дорожек внизу; ручки
+SEQ — маленькие, в нижней полосе. До этого, в 0.22, редактор звука — дополнительные настройки всех движков, полный
+редактор шести операторов FM, небольшие анимированные ручки в духе Octatrack и расширенные пресеты (0.21: ALGO
+выбирает движок, PRESET — его звуки). HOME листает страницы; HOME зажат + SELECT переключает их быстро.
 [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
+<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="240" alt="Страница SEQ играет такт, в симуляторе: шаги вспыхивают, курсор плывёт, на карте движутся шаги всех дорожек"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
 ## Возможности
 
@@ -120,7 +122,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.22.0.fwsc 0.22.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.23.0.fwsc 0.23.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -135,7 +137,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.22.0      # grav-code/build/grav_code-0.22.0.fwsc
+python3 tools/build.py grav-code --release 0.23.0      # grav-code/build/grav_code-0.23.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

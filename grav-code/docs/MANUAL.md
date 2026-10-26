@@ -63,12 +63,12 @@ From the top:
 - **The page's three parameters** as knobs, K1 to K3, on every page: a thin ring, ticks over its travel lit up to
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
-  settles back.
-- **The bottom band:** the page's state (SEQ: PLAY or STOP, MIDI CLOCK, STEP or REC, the pattern; a sound page: how
-  to change pages; FX: SEED and whether the effect is on); OCT (the octave), PRESET (the selected sound, or CUSTOM
-  after editing), VOL (MASTER); a message, or the last MIDI message in and where from (USB or TRS); CPU, the share of
-  its time the sound takes: it turns red once a block of sound came late (heard as a crackle), until the next
-  power-on. The keys are not drawn: the FM-1's own are under the screen.
+  settles back. On SEQ the page is the sequencer's, and its knobs are small, in the bottom band (section 5).
+- **The bottom band:** the page's state (a sound page: how to change pages; FX: SEED and whether the effect is on);
+  OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
+  message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
+  sound came late (heard as a crackle), until the next power-on. On SEQ: TEMPO, SWING and LENGTH, then PLAY or
+  STOP, the pattern and CPU. The keys are not drawn: the FM-1's own are under the screen.
 
 ---
 
@@ -206,7 +206,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.22.0, ID FM-1_73002200, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.23.0, ID FM-1_73002300, 24 engines](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -227,7 +227,9 @@ The effect's three pages: section 7.
 
 ## 5. The sequencer
 
-![The SEQ page playing S1 (CHORDS): its steps with their velocity and note, chords marked by their dots, the step playing on a light ground (6 of 16), the eight tracks' lights; TEMPO 120, SWING 58 %, LENGTH 16; PLAY](img/screen-seq.png "The SEQ page")
+![The SEQ page playing S1 (CHORDS): its 16 steps as amber bars, as tall as their velocity, with a white tick at their note and dots for a chord; step 13 flashing white as it begins, the cursor under it; the four pages, the first shown; the eight tracks' steps below, each with its step playing; TEMPO 120, SWING 58 %, LENGTH 16 as small knobs; PLAY, P1, CPU](img/screen-seq.png "The SEQ page")
+
+![One bar of the pattern playing on SEQ, in the simulator: each step flashes and leaps as it begins, the cursor glides under the steps, every track's step playing moves in the map below](img/seq-playing.gif "SEQ playing")
 
 ![SELECT turned: the eight tracks, S2 (VA VCF) selected, each with its engine and voices (DRUM: a drum track's own)](img/screen-tracks.png "The tracks' list")
 
@@ -246,18 +248,29 @@ and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 
 ### The SEQ page (HOME)
 
-- **The steps** of the page shown: a step on is a bar as tall as its velocity, with an amber tick at its note's height
-  among the pattern's notes and a dot for each further note of a chord; an empty step is a line, a step past the
-  LENGTH a dot. The step playing stands on a light ground.
-- **Under them** the four pages (amber: the one shown; white: the one playing), the eight tracks (S1 to S4, then D1
-  to D4; the selected one framed; each flashes as it plays a note) and the step playing, of the selected track's
-  LENGTH.
-- **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's), **K2 SWING** (50 % straight to 75 %,
-  the pattern's), **K3 LENGTH** (the selected track's, 1 to 64 steps), as knobs under the steps.
-  A step held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead.
-- **In the bottom band:** PLAY or STOP, MIDI CLOCK while following one, STEP in step mode, REC and the step while
-  recording; at the right the pattern (P1 to P16) and, blinking, the next one (>3).
+- **The steps** of the selected track, the 16 of the page shown, in four beats of four (each beat's first slot a
+  little lighter): a step on is an amber bar as tall as its velocity, with a white tick at its note's height among
+  the track's notes (a drum track's: none) and a dot for each further note of a chord; an empty step is a short
+  line, a step past the LENGTH a dot. While it plays, the step playing lights its slot; a step on flashes white and
+  leaps a little as it begins, then settles back. A held step is framed in white; recording, the step the next
+  chord goes to is marked red under it.
+- **The cursor** under the steps glides from the step playing to the next, in time.
+- **The pages:** four bars under the cursor, the one shown amber (OCT- / OCT+ in step mode), with a white mark
+  travelling through all four where the selected track plays.
+- **The tracks' map:** every track's steps (S1 to S4, then D1 to D4; the selected one amber, marked at the left), the
+  16 of the page each is playing (stopped: of the page shown, or its last page if it is shorter), each with its own
+  LENGTH and its step playing: tracks of different lengths drift apart in it. A note flashes white as it begins.
+- **In the bottom band**, small: **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's),
+  **K2 SWING** (50 % straight to 75 %, the pattern's), **K3 LENGTH** (the selected track's, 1 to 64 steps). A step
+  held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead. Under them: PLAY or STOP; REC and the
+  step while recording, STEP in step mode, or CLOCK while following a MIDI clock; the pattern (P1 to P16) and,
+  blinking, the next one (>3); UNSAVED while the sound's preset has changes not saved (PENDING while it waits to
+  be written); CPU. A message (OCTAVE, PATTERN, the volume as it moves) takes the line's left part for a moment.
 - **SELECT** picks the track (recording: moves the step).
+
+While it plays, only the strip under the track's line redraws, about 30 times a second (10 while the sound takes
+75 % or more); stopped, nothing moves. A list over it (the tracks, the patterns, a preset's slots) stops it until
+the list goes.
 
 ### Step mode (SEQ)
 
