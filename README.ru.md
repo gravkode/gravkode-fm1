@@ -7,7 +7,7 @@
 огибающая, движение даёт LFO, а дальше он идёт через гранулы, задержку и реверб Beads. Всё управляется с панели и
 экрана самого FM-1.
 
-<p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE на экране FM-1: аккорд на движке CHORDS, три нажатые клавиши показывают силу нажатия и давление"></p>
+<p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE на экране FM-1: аккорд на движке CHORDS, страница звука с ручками, CHORD только что повернули"></p>
 
 [English](README.md) · [Мануал (на английском)](grav-code/docs/MANUAL.md)
 

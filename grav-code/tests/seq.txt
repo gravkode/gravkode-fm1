@@ -10,6 +10,8 @@ expect seq_playing 0
 expect seq_bpm 120
 expect seq_swing 50
 expect seq_length 16
+# (the knobs at rest: none redrawn alone until one is turned)
+expect dial_frames 0
 # step mode: steps 1 and 3 on, then step 1 off again (a tap on a step that is on)
 listen
 tap SEQ
@@ -165,6 +167,9 @@ wait 30
 expect seq_bpm 100
 expect header_bpm 100
 expect seq_swing 60
+# (0.22: SEQ's knobs as every page's: the ones turned grow and settle, redrawn alone, tile by tile)
+wait 600
+expect dial_frames >8
 # SAVE, a restart: the pattern as it was
 tap SAVE
 wait 60

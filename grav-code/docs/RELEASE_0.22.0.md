@@ -15,7 +15,12 @@ pages while retaining AUTO for the original macro behavior, plus a full editor f
   notes; changing PATCH restores that factory template. Operator numbering follows DX, reversing packed order.
 - **Knobs in the Octatrack's manner:** small (a 14-pixel ring), grey and white, nine ticks over their travel lit up to
   the value, a pointer easing to it; the name above, the value under; only the knob being turned takes the theme's
-  colour, for a moment. Page title/index and a compact engine icon above. The easing redraws one 80×84 knob tile
+  colour and grows a little, then settles back. The same knobs on every page: SEQ's TEMPO, SWING, LENGTH (a step's
+  NOTE, VELOCITY, LENGTH) under smaller step bars, GLO's VOICES and VELOCITY. Page title/index and a compact engine
+  icon above.
+- **No keyboard drawn:** the bottom band holds the page's state (PLAY/STOP and the pattern, a sound page's HOME,
+  the effect's SEED and FX), OCT, PRESET, VOL, messages, MIDI in and CPU. A key no longer redraws the screen unless it
+  acts there (step mode, REC, a pattern or a preset slot), nor does its pressure (still sent over MIDI). The easing redraws one 80×84 knob tile
   per frame, at most 30 fps (10 under high audio load). The complete screen is not
   animated. Missing controls remain blank; discrete choices have labels. Saving/error status is visible.
 - **Expanded persistence:** every new engine control, FM patch, drum setting and OUTPUT travels with the sound
@@ -51,11 +56,11 @@ Validation on 26 October 2026:
 - **1008 bit-exact concurrent comparisons**: 960 stock plus 48 with advanced controls, four synth/four drum
   voices and FX off/on; existing six-op ENV/LFO and overload-fade regressions pass. Sequencer timing and pattern
   bank fault/wear tests pass.
-- Device build/compiler checks pass: image **395108 B**, RAM **91512 / 98304 B** (**6792 B free**), pool
+- Device build/compiler checks pass: image **395188 B**, RAM **91512 / 98304 B** (**6792 B free**), pool
   **332968 / 344064 B** (**11096 B free**). Package **611496 B**; no soft-double helpers, unsafe instruction
   patterns or direct register access introduced.
 
-Package SHA-256: `134c38c4d1193146516fd06e19e0f6ac6d7103a73bd408fde7c7aaa3ae857b8c`.
+Package SHA-256: `2ddacb3671c7a552a5ccf81988f7da3a467eea67327ddd71151b83ca8bfdbcf0`.
 
 Not installed on the FM-1 in this change. Listening, physical encoder feel and real CPU/XRUN measurements during
 editing with eight tracks and FX still require hardware validation. The GIF is a simulator capture.

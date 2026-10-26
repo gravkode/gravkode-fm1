@@ -12,7 +12,7 @@ engine and 64 user slots, saved with held SAVE and a white key. The sound editor
 controls, all six FM operators, small animated knobs and extended preset storage; HOME advances pages, held
 HOME with SELECT jumps between them.
 
-![GRAV CODE on the FM-1's screen: a chord on CHORDS, three keys held, each filled to its velocity and its pressure](manual/img/screen-playing.png "A chord on CHORDS")
+![GRAV CODE on the FM-1's screen: a chord on CHORDS, its sound page with its knobs](manual/img/screen-playing.png "A chord on CHORDS")
 
 Version {{VERSION}}. Installing is at your own risk; the installer can put M-VAVE's own firmware back.
 

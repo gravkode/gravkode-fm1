@@ -7,7 +7,7 @@ sequencer of eight tracks of 64 steps, four synth tracks (each its own engine) a
 drums, snares and hi-hats, each with six knobs), in sixteen patterns, with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings
 and the pattern stay across a power cycle.
 
-![GRAV CODE playing a chord on CHORDS: three keys held, each filled to its velocity (amber) and its pressure (white), TIMBRE 65, MORPH 50, HARMONICS 75](img/screen-playing.png "A chord on CHORDS")
+![GRAV CODE playing a chord on CHORDS: its sound page, its icon alive, INVERSION, WAVE and CHORD as knobs, CHORD just turned (grown, lit)](img/screen-playing.png "A chord on CHORDS")
 
 ---
 
@@ -49,7 +49,7 @@ your own risk.
 
 ## 2. The screen
 
-![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; FOLD 65, ASYMMETRY 50, CURVE 75 with their bars; the keyboard; OCT +0, PRESET INIT, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
+![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; FOLD 65, ASYMMETRY 50, CURVE 75 as knobs; the page's state, OCT +0, PRESET INIT, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
 
 From the top:
 
@@ -60,12 +60,15 @@ From the top:
 - **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
   is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine, its icon
   (small) and its voices.
-- **The page's three parameters**, each with its value (0 to 100) and a bar: K1, K2 and K3 change them. A bar that
-  starts from a mark in the middle (DENSITY, PITCH) has its rest there.
-- **The keyboard:** a key held fills to its velocity (amber) and, pressed further, to its pressure (white).
-- **The bottom lines:** OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER), and when MIDI has come in, the last
-  message and where from (USB or TRS). CPU is the share of its time the sound takes: it turns red once a block of
-  sound came late (heard as a crackle), until the next power-on.
+- **The page's three parameters** as knobs, K1 to K3, on every page: a thin ring, ticks over its travel lit up to
+  the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
+  PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
+  settles back.
+- **The bottom band:** the page's state (SEQ: PLAY or STOP, MIDI CLOCK, STEP or REC, the pattern; a sound page: how
+  to change pages; FX: SEED and whether the effect is on); OCT (the octave), PRESET (the selected sound, or CUSTOM
+  after editing), VOL (MASTER); a message, or the last MIDI message in and where from (USB or TRS); CPU, the share of
+  its time the sound takes: it turns red once a block of sound came late (heard as a crackle), until the next
+  power-on. The keys are not drawn: the FM-1's own are under the screen.
 
 ---
 
@@ -250,11 +253,10 @@ and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
   to D4; the selected one framed; each flashes as it plays a note) and the step playing, of the selected track's
   LENGTH.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's), **K2 SWING** (50 % straight to 75 %,
-  the pattern's), **K3 LENGTH** (the selected
-  track's, 1 to 64 steps).
+  the pattern's), **K3 LENGTH** (the selected track's, 1 to 64 steps), as knobs under the steps.
   A step held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead.
-- **Below:** PLAY or STOP, MIDI CLOCK while following one, STEP in step mode, REC and the step while recording; at
-  the right the pattern (P1 to P16) and, blinking, the next one (>3).
+- **In the bottom band:** PLAY or STOP, MIDI CLOCK while following one, STEP in step mode, REC and the step while
+  recording; at the right the pattern (P1 to P16) and, blinking, the next one (>3).
 - **SELECT** picks the track (recording: moves the step).
 
 ### Step mode (SEQ)
@@ -472,7 +474,7 @@ it loops a slice of the recording: TIME picks which, SHAPE its envelope.
 
 ## 8. Voices and velocity
 
-![Three keys held on CHORDS, each filled to its velocity and pressure](img/screen-playing.png "Three keys held")
+![A chord on CHORDS, its sound page](img/screen-playing.png "A chord on CHORDS")
 
 **VOICES** (GLO, K1): the FM-1 has four voices for the synth tracks, each its own engine, shared out among them:
 each track none (OFF), one (MONO) or up to four (POLY), four in all. Each track starts with one. Turning a track's
