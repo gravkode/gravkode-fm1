@@ -58,9 +58,13 @@ wait 30
 tap HOME
 wait 30
 
-# DEBUG (GLO twice): its fields and controls, with the effect still on
+# SCREEN (GLO again, 0.25.1): THEME, every palette's swatch under it, the one shown framed
 tap GLO
 wait 30
+tap GLO
+wait 1400
+shot screen-theme.png
+# DEBUG (GLO again): its fields and controls, with the effect still on
 tap GLO
 wait 400
 shot screen-debug.png

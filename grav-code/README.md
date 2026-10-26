@@ -26,7 +26,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Build, test, install
 
-Version 0.14 renders on both cores, with the DEBUG page (GLO twice); since 0.14.1 Beads runs on the second core,
+Version 0.14 renders on both cores, with the DEBUG page (GLO three times since 0.25.1); since 0.14.1 Beads runs on the second core,
 a chunk behind the voices.
 K1 switches one/two-core processing; K2 clears peaks and counters. See
 [the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
@@ -42,6 +42,7 @@ From the repository's root:
     grav-code/build/host/grav_code_host grav-code/tests/fx.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/seq.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/rec.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/theme.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/tracks.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/drums.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/patterns.txt grav-code/build/host

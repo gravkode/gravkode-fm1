@@ -13,12 +13,13 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.25.1**, the screen in teal (0.25.0, recording finished): each track its own swing (SWING on
-SEQ; SEQ held: the pattern's); a bar's count-in before recording from a stop (GLO's METRONOME at COUNT); notes from
-a MIDI keyboard recorded too; SEQ held while recording erases the steps it passes. Before it: 0.24, live recording
-(REC while playing, quantized, with a metronome; SEQ held and REC clears a track); 0.23, the sequencer's screen
-(HOME the selected track as a piano roll, step mode all eight tracks as a grid); 0.22, the sound editor. HOME
-advances pages; hold HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.25.1**, the screen in teal, its colours chosen on GLO's second page (THEME, ten palettes)
+(0.25.0, recording finished): each track its own swing (SWING on SEQ; SEQ held: the pattern's); a bar's count-in
+before recording from a stop (GLO's METRONOME at COUNT); notes from a MIDI keyboard recorded too; SEQ held while
+recording erases the steps it passes. Before it: 0.24, live recording (REC while playing, quantized, with a
+metronome; SEQ held and REC clears a track); 0.23, the sequencer's screen (HOME the selected track as a piano roll,
+step mode all eight tracks as a grid); 0.22, the sound editor. HOME advances pages; hold HOME and turn SELECT to
+jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's piano roll of one track, and step mode's grid of all eight"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
@@ -57,7 +58,8 @@ advances pages; hold HOME and turn SELECT to jump. [All sound controls](grav-cod
 | HOME again | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
-| GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | the version |
+| GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
+| GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | — | — |
 | FX | FX GRAIN | DENSITY (none at the middle: clocked left, random right) | TIME (how far back) | SIZE (backwards, forwards, at the end the delay) |
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
 | FX again | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
@@ -143,7 +145,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

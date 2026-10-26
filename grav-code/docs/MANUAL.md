@@ -86,7 +86,7 @@ From the top:
 | HOME | SEQ (the selected track alone) → OSC → extra sound pages → OUTPUT → SEQ. A drum track: DRUM → SHAPE → OUTPUT. From step mode: SEQ, the track alone. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
-| GLO | The GLO page: VOICES, VELOCITY, the version; again DEBUG (section 11) |
+| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
 | SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
@@ -218,7 +218,15 @@ The firmware and its global settings:
 
 Under them, the package's identity (the installer's) and the firmware's version. Section 8 has more on VOICES and
 VELOCITY, section 5 on the metronome.
-GLO again opens DEBUG, the two cores' timings (section 11).
+GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
+AMBER (GRAV CODE's until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown beside the knob as
+a swatch of its two colours, the one shown framed. Only the theme's two brightest colours change (values, the knob
+turned, the selected track, the steps and notes); the greys stay, REC stays red. It is saved with the settings (SAVE).
+The splash at power-on keeps its teal: it is drawn before the settings are read.
+
+![GLO's SCREEN page: THEME at TEAL, the ten palettes' swatches beside it, TEAL framed](img/screen-theme.png "The SCREEN page")
+
+GLO once more opens DEBUG, the two cores' timings (section 11).
 
 ### FX GRAIN, FX SHAPE, FX MIX (FX)
 
@@ -618,7 +626,7 @@ CPU (bottom right) is the smoothed share of each audio block's time used by rend
 the FM-1's cores. With the effect off, the sounding Plaits voices are split between them. With the effect on,
 Beads (more than half a block's time by itself on the FM-1) runs on the second core, a 24-sample chunk behind the
 voices, while the first renders them; the voices go to whichever core has room. Nothing is added to the latency,
-and the sound is the same on one core or two. GLO twice opens DEBUG, where K1 selects one/two-core processing and K2
+and the sound is the same on one core or two. GLO three times opens DEBUG (after GLO and SCREEN), where K1 selects one/two-core processing and K2
 resets peaks and counters. These debug choices are temporary.
 
 Off (DRY/WET and REVERB at 0, not frozen), Beads is bypassed and costs nothing. If a block takes over 90% of its

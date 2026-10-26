@@ -13,12 +13,13 @@
 
 ---
 
-Текущая версия: **0.25.1**, экран в бирюзовом цвете (0.25.0 — доводка записи): у каждой дорожки свой свинг (SWING на
-SEQ; SEQ зажат — свинг паттерна); такт отсчёта перед записью со стопа (GLO, METRONOME: COUNT); ноты с
-MIDI-клавиатуры тоже записываются; SEQ зажат во время записи стирает проходимые шаги. До этого: 0.24 — живая запись
-(REC во время игры, с квантованием и метрономом; SEQ зажат + REC очищает дорожку); 0.23 — экран секвенсора (на HOME
-piano roll дорожки, в шаговом режиме сетка всех восьми); 0.22 — редактор звука. HOME листает страницы; HOME зажат +
-SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
+Текущая версия: **0.25.1**, экран в бирюзовом цвете, а цвета можно выбрать на второй странице GLO (THEME, десять
+палитр) (0.25.0 — доводка записи): у каждой дорожки свой свинг (SWING на SEQ; SEQ зажат — свинг паттерна); такт
+отсчёта перед записью со стопа (GLO, METRONOME: COUNT); ноты с MIDI-клавиатуры тоже записываются; SEQ зажат во время
+записи стирает проходимые шаги. До этого: 0.24 — живая запись (REC во время игры, с квантованием и метрономом; SEQ
+зажат + REC очищает дорожку); 0.23 — экран секвенсора (на HOME piano roll дорожки, в шаговом режиме сетка всех
+восьми); 0.22 — редактор звука. HOME листает страницы; HOME зажат + SELECT переключает их быстро. [Все параметры и
+управление](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: piano roll одной дорожки на HOME и сетка всех восьми в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
@@ -56,7 +57,8 @@ SELECT переключает их быстро. [Все параметры и �
 | HOME ещё раз | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0,05–20 Гц) | LFO DEPTH (глубина) | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
-| GLO | GLO | VOICES дорожки (OFF, MONO, 2, 3, 4; всего четыре) | VELOCITY (ON, OFF) | версия прошивки |
+| GLO | GLO | VOICES дорожки (OFF, MONO, 2, 3, 4; всего четыре) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
+| GLO ещё раз | SCREEN | THEME: цвета экрана (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | — | — |
 | FX | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
 | FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
 | FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
@@ -145,7 +147,7 @@ python3 tools/build.py grav-code --web                 # эмулятор в б�
 
 Тесты (`grav-code/tests/`): `basic.txt` (клавиши, октава, сохранение, MIDI), `engines.txt` (все движки звучат),
 `voices.txt` (полифония, MONO, velocity), `fx.txt` (эффект: страницы, FREEZE, SEED, QUALITY, сохранение),
-`seq.txt` (секвенсор), `rec.txt` (живая запись, метроном), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
+`seq.txt` (секвенсор), `rec.txt` (живая запись, метроном), `theme.txt` (цвета экрана), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
 (паттерны во флеше): `run_seq_test.py`, `screens.txt` (скриншоты). Подробнее — в
 [grav-code/README.md](grav-code/README.md).
 

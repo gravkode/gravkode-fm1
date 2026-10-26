@@ -33,7 +33,8 @@ typedef struct {
     uint8_t engine_id;                   /* GRAV_ENGINE_* (dsp/grav_plaits.h): one of Plaits' 24 */
     uint8_t rsv_ble;                     /* was Bluetooth switched off (REC held), when there was Bluetooth: kept,
                                           * unread, for the record's layout (saved settings still load) */
-    uint8_t rsv[1];
+    uint8_t theme;                       /* (0.25.1) GLO's SCREEN: the palette + 1 (device/gfx.c PALETTES); 0 (as saved
+                                          * before): the app's, APP_PALETTE */
     uint8_t osc[3];
     uint8_t mod[3];
     uint8_t env[3];
@@ -105,6 +106,7 @@ enum {
     PAGE_SHAPE,                          /* a drum track's: HOME after its DRUM page (OSC's): SHAPE's knobs */
     PAGE_SOUND,
     PAGE_OUTPUT,
+    PAGE_SCREEN,                         /* (0.25.1) GLO again: THEME, the screen's colours (GLO again: DEBUG) */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN && (p) <= PAGE_FX_MIX)
@@ -115,7 +117,7 @@ static uint8_t fx_page = PAGE_FX_GRAIN;  /* the FX page shown last: FX goes back
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG",
-                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT"};
+                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -208,7 +210,8 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"DRY/WET", "REVERB", "QUALITY"},
     {"", "", ""},
     {"TEMPO", "SWING", "LENGTH"},
-    {"PUNCH", "SWEEP", "DRIVE"}
+    {"PUNCH", "SWEEP", "DRIVE"},
+    [PAGE_SCREEN] = {"THEME", "", ""}
 };
 
 
@@ -534,7 +537,7 @@ static void settings_defaults(void)
     set.octave = 0;
     set.engine_id = 0;
     set.rsv_ble = 0;
-    set.rsv[0] = 0;
+    set.theme = 0;
     set.osc[0] = 65; set.osc[1] = 50; set.osc[2] = 75;
     set.mod[0] = 50; set.mod[1] = 0; set.mod[2] = 0;
     set.env[0] = 10; set.env[1] = 50; set.env[2] = 30;
@@ -617,6 +620,8 @@ void app_init(void)
                 loaded_settings.pattern = 0;
                 loaded_settings.metro = METRO_REC;
             }
+            if (loaded_settings.theme > NPALETTES)   /* (a byte reserved before 0.25.1) */
+                loaded_settings.theme = 0;
             if (loaded_settings.metro > METRO_COUNT)   /* (a byte reserved before 0.24) */
                 loaded_settings.metro = METRO_REC;
             if (loaded_settings.bpm < SEQ_BPM_MIN || loaded_settings.bpm > SEQ_BPM_MAX ||
@@ -1172,6 +1177,36 @@ static void voices_turn(int32_t e)
 
 /* GLO's knobs: K1 VOICES (MONO, 2, 3, 4), K2 VELOCITY (right: on, the keys' own; left: off, fixed), K3 the version */
 static const char *const METRO_NAME[3] = {"REC", "OFF", "COUNT"};
+
+/* (0.25.1) GLO's SCREEN, K1 THEME: the palettes (device/gfx.c) in the knob's order, the app's own (TEAL) first */
+static const uint8_t THEME_ORDER[] = {6, 1, 2, 7, 0, 9, 5, 8, 3, 4};
+#define THEMES (sizeof THEME_ORDER / sizeof THEME_ORDER[0])
+_Static_assert(THEMES == NPALETTES, "every palette on the knob");
+
+static uint32_t theme_palette(void)          /* the palette shown: the one chosen, or the app's */
+{
+    return set.theme && set.theme <= NPALETTES ? set.theme - 1u : APP_PALETTE;
+}
+
+static uint32_t theme_at(void)               /* its place on the knob */
+{
+    for (uint32_t i = 0; i < THEMES; i++)
+        if (THEME_ORDER[i] == theme_palette())
+            return i;
+    return 0;
+}
+
+static void theme_turn(int32_t e)
+{
+    const uint32_t at = (uint32_t)clamp((int32_t)theme_at() + (e > 0 ? 1 : -1), 0, (int32_t)THEMES - 1);
+    if (THEME_ORDER[at] != theme_palette()) {
+        set.theme = (uint8_t)(THEME_ORDER[at] + 1u);
+        set_dirty = 1;
+        palette_set(theme_palette());        /* (every colour the screen draws comes from it: the whole screen anew) */
+        ui.redraw = 1;
+    }
+    app_say("THEME", PALETTES[theme_palette()].name);
+}
 
 static void glo_turn(uint32_t index, int32_t e)
 {
@@ -1847,14 +1882,14 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
     return page == PAGE_SEQ || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
-           page == PAGE_GLO || page == PAGE_DEBUG ? B_GLO : B_FX;
+           page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : B_FX;
 }
 
 /* its blink's period: the first of a button's pages slow, the next faster (FX: GRAIN, SHAPE, MIX) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_OSC || page == PAGE_DEBUG || page == PAGE_FX_SHAPE ? 500u :
-           page == PAGE_FX_MIX || page == PAGE_SHAPE ? 250u : 1000u;
+    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_SHAPE ? 500u :
+           page == PAGE_FX_MIX || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
 }
 
 /* the lights: the buttons (the open page's blinking, PLAY green on the beat, red recording) and, in step mode, the
@@ -2026,7 +2061,8 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
         return;
     }
     if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
-        glo_page = active_page == PAGE_GLO ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
+        glo_page = active_page == PAGE_GLO ? PAGE_SCREEN : active_page == PAGE_SCREEN ? PAGE_DEBUG :
+                   active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
     active_page = k == B_HOME ? home_page :
                   k == B_LFO  ? PAGE_MOD :
                   k == B_ENV  ? PAGE_ENV :
@@ -2292,6 +2328,9 @@ static void input(void)
                 app_say("REC STEP", t);
             } else
                 track_select((uint32_t)clamp((int32_t)track_sel + e, 0, SYNTH_TRACKS - 1));
+        } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_SCREEN) {
+            if (k == EN_K1)                  /* (K2, K3: none) */
+                theme_turn(e);
         } else if ((k == EN_K1 || k == EN_K2 || k == EN_K3) && active_page == PAGE_GLO) {
             glo_turn((uint32_t)(k - EN_K1), e);
         } else if (k == EN_K3 && active_page == PAGE_FX_MIX) {
@@ -2528,6 +2567,16 @@ static void knob_get(uint32_t i, knob_t *k)
         }
         return;
     }
+    if (active_page == PAGE_SCREEN) {        /* THEME alone */
+        k->name = PARAM_NAME[PAGE_SCREEN][i];
+        if (i) {
+            k->frac = KNOB_NONE;
+            return;
+        }
+        text_cat(k->value, PALETTES[theme_palette()].name);
+        k->frac = (int32_t)theme_at() * 25600 / (int32_t)(THEMES - 1u);
+        return;
+    }
     if (active_page == PAGE_GLO) {
         k->name = PARAM_NAME[PAGE_GLO][i];
         if (i == 0u) {
@@ -2578,7 +2627,7 @@ static void dials_sync(void)
  * radius. (SEQ's are small, in the bottom band: draw_chips) */
 static int32_t knob_row(int32_t *h, int32_t *r)
 {
-    *h = active_page == PAGE_GLO ? 84 : 96;
+    *h = active_page == PAGE_GLO || active_page == PAGE_SCREEN ? 84 : 96;
     *r = 17;
     return 46;
 }
@@ -2703,7 +2752,7 @@ static void draw_knobs(void)
 static int animate_dials(uint32_t now)
 {
     if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page) ||
-          active_page == PAGE_SEQ || active_page == PAGE_GLO) ||
+          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_SCREEN) ||
         ui.splash_until || ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown) return 0;
     const uint32_t dt = now - ui.dial_at, period = plat_cpu_pct() >= 75u ? 96u : 30u;
     if (dt < period) return 0;
@@ -2722,6 +2771,8 @@ static int animate_dials(uint32_t now)
         } else ui.dial_q8[i] = target;
     }
     ui.dial_at = now;
+    if (active_page == PAGE_SCREEN)          /* (THEME alone: K2's and K3's tiles are the palettes' swatches) */
+        ui.dial_dirty &= 1u;
     if (!ui.dial_dirty) return 0;
     /* One 80-wide tile of the row per frame (~2.5 ms SPI), even when a preset changes all three values at once. */
     uint32_t dial = ui.dial_next;
@@ -3048,6 +3099,25 @@ static void draw_glo(void)
     cv_text(176, 130, &FONT_XS, APP_VERSION, C_WHITE);
 }
 
+/* GLO's SCREEN: THEME as a knob; beside it every palette in the knob's order, five a row: a swatch of its two
+ * colours and its name, the one shown framed */
+static void draw_screen_page(void)
+{
+    int32_t h, r;
+    draw_dials(knob_row(&h, &r), 1u, 0);
+    for (uint32_t i = 0; i < THEMES; i++) {
+        const palette_t *pl = &PALETTES[THEME_ORDER[i]];
+        const int32_t x = 96 + (int32_t)(i % 5u) * 28, y = 56 + (int32_t)(i / 5u) * 34;
+        const int shown = THEME_ORDER[i] == theme_palette();
+        if (shown)
+            cv_rect(x - 2, y - 2, 28, 18, C_WHITE);
+        cv_rect(x - 1, y - 1, 26, 16, C_BLACK);
+        cv_rect(x, y, 24, 7, pl->c[3]);
+        cv_rect(x, y + 7, 24, 7, pl->c[4]);
+        cv_text(x + 12 - text_w(&FONT_T, pl->name) / 2, y + 17, &FONT_T, pl->name, shown ? C_WHITE : C_DIM);
+    }
+}
+
 /* DEBUG times are microseconds; AVG/PEAK are the whole render's deadline usage.
  * CPU0 cannot run the UI until the audio ISR has joined CPU1, so this short lock
  * obtains a completed block without displaying half-updated worker results. */
@@ -3247,6 +3317,8 @@ static void draw(void)
 
     if (active_page == PAGE_GLO)
         draw_glo();
+    else if (active_page == PAGE_SCREEN)
+        draw_screen_page();
     else if (active_page == PAGE_DEBUG)
         draw_debug();
     else if (active_page == PAGE_SEQ)
@@ -3316,6 +3388,7 @@ void app_ui_init(void)
     ui.last_vel = 100;
     ui.shown_step = -2;
     touch_on(1);                             /* velocity and pressure: the keys' readings on */
+    palette_set(theme_palette());            /* (0.25.1) GLO's SCREEN: the theme chosen (the start set the app's) */
     lcd_fill(0, 0, 240, 240, C_BLACK);
     ui.redraw = 1;
     if (preset_import_failed) app_say("PRESET IMPORT FAILED", "REBOOT TO RETRY");
@@ -3625,6 +3698,10 @@ int app_expect(const char *what, int *got)
         *got = ui.rec_live;
     else if (!strcmp(what, "clicks"))
         *got = (int)clicks;
+    else if (!strcmp(what, "theme"))         /* (0.25.1) GLO's SCREEN: the palette chosen + 1 (0: the app's); shown */
+        *got = set.theme;
+    else if (!strcmp(what, "palette"))
+        *got = (int)theme_palette();
     else if (!strcmp(what, "metro"))         /* METRO_*: 0 REC, 1 OFF, 2 COUNT */
         *got = set.metro;
     else if (!strcmp(what, "count_in"))      /* the count-in's steps still to come */
