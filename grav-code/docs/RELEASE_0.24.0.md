@@ -25,6 +25,10 @@ The sequencer itself gained three small things, in the audio interrupt: where a 
 (`seq_quantize`, under the lock), a step a track skips once (`skip`), and a beat event on each quarter note while
 asked for (`beats`). Nothing else in its timing changes; PLAY no longer ends step recording, it goes on live.
 
+The installer page (`web/installer.html`, every firmware's site): its "Also install m-bootloader" box is now unticked
+whenever the page opens. A browser restored an earlier tick on a reload, and m-bootloader was written without being
+asked for this time (harmless: the FM-1 came back on the firmware).
+
 Validation on 26 October 2026:
 
 - All **15 simulator scenarios** pass. The new `rec.txt` checks a note early in a step and one late in it (written to

@@ -68,7 +68,7 @@
   <p class="small" data-t="back"></p>
   <p class="small"><a href="https://www.m-vave.com/download" target="_blank" rel="noopener">www.m-vave.com/download<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
   <div id="mbootopt" hidden>
-    <p class="opt"><input type="checkbox" id="mboot"><label for="mboot" data-t="mboot"></label></p>
+    <p class="opt"><input type="checkbox" id="mboot" autocomplete="off"><label for="mboot" data-t="mboot"></label></p>
     <p class="small"><span data-t="mbootwhy"></span>
       <a href="https://github.com/jvitkauskas/m-bootloader" target="_blank" rel="noopener">github.com/jvitkauskas/m-bootloader<span class="sr" data-t="newtab"> (opens in a new tab)</span></a></p>
   </div>
@@ -291,6 +291,11 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
     $("mbootopt").hidden = false;
   } catch (_) { /* no option, then */ }
 })();
+
+/* m-bootloader is written only when ticked for this install: never ticked as the page opens, whatever the browser
+   kept of an earlier visit (a reload restores form fields; going back restores the whole page) */
+$("mboot").checked = false;
+window.addEventListener("pageshow", () => { if (!writing) $("mboot").checked = false; });
 
 /* stock firmware: M-VAVE's FM-1 firmware, any version, chosen by the user (M-VAVE's server allows no cross-site
    download) and named as M-VAVE's (IS_STOCK, fm1ota.js, inlined above); the FM-1 checks the package itself before writing */
