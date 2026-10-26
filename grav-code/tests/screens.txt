@@ -215,7 +215,7 @@ turn SELECT 4
 wait 30
 tap SEQ
 wait 30
-tap SEQ
+tap HOME
 wait 30
 tap HOME
 wait 30

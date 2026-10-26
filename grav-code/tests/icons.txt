@@ -65,7 +65,8 @@ wait 100
 expect page 10
 expect live_w 38
 tap SEQ
-tap SEQ
+wait 30
+tap HOME
 wait 30
 expect page 8
 # a drum's DRUM and SHAPE pages: the drum's icon

@@ -176,6 +176,35 @@ expect seq_swing 60
 # (0.22: SEQ's knobs as every page's: the ones turned grow and settle, redrawn alone, tile by tile)
 wait 600
 expect dial_frames >8
+# (0.23) the buttons and the page's two views: HOME, SEQ's page, shows the selected track alone; SEQ (step mode) every
+# track. SEQ on OSC, then SEQ again: OSC again; SEQ, then LFO: step mode ends (the keys play); SEQ, then HOME: HOME's
+# view (SEQ's page, step mode off), however SEQ was reached
+expect page 8
+expect step_mode 0
+tap HOME
+wait 30
+expect page 0
+tap SEQ
+wait 30
+expect page 8
+expect step_mode 1
+tap SEQ
+wait 30
+expect page 0
+expect step_mode 0
+tap SEQ
+wait 30
+tap LFO
+wait 30
+expect page 1
+expect step_mode 0
+tap SEQ
+wait 30
+expect step_mode 1
+tap HOME
+wait 30
+expect page 8
+expect step_mode 0
 # SAVE, a restart: the pattern as it was
 tap SAVE
 wait 60

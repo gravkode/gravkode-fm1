@@ -696,7 +696,8 @@ static struct {
     uint8_t redraw;
     uint32_t debug_at, debug_xruns_base;
     /* the sequencer's (seq) */
-    uint8_t step_mode;                   /* SEQ: the white keys are the steps of view_page */
+    uint8_t step_mode;                   /* SEQ: the white keys are the steps of view_page (on SEQ's page alone) */
+    uint8_t seq_from, seq_from_home;     /* the page SEQ was pressed on (and HOME's): SEQ again goes back to it */
     uint8_t view_page;                   /* the page of 16 steps shown and edited */
     int8_t step_held;                    /* the step a white key holds (K1..K3 edit it); -1: none */
     uint8_t step_was_on, step_edited;    /* (a step on, let go untouched, goes off) */
@@ -1766,6 +1767,13 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
 {
     if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
         fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : (uint8_t)(active_page + 1u);
+    if (k == B_HOME && ui.step_mode) {       /* from step mode (every track): HOME's own view, the one track */
+        ui.step_mode = 0;
+        ui.step_held = -1;
+        active_page = home_page = PAGE_SEQ;
+        app_say("HOME", TRACK_NAME[track_sel]);
+        return;
+    }
     if (k == B_HOME) {
         if (active_page == PAGE_SEQ) sound_activate(0);
         else if (IS_SOUND_PAGE(active_page)) {
@@ -1967,14 +1975,22 @@ static void input(void)
     }
     if (ui.seq_down && !(btn & 1u << B_SEQ)) {   /* SEQ let go: step mode on or off, unless it set the length */
         ui.seq_down = 0;
-        if (!ui.seq_used) {
+        if (!ui.seq_used) {                  /* SEQ: every track, the white keys the steps; again: back where it was */
             ui.step_mode = !ui.step_mode;
             ui.step_held = -1;
             if (ui.step_mode) {
                 ui.rec = 0;
+                ui.seq_from = active_page;
+                ui.seq_from_home = home_page;
                 active_page = home_page = PAGE_SEQ;
+            } else if (IS_SOUND_PAGE(ui.seq_from))   /* (the track's own sound page: it may be another track now) */
+                sound_activate(ui.sound_page[track_sel]);
+            else {
+                active_page = ui.seq_from;
+                home_page = ui.seq_from_home;
             }
             app_say("STEP", ui.step_mode ? "ON" : "OFF");
+            ui.redraw = 1;
         }
     }
     if (!(btn & 1u << B_SEL))                /* SEL let go; held 2 s: the grains on their own again */
@@ -2078,6 +2094,11 @@ static void input(void)
         ui.redraw = 1;
     ui.keys = keys;
     ui.btn = btn;
+    if (ui.step_mode && active_page != PAGE_SEQ) {   /* another page opened (LFO, ENV, FX, GLO, HOME + SELECT): the
+                                                  * white keys play again; step mode is SEQ's page alone */
+        ui.step_mode = 0;
+        ui.step_held = -1;
+    }
     lights(btn, keys);
 }
 

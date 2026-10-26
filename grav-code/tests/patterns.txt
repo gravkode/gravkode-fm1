@@ -63,6 +63,18 @@ key 11 up
 wait 30
 tap SEQ
 wait 30
+# (0.23: SEQ again goes back to the page it was pressed on; HOME from step mode: SEQ's page, the one track)
+expect page 10
+expect step_mode 0
+tap SEQ
+wait 30
+expect page 8
+expect step_mode 1
+tap HOME
+wait 30
+expect page 8
+expect step_mode 0
+said HOME S1
 turn K2 10
 wait 30
 expect seq_swing 60

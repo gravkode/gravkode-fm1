@@ -83,14 +83,14 @@ From the top:
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
-| HOME | SEQ → OSC → extra sound pages → OUTPUT → SEQ. A drum track: DRUM → SHAPE → OUTPUT. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
+| HOME | SEQ (the selected track alone) → OSC → extra sound pages → OUTPUT → SEQ. A drum track: DRUM → SHAPE → OUTPUT. From step mode: SEQ, the track alone. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, the version; again DEBUG (section 11) |
 | FX | The effect's pages, again for the next: FX GRAIN, FX SHAPE, FX MIX. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
 | SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
-| SEQ | Step mode: the white keys are the sequencer's steps (section 5). Lit while on |
+| SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording (section 5) |
 | MASTER | The volume, glided: no step in the sound |
@@ -278,8 +278,10 @@ the list goes.
 
 ### Step mode (SEQ)
 
-SEQ turns step mode on (SEQ lit): the 16 white keys are the steps of the page shown, and the keys no longer play.
-SEQ again turns it off.
+SEQ turns step mode on (SEQ lit), from any page: the screen shows every track, the 16 white keys are the steps of
+the page shown, and the keys no longer play. SEQ again turns it off and goes back to the page it was pressed on;
+HOME turns it off and shows SEQ's own view, the selected track alone; another page's button (LFO, ENV, FX, GLO)
+turns it off and opens that page.
 
 The screen shows every track then, as the keys do: eight rows, S1 to S4 then D1 to D4, named at the left, the
 selected one on an amber ground; the 16 steps of the page shown across (the white keys), in beats of four. A step on
@@ -618,7 +620,7 @@ or hold it 2 s for AUTO. Or the recording holds nothing yet: play.
 **The installer doesn't find the FM-1:** a data cable, other MIDI apps and browser tabs closed, Chrome or Edge.
 Started but out of reach over USB: hold REC while switching on (update mode), then install.
 
-**The keys play no notes:** step mode is on (SEQ lit): press SEQ.
+**The keys play no notes:** step mode is on (SEQ lit): press SEQ (or HOME).
 
 **The sequencer plays nothing:** the steps past the LENGTH don't play (they show as dots); a MIDI clock coming in
 leads it (MIDI CLOCK on SEQ): start it from there.
