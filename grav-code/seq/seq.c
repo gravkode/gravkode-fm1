@@ -46,13 +46,18 @@ static int steps_valid(const seq_step_t *step, uint32_t length)
     return 1;
 }
 
+static int swing_valid(uint32_t swing)   /* a track's: 0 (the pattern's) or its own */
+{
+    return swing == 0u || (swing >= SEQ_SWING_MIN && swing <= SEQ_SWING_MAX);
+}
+
 int seq_valid(const seq_pattern_t *p)
 {
     if (p->magic != SEQ_MAGIC || p->drum_magic != SEQ_MAGIC_DRUMS || p->bpm < SEQ_BPM_MIN || p->bpm > SEQ_BPM_MAX ||
         p->swing < SEQ_SWING_MIN || p->swing > SEQ_SWING_MAX)
         return 0;
     for (uint32_t k = 0; k < SEQ_TRACKS; k++)
-        if (!steps_valid(p->track[k].step, p->track[k].length))
+        if (!steps_valid(p->track[k].step, p->track[k].length) || !swing_valid(p->track[k].swing))
             return 0;
     return 1;
 }
@@ -73,7 +78,7 @@ int seq_from_record(const seq_record_t *r, seq_pattern_t *p)
         r->swing > SEQ_SWING_MAX)
         return 0;
     for (uint32_t k = 0; k < SEQ_S_TRACKS; k++)
-        if (!steps_valid(r->track[k].step, r->track[k].length))
+        if (!steps_valid(r->track[k].step, r->track[k].length) || !swing_valid(r->track[k].swing))
             return 0;
     p->bpm = r->bpm;
     p->swing = r->swing;
@@ -86,7 +91,7 @@ int seq_from_drum_record(const seq_drum_record_t *d, seq_pattern_t *p)
     if (d->magic != SEQ_MAGIC_DRUMS)
         return 0;
     for (uint32_t k = 0; k < SEQ_TRACKS - SEQ_S_TRACKS; k++)
-        if (!steps_valid(d->track[k].step, d->track[k].length))
+        if (!steps_valid(d->track[k].step, d->track[k].length) || !swing_valid(d->track[k].swing))
             return 0;
     memcpy(&p->track[SEQ_S_TRACKS], d->track, sizeof d->track);
     return 1;
@@ -111,8 +116,10 @@ void seq_init(seq_t *s)
     seq_defaults(&s->pat);
     s->bpm = 120;
     s->next = SEQ_NO_PATTERN;
-    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++) {
         s->step[k] = -1;
+        s->pend_q8[k] = SEQ_FAR;
+    }
     s->due_q8 = SEQ_FAR;
     s->ext_step_q8 = (int32_t)(SEQ_STEP_Q8_BPM / 120u);
 }
@@ -123,13 +130,13 @@ static int32_t straight_q8(const seq_t *s)
     return s->ext ? s->ext_step_q8 : (int32_t)(SEQ_STEP_Q8_BPM / s->bpm);
 }
 
-/* the step played count-th since the start: the first of each pair takes swing % of the pair (at most 2 x 5644800 x
- * 75: within 32 bits) */
-static int32_t step_q8(const seq_t *s, uint32_t count)
+/* (0.25) the steps come on a straight grid; a track's swing puts the second of each pair later: by (2 x swing - 100)
+ * % of a step (its first takes swing % of the pair), less than half a step (5644800 x 50: within 32 bits) */
+static int32_t swing_q8(const seq_t *s, uint32_t track, uint32_t count)
 {
-    const uint32_t st = (uint32_t)straight_q8(s);
-    const uint32_t first = 2u * st * s->pat.swing / 100u;
-    return (int32_t)((count & 1u) ? 2u * st - first : first);
+    if (!(count & 1u))
+        return 0;
+    return straight_q8(s) * (int32_t)(2u * seq_track_swing(&s->pat, track) - 100u) / 100;
 }
 
 uint32_t seq_bpm(const seq_t *s)
@@ -144,17 +151,19 @@ int32_t seq_quantize(const seq_t *s, uint32_t track, int *ahead)
         return -1;
     const int32_t step = s->step[track];
     const uint32_t length = s->pat.track[track].length ? s->pat.track[track].length : 1u;
-    if (step < 0) {                      /* started, its first step not yet played: that one, ahead */
+    if (s->count_in)                     /* counting in: not yet */
+        return -1;
+    if (step < 0 && !s->start_due) {     /* started, its first step not yet played: that one, ahead */
         *ahead = 1;
         return 0;
     }
     int late;                            /* past the step's first half */
     if (s->ext)                          /* by the clock in: 6 ticks a step, the step's on the first */
         late = s->ext_ticks && (s->ext_ticks - 1u) % SEQ_CLOCKS_PER_STEP >= SEQ_CLOCKS_PER_STEP / 2u;
-    else {                               /* by the time to the next step, of the one playing's */
-        const int32_t len = step_q8(s, s->count ? s->count - 1u : 0u);
-        late = s->due_q8 != SEQ_FAR && s->due_q8 * 2 < len;
-    }
+    else                                 /* by the time to the next step (a straight one) */
+        late = s->due_q8 != SEQ_FAR && s->due_q8 * 2 < straight_q8(s);
+    if (step < 0)                        /* the count-in's last step: late in it, the first step's */
+        return late ? (*ahead = 1, 0) : -1;
     if (!late)
         return step;
     *ahead = 1;
@@ -187,6 +196,7 @@ static void steps_reset(seq_t *s)
     for (uint32_t k = 0; k < SEQ_TRACKS; k++) {
         s->step[k] = -1;
         s->skip[k] = 0;
+        s->pend_q8[k] = SEQ_FAR;
     }
     s->pat_steps = 0;
 }
@@ -225,11 +235,62 @@ void seq_load(seq_t *s, const seq_pattern_t *src)
     steps_reset(s);
 }
 
-/* the next step of every track, at at_q8 (each round its own length): its notes start (one already sounding on
- * the track is ended first), and end after its length */
+/* a track's step: its notes start at at_q8 (one already sounding on the track is ended first), and end gate later */
+static void play_step(seq_t *s, uint32_t track, uint32_t step, int32_t at_q8, int32_t gate, seq_event_t *ev,
+                      uint32_t *ne, uint32_t max)
+{
+    const seq_step_t *t = &s->pat.track[track].step[step];
+    if (!t->on)
+        return;
+    s->hits[track]++;
+    for (uint32_t k = 0; k < t->n && k < SEQ_NOTES; k++) {
+        const uint8_t note = t->note[k];
+        for (uint32_t i = 0; i < s->nsounding; i++)
+            if (s->sounding[i].note == note && s->sounding[i].track == track) {   /* sounding: ended, anew */
+                put(ev, ne, max, at_q8, SEQ_EV_OFF, note, 0, (uint8_t)track);
+                s->sounding[i] = s->sounding[--s->nsounding];
+                break;
+            }
+        if (s->nsounding >= SEQ_SOUNDING)
+            continue;
+        put(ev, ne, max, at_q8, SEQ_EV_ON, note, t->vel, (uint8_t)track);
+        s->sounding[s->nsounding].note = note;
+        s->sounding[s->nsounding].track = (uint8_t)track;
+        s->sounding[s->nsounding].off_q8 = at_q8 + gate;
+        s->nsounding++;
+    }
+}
+
+/* the steps swung later that come before limit_q8 */
+static void flush_pending(seq_t *s, int32_t limit_q8, seq_event_t *ev, uint32_t *ne, uint32_t max)
+{
+    for (uint32_t track = 0; track < SEQ_TRACKS; track++)
+        if (s->pend_q8[track] < limit_q8) {
+            play_step(s, track, s->pend_step[track], s->pend_q8[track], s->pend_gate[track], ev, ne, max);
+            s->pend_q8[track] = SEQ_FAR;
+        }
+}
+
+/* the next step of every track, at at_q8 (each round its own length): its notes start then, or (the second of a pair)
+ * as late as the track's swing puts them, and end an eighth of a step before the end of their length's last step.
+ * Counting in, only the beats */
 static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_t max)
 {
     const uint32_t count = s->count++;
+    const int32_t st = straight_q8(s);
+    if (s->count_in) {                   /* a count-in: a beat on each quarter note, the tracks waiting */
+        if (count % 4u == 0u)
+            put(ev, ne, max, at_q8, SEQ_EV_BEAT, count % 16u == 0u, 0, 0);
+        if (--s->count_in == 0u) {
+            s->count = 0;                /* (the first step next: on the beat, unswung) */
+            s->start_due = 1;
+        }
+        return;
+    }
+    if (s->start_due) {                  /* the count-in over: MIDI start with the first step */
+        s->start_due = 0;
+        put(ev, ne, max, at_q8, SEQ_EV_START, 0, 0, 0);
+    }
     if (s->pat_steps >= seq_length(&s->pat)) {   /* the pattern's end: the next one in, if it is ready */
         s->pat_steps = 0;
         if (s->next_ready && s->next != SEQ_NO_PATTERN && s->edits == s->saved) {
@@ -258,27 +319,14 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
         }
         if (!t->on)
             continue;
-        s->hits[track]++;
-        int32_t gate = 0;
-        for (uint32_t k = 0; k < t->len; k++)
-            gate += step_q8(s, count + k);
-        gate -= straight_q8(s) / 8;
-        for (uint32_t k = 0; k < t->n && k < SEQ_NOTES; k++) {
-            const uint8_t note = t->note[k];
-            for (uint32_t i = 0; i < s->nsounding; i++)
-                if (s->sounding[i].note == note && s->sounding[i].track == track) {   /* sounding: ended, anew */
-                    put(ev, ne, max, at_q8, SEQ_EV_OFF, note, 0, (uint8_t)track);
-                    s->sounding[i] = s->sounding[--s->nsounding];
-                    break;
-                }
-            if (s->nsounding >= SEQ_SOUNDING)
-                continue;
-            put(ev, ne, max, at_q8, SEQ_EV_ON, note, t->vel, (uint8_t)track);
-            s->sounding[s->nsounding].note = note;
-            s->sounding[s->nsounding].track = (uint8_t)track;
-            s->sounding[s->nsounding].off_q8 = at_q8 + gate;
-            s->nsounding++;
-        }
+        const int32_t late = swing_q8(s, track, count);
+        const int32_t gate = (int32_t)t->len * st + swing_q8(s, track, count + t->len) - late - st / 8;
+        if (late > 0) {                  /* swung: when its time comes (before the next step) */
+            s->pend_q8[track] = at_q8 + late;
+            s->pend_gate[track] = gate;
+            s->pend_step[track] = (uint8_t)step;
+        } else
+            play_step(s, track, (uint32_t)step, at_q8, gate, ev, ne, max);
     }
 }
 
@@ -295,7 +343,8 @@ static void start(seq_t *s, int ext, int cont, seq_event_t *ev, uint32_t *ne, ui
     } else {
         s->due_q8 = 0;
         s->clock_q8 = 0;
-        put(ev, ne, max, 0, SEQ_EV_START, 0, 0, 0);
+        if (!s->count_in)                /* (counting in: MIDI start with the first step) */
+            put(ev, ne, max, 0, SEQ_EV_START, 0, 0, 0);
     }
 }
 
@@ -305,6 +354,8 @@ static void stop(seq_t *s, seq_event_t *ev, uint32_t *ne, uint32_t max)
     if (!s->ext)
         put(ev, ne, max, 0, SEQ_EV_STOP, 0, 0, 0);
     s->playing = 0;
+    s->count_in = 0;
+    s->start_due = 0;
     steps_reset(s);
     s->due_q8 = SEQ_FAR;
 }
@@ -327,10 +378,8 @@ void seq_midi_clock(seq_t *s)
         s->win_samples = s->win_ticks = 0;
     }
     if (s->playing) {
-        if (s->ext_ticks % SEQ_CLOCKS_PER_STEP == 0) {   /* a step: on the tick, the second of a pair swung later */
-            const int32_t st = s->ext_step_q8;
-            s->due_q8 = (s->count & 1u) ? st * (int32_t)(2u * s->pat.swing - 100u) / 100 : 0;
-        }
+        if (s->ext_ticks % SEQ_CLOCKS_PER_STEP == 0)   /* a step: on the tick (its tracks' swing delays their notes) */
+            s->due_q8 = 0;
         s->ext_ticks++;
     }
 }
@@ -340,6 +389,8 @@ void seq_midi_start(seq_t *s, int cont)
     /* at once, not at the next block: the first clock may come in with it (the first step on it) */
     s->all_off = 1;
     s->ext = 1;
+    s->count_in = 0;                     /* (the clock in's start: no count-in) */
+    s->start_due = 0;
     s->ext_quiet = 0;
     s->playing = 1;
     if (!cont) {
@@ -387,7 +438,7 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
         if (s->ext_quiet > SEQ_EXT_TIMEOUT) {   /* the clock in stopped: on our own tempo, from the next step */
             s->ext = 0;
             if (s->playing && s->due_q8 == SEQ_FAR) {
-                s->due_q8 = step_q8(s, s->count);
+                s->due_q8 = straight_q8(s);
                 s->clock_q8 = 0;
             }
         }
@@ -395,14 +446,18 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
     if (s->playing) {
         while (s->due_q8 < span) {
             const int32_t at = s->due_q8;
-            const uint32_t count = s->count;
+            flush_pending(s, at + 1, ev, &ne, max);   /* (a swung step comes before the next) */
             fire(s, at, ev, &ne, max);
             if (s->ext) {
                 s->due_q8 = SEQ_FAR;     /* the next on its clock in */
                 break;
             }
-            s->due_q8 = at + step_q8(s, count);
+            s->due_q8 = at + straight_q8(s);
         }
+        flush_pending(s, span, ev, &ne, max);   /* the swung steps due in this block; the others nearer */
+        for (uint32_t track = 0; track < SEQ_TRACKS; track++)
+            if (s->pend_q8[track] != SEQ_FAR)
+                s->pend_q8[track] -= span;
         for (uint32_t i = 0; i < s->nsounding;) {   /* the notes that end in this block */
             if (s->sounding[i].off_q8 < span) {
                 put(ev, &ne, max, s->sounding[i].off_q8, SEQ_EV_OFF, s->sounding[i].note, 0, s->sounding[i].track);

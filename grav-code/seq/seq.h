@@ -1,5 +1,6 @@
 /* GRAV CODE's sequencer: 8 tracks (S1..S4 the synth's, 0.16; D1..D4 the drums', 0.17) of 64 steps in 4 pages of 16,
- * each its own length of 1..64 (polymeters), one tempo and swing, MIDI clock out and in. It runs in the audio
+ * each its own length of 1..64 (polymeters) and swing (0.25; the pattern's, or its own), one tempo, MIDI clock
+ * out and in. It runs in the audio
  * interrupt: each block it gives the events that fall in it, at their sample offsets on a 24-sample grid (app.c renders between them: 0.5 ms, not a block's 5.8 ms). The UI edits the pattern
  * (under plat_lock) and asks for start and stop through want. */
 #pragma once
@@ -33,7 +34,9 @@ typedef struct {
 
 typedef struct {
     uint8_t length;                      /* steps that play, 1..SEQ_STEPS */
-    uint8_t rsv[3];
+    uint8_t swing;                       /* (0.25) its own swing, SEQ_SWING_MIN..MAX; 0 (as saved before): the
+                                          * pattern's */
+    uint8_t rsv[2];
     seq_step_t step[SEQ_STEPS];
 } seq_track_t;
 
@@ -41,7 +44,8 @@ typedef struct {
     uint32_t magic;                      /* SEQ_MAGIC */
     uint16_t bpm;                        /* the tempo it was saved with (SEQ_BPM_MIN..MAX); since 0.18 the song's
                                           * tempo is seq_t's, every pattern's */
-    uint8_t swing;                       /* SEQ_SWING_MIN..MAX: the first of each pair of steps' share, in % */
+    uint8_t swing;                       /* SEQ_SWING_MIN..MAX: the first of each pair of steps' share, in %: every
+                                          * track's but those with their own (seq_track_t.swing) */
     uint8_t rsv;
     seq_track_t track[SEQ_TRACKS];
     uint32_t drum_magic;                 /* SEQ_MAGIC_DRUMS: the end of the drum tracks' record */
@@ -105,6 +109,12 @@ typedef struct {
     volatile uint8_t skip[SEQ_TRACKS];   /* (0.24) a step + 1 a track does not play when it next comes (a note
                                           * recorded live just ahead of it: already heard); 0: none */
     volatile uint8_t beats;              /* (0.24) SEQ_EV_BEAT on every quarter note (the UI: the metronome on) */
+    volatile uint8_t count_in;           /* (0.25) steps of a count-in still to come before the first (set with
+                                          * want = SEQ_WANT_PLAY): only the beats sound, the tracks wait */
+    uint8_t start_due;                   /* the count-in over: MIDI start with the next step */
+    int32_t pend_q8[SEQ_TRACKS];         /* (0.25) a track's step swung later, still to play: when (SEQ_FAR: none), */
+    int32_t pend_gate[SEQ_TRACKS];       /* its notes' length, */
+    uint8_t pend_step[SEQ_TRACKS];       /* which step */
     int32_t due_q8;                      /* samples x 256 from this block's start to the next step (SEQ_FAR: none) */
     int32_t clock_q8;                    /* to the next MIDI clock out (24 a quarter note, straight) */
     uint32_t ext_ticks;                  /* MIDI clocks in since the start: every 6th is a step */
@@ -123,6 +133,11 @@ void seq_midi_clock(seq_t *s);           /* audio interrupt, MIDI in: a clock (F
 void seq_midi_start(seq_t *s, int cont); /* audio interrupt, MIDI in: start (FA) or continue (FB); stop (FC) is
                                           * want = SEQ_WANT_STOP */
 uint32_t seq_bpm(const seq_t *s);        /* the tempo playing: the song's, or the clock in's */
+/* (0.25) a track's swing: its own, or the pattern's */
+static inline uint32_t seq_track_swing(const seq_pattern_t *p, uint32_t track)
+{
+    return p->track[track].swing ? p->track[track].swing : p->swing;
+}
 /* (0.24) live recording, under plat_lock: the step of a track a note played now goes to, quantized: the one playing
  * while in its first half, else the next (*ahead = 1: it has not played yet); -1 when not playing */
 int32_t seq_quantize(const seq_t *s, uint32_t track, int *ahead);

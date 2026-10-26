@@ -363,10 +363,79 @@ int main(void)
     run(&s, 100);
     CHECK(count(SEQ_EV_BEAT) == 0, "no beats unless asked");
 
+    /* (0.25) a track's own swing: track 1 at 75 % on a straight pattern: its second of each pair three quarters of the
+     * pair in, track 0's on the grid; its notes' end swung too; a bad swing refused */
+    fresh(&s);
+    for (uint32_t i = 0; i < SEQ_PAGE; i++) {
+        s.pat.track[1].step[i].on = 1;
+        s.pat.track[1].step[i].note[0] = 72;
+    }
+    s.pat.track[1].swing = 75;
+    s.want = SEQ_WANT_PLAY;
+    run(&s, 200);
+    {
+        uint32_t k0 = 0, k1 = 0;
+        for (uint32_t i = 0; i < nlog; i++) {
+            if (log_[i].e.type != SEQ_EV_ON)
+                continue;
+            if (log_[i].e.track == 0 && k0 < 8) {
+                CHECK(log_[i].t == grid(k0 * step), "straight track: step %u at %u", k0, log_[i].t);
+                k0++;
+            } else if (log_[i].e.track == 1 && k1 < 8) {
+                double at = (k1 / 2) * 2 * step + ((k1 & 1) ? 1.5 * step : 0.0);
+                CHECK(log_[i].t == grid(at), "swung track: step %u at %u, not %u", k1, log_[i].t, grid(at));
+                k1++;
+            }
+        }
+        CHECK(k0 == 8 && k1 == 8, "both tracks played: %u %u", k0, k1);
+        uint32_t offs = 0;                   /* track 1's first note (step 0) ends where step 1 starts, less an eighth */
+        for (uint32_t i = 0; i < nlog && !offs; i++)
+            if (log_[i].e.type == SEQ_EV_OFF && log_[i].e.track == 1)
+                offs = log_[i].t;
+        CHECK(offs == grid(1.5 * step - step / 8), "a swung track's gate: %u, not %u", offs, grid(1.5 * step - step / 8));
+    }
+    {
+        static seq_pattern_t p;
+        seq_defaults(&p);
+        p.track[2].swing = 49;
+        CHECK(!seq_valid(&p), "a track's swing below 50 refused");
+        p.track[2].swing = 0;
+        CHECK(seq_valid(&p) && seq_track_swing(&p, 2) == p.swing, "0: the pattern's swing");
+    }
+
+    /* (0.25) a count-in: a bar of beats (4, the first marked), no notes, no MIDI start; then MIDI start and the first
+     * step on the next bar's first beat; quantizing waits for the count-in's last half step */
+    fresh(&s);
+    s.count_in = 16;
+    s.want = SEQ_WANT_PLAY;
+    run(&s, 1);
+    {
+        int ahead = 0;
+        CHECK(seq_quantize(&s, 0, &ahead) == -1, "counting in: nothing recorded yet");
+    }
+    run(&s, 320);                        /* 82176 samples: in the count-in's 15th step */
+    {
+        int ahead = 0;
+        CHECK(seq_quantize(&s, 0, &ahead) == -1, "counting in, a step before the last: nothing recorded");
+    }
+    run(&s, 10);                         /* 84736: early in its last step (82687..88200) */
+    CHECK(count(SEQ_EV_ON) == 0 && count(SEQ_EV_START) == 0 && count(SEQ_EV_BEAT) == 4, "a count-in: 4 beats only (%u)",
+          count(SEQ_EV_BEAT));
+    {
+        int ahead = 0;
+        CHECK(seq_quantize(&s, 0, &ahead) == -1, "early in the count-in's last step: nothing");
+        run(&s, 6);                      /* 86272: late in it */
+        CHECK(seq_quantize(&s, 0, &ahead) == 0 && ahead, "late in the count-in's last step: the first step, ahead");
+    }
+    run(&s, 24);
+    CHECK(find(SEQ_EV_START, 0) == grid(16 * step) && find(SEQ_EV_ON, 0) == grid(16 * step) &&
+          find(SEQ_EV_BEAT, 3) == grid(12 * step), "the first step after a bar: %u", find(SEQ_EV_ON, 0));
+    CHECK(s.count_in == 0, "the count-in over");
+
     if (fails) {
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats)\n");
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats, a track's swing, count-in)\n");
     return 0;
 }

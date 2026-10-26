@@ -7,7 +7,7 @@
 #   grav-code/build/host/grav_code_host grav-code/tests/rec.txt grav-code/build/host
 wait 600
 expect page 8
-expect metro_off 0
+expect metro 0
 expect clicks 0
 listen
 # PLAY, REC: recording live; no click yet without a beat since
@@ -71,7 +71,7 @@ tap GLO
 wait 30
 turn K3 -1
 wait 30
-expect metro_off 1
+expect metro 1
 said METRONOME OFF
 expect dirty 1
 tap HOME
@@ -85,7 +85,7 @@ tap GLO
 wait 30
 turn K3 1
 wait 30
-expect metro_off 0
+expect metro 0
 tap HOME
 wait 600
 expect clicks >5
@@ -159,7 +159,7 @@ tap SAVE
 wait 100
 reboot
 wait 600
-expect metro_off 1
+expect metro 1
 # the click heard: every track empty (S1 cleared too), recording live: with the metronome off, silence; on, the
 # clicks alone, well under full scale
 press SEQ
@@ -187,5 +187,76 @@ wait 1000
 expect clicks >1
 expect peak_db_min -40
 expect peak_db_max -6
+tap PLAY
+wait 60
+# (0.25) a track's own swing: K2 on S1 its own; S2 still the pattern's; SEQ held and K2: the pattern's, every track's
+# own gone (SEQ let go: no step mode)
+turn K2 5
+wait 30
+expect track_swing 55
+expect seq_swing 55
+said SWING 55%
+turn SELECT 1
+wait 1600
+expect track_swing 0
+expect seq_swing 50
+press SEQ
+wait 30
+turn K2 10
+wait 30
+release SEQ
+wait 30
+expect step_mode 0
+expect seq_swing 60
+said SWING ALL 60%
+turn SELECT -1
+wait 1600
+expect track_swing 0
+expect seq_swing 60
+# (0.25) the count-in: METRONOME at COUNT; REC (stopped), PLAY: a bar's four clicks first, no step played, a note
+# early in it not recorded
+tap GLO
+wait 30
+turn K3 1
+wait 30
+expect metro 2
+said METRONOME COUNT
+tap HOME
+wait 30
+tap REC
+wait 30
+expect clicks 9
+tap PLAY
+wait 30
+said COUNT IN
+expect count_in 15
+expect seq_step -1
+key 7 down 100 0
+wait 60
+key 7 up
+wait 30
+expect step0 0
+wait 1900
+expect count_in 0
+expect clicks 14
+expect seq_step 0
+# (0.25) MIDI in's notes recorded live too, with their velocity; the length from the note-off
+midi 90 48 50
+wait 260
+midi 80 48 00
+wait 30
+expect step1 1
+expect stepnote1 72
+expect stepvel1 80
+expect steplen1 2
+# (0.25) SEQ held while recording live: the steps it passes erased (a loop: all); let go: no step mode
+press SEQ
+wait 2100
+said ERASE S1
+release SEQ
+wait 30
+expect step1 0
+expect step_mode 0
+expect rec 1
 tap PLAY
 wait 60

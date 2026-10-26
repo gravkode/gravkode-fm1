@@ -13,13 +13,12 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.24.0**, live recording: REC while playing records what you play into the selected track, each
-note on its nearest step, with its velocity and length; notes together make a chord; a metronome clicks while
-recording (GLO's METRONOME: REC or OFF); SEQ held and REC clears a track. Before it: 0.23, the sequencer's screen
-(HOME the selected track as a piano roll, step mode all eight tracks as a grid); 0.22, the sound editor (independent
-engine controls, a complete six-operator FM editor, knobs in the Octatrack's manner); 0.21, ALGO picks the engine
-and PRESET its sounds. HOME advances pages; hold HOME and turn SELECT to jump. [All sound
-controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.25.0**, recording finished: each track its own swing (SWING on SEQ; SEQ held: the pattern's); a
+bar's count-in before recording from a stop (GLO's METRONOME at COUNT); notes from a MIDI keyboard recorded too; SEQ
+held while recording erases the steps it passes. Before it: 0.24, live recording (REC while playing, quantized, with
+a metronome; SEQ held and REC clears a track); 0.23, the sequencer's screen (HOME the selected track as a piano
+roll, step mode all eight tracks as a grid); 0.22, the sound editor. HOME advances pages; hold HOME and turn SELECT
+to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's piano roll of one track, and step mode's grid of all eight"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
@@ -121,7 +120,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.24.0.fwsc 0.24.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.25.0.fwsc 0.25.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -136,7 +135,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.24.0      # grav-code/build/grav_code-0.24.0.fwsc
+python3 tools/build.py grav-code --release 0.25.0      # grav-code/build/grav_code-0.25.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)

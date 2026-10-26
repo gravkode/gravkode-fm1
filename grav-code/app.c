@@ -23,6 +23,8 @@ enum { FX_DENSITY, FX_TIME, FX_SIZE, FX_SHAPE, FX_PITCH, FX_FEEDBACK, FX_DRY_WET
 static const uint8_t FX_DEFAULT[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};   /* (DRY/WET and REVERB 0: off) */
 
 #define SET_MAGIC 0x47525639u
+/* GLO's METRONOME: clicks while recording live; OFF; COUNT: and a bar's count-in when recording starts from a stop */
+enum { METRO_REC, METRO_OFF, METRO_COUNT };
 #define PREV_SET_MAGIC 0x54504C32u
 #define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -53,7 +55,7 @@ typedef struct {
     /* 0.18: the song's tempo (every pattern's), and the pattern it was on */
     uint16_t bpm;                        /* SEQ_BPM_MIN..SEQ_BPM_MAX */
     uint8_t pattern;                     /* 0..BANK_PATTERNS - 1 */
-    uint8_t metro_off;                   /* 0.24: GLO's METRONOME off (0, as saved before: it clicks while recording) */
+    uint8_t metro;                       /* 0.24: GLO's METRONOME, METRO_*: REC (0, as saved before), OFF, COUNT */
     /* 0.19: the drums' knobs beyond TONE and DECAY (drum_osc's TIMBRE and MORPH): TUNE (50: as the note), and SHAPE's
      * three (dsp/grav_drums.h); drum_osc's HARMONICS unread since */
     uint8_t drum_tune[SYNTH_D_TRACKS];
@@ -64,7 +66,7 @@ typedef struct {
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
 #define SET_SIZE_016 56                  /* as 0.16 saved it: up to trk_reserved[] (no drums) */
 #define SET_SIZE_017 72                  /* as 0.17 saved it: up to drum_osc[] (the tempo the pattern's) */
-#define SET_SIZE_018 76                  /* as 0.18 saved it: up to metro_off, then reserved (the drums on Plaits'
+#define SET_SIZE_018 76                  /* as 0.18 saved it: up to metro, then reserved (the drums on Plaits'
                                           * three knobs) */
 #define SET_SIZE_021 92
 _Static_assert(sizeof(settings_t) == 1404 && SET_SIZE_021 == __builtin_offsetof(settings_t, controls) && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
@@ -220,6 +222,20 @@ static int32_t clamp_percent(int32_t value)
 
 static volatile uint32_t midi_last, midi_last_port, midi_count;   /* the last message in (shown), and how many */
 static volatile uint32_t midi_program;       /* a program change in, + 1 (0: none): the pattern (patterns()) */
+/* (0.25) MIDI in's notes to record live: the audio interrupt's queue, the main loop's to empty (rec_midi) */
+#define REC_MIDI_N 32u
+static volatile uint8_t rec_midi_on;     /* recording live: queue them */
+static volatile uint16_t rec_midi_q[REC_MIDI_N];   /* note | velocity << 8 (0: off) */
+static volatile uint32_t rec_midi_head, rec_midi_tail;
+
+static void rec_midi_put(uint32_t note, uint32_t vel)   /* audio interrupt */
+{
+    if (!rec_midi_on || rec_midi_head - rec_midi_tail >= REC_MIDI_N)
+        return;
+    rec_midi_q[rec_midi_head % REC_MIDI_N] = (uint16_t)(note | vel << 8);
+    rec_midi_head++;
+}
+
 static void midi_in(void)                    /* audio interrupt: the packets that came in */
 {
     uint32_t pkt;
@@ -231,12 +247,15 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             midi_last_port = (uint32_t)port;
             midi_count++;
         }
-        if ((st & 0xF0u) == 0x90u && d2) {      /* (any channel: the track selected) */
+        if ((st & 0xF0u) == 0x90u && d2) {      /* (any channel: the track selected; recording live: recorded) */
             synth_audio_mute = 0u;
             synth_track_note_on(&synth, track_sel, (int32_t)d1, d2);
+            rec_midi_put(d1, d2);
         }
-        else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u)
+        else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
             synth_track_note_off(&synth, track_sel, (int32_t)d1);
+            rec_midi_put(d1, 0);
+        }
         else if (st == 0xF8u)                /* clock, start, continue, stop: the sequencer follows them */
             seq_midi_clock(&seq);
         else if (st == 0xFAu || st == 0xFBu)
@@ -294,6 +313,7 @@ static struct {
     uint32_t left;                       /* samples still to come */
 } click;
 static volatile uint32_t clicks;         /* clicks begun (the tests) */
+
 
 static void click_start(int accent)
 {
@@ -526,7 +546,7 @@ static void settings_defaults(void)
     drum_defaults(&set);
     set.bpm = 120;
     set.pattern = 0;
-    set.metro_off = 0;
+    set.metro = METRO_REC;
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) grav_controls_init(&set.controls[t]);
 }
 
@@ -595,10 +615,10 @@ void app_init(void)
             if (loaded <= SET_SIZE_017) {    /* (saved before 0.18: the tempo the pattern's, on pattern 1) */
                 loaded_settings.bpm = 120;
                 loaded_settings.pattern = 0;
-                loaded_settings.metro_off = 0;
+                loaded_settings.metro = METRO_REC;
             }
-            if (loaded_settings.metro_off > 1u)   /* (a byte reserved before 0.24) */
-                loaded_settings.metro_off = 0;
+            if (loaded_settings.metro > METRO_COUNT)   /* (a byte reserved before 0.24) */
+                loaded_settings.metro = METRO_REC;
             if (loaded_settings.bpm < SEQ_BPM_MIN || loaded_settings.bpm > SEQ_BPM_MAX ||
                 loaded_settings.pattern >= BANK_PATTERNS)
                 valid = 0;
@@ -730,6 +750,8 @@ void app_init(void)
 }
 
 /* --------------------------------------------------------------------- UI --- */
+#define LIVE_MIDI 8u                         /* MIDI in's notes held at once while recording live */
+#define LIVE_SLOTS (NKEYS + LIVE_MIDI)
 static struct {
     char msg[2][24];                     /* a short message over the header */
     uint32_t msg_until;
@@ -751,15 +773,19 @@ static struct {
     int8_t step_held;                    /* the step a white key holds (K1..K3 edit it); -1: none */
     uint8_t step_was_on, step_edited;    /* (a step on, let go untouched, goes off) */
     uint8_t seq_down, seq_used;          /* SEQ held; and a white key pressed meanwhile (the length: no mode change) */
+    uint8_t erasing;                     /* (0.25) SEQ held while recording live: erasing */
+    uint32_t seq_at;                     /* SEQ pressed, when */
+    uint8_t shown_count;                 /* the count-in's beat the screen shows (0: none) */
     uint8_t rec, rec_pos;                /* REC (stopped): the next chord goes to rec_pos */
     uint32_t key_step;                   /* the keys pressed as steps (let go as steps) */
     uint8_t chord_open, chord_n, chord_vel, chord[SEQ_NOTES];   /* the notes held together, as they came */
     uint8_t rec_live;                    /* (0.24) REC while playing: the keys' notes written as they play */
     uint8_t live_track, live_step, live_ahead, live_pattern;   /* the last note recorded live (a chord: the next */
     uint32_t rec_at;                     /* within LIVE_CHORD_MS to the same step) and when */
-    uint32_t live_keys;                  /* the keys recorded live and still held: */
-    uint8_t live_key_step[NKEYS], live_key_track[NKEYS];   /* each one's step and track, and when it was */
-    uint32_t live_key_at[NKEYS];         /* pressed (its length when it is let go) */
+    uint8_t live_held[LIVE_SLOTS];       /* the notes recorded live still held, a slot each (a key's: its number;
+                                          * MIDI in's: NKEYS on): */
+    uint8_t live_slot_step[LIVE_SLOTS], live_slot_track[LIVE_SLOTS], live_slot_note[LIVE_SLOTS];   /* its step, */
+    uint32_t live_slot_at[LIVE_SLOTS];   /* track, note, and when (its length when let go) */
     uint8_t last_n, last_vel, last_chord[SEQ_NOTES];             /* the last chord: a new step's */
     uint32_t beat_count, beat_at;        /* PLAY's green: the last beat, and the bar's first */
     uint8_t beat_bar;
@@ -1145,6 +1171,8 @@ static void voices_turn(int32_t e)
 }
 
 /* GLO's knobs: K1 VOICES (MONO, 2, 3, 4), K2 VELOCITY (right: on, the keys' own; left: off, fixed), K3 the version */
+static const char *const METRO_NAME[3] = {"REC", "OFF", "COUNT"};
+
 static void glo_turn(uint32_t index, int32_t e)
 {
     if (index == 0u) {
@@ -1156,13 +1184,15 @@ static void glo_turn(uint32_t index, int32_t e)
             set_dirty = 1;
         }
         app_say("VELOCITY", set.velocity_off ? "OFF" : "ON");
-    } else {                                 /* METRONOME: clicks while recording live, or none */
-        uint8_t off = e < 0;
-        if (off != set.metro_off) {
-            set.metro_off = off;
+    } else {                                 /* METRONOME: OFF, REC (clicks while recording live), COUNT (and a count-in) */
+        static const uint8_t ORDER[3] = {METRO_OFF, METRO_REC, METRO_COUNT};
+        const int32_t at = set.metro == METRO_OFF ? 0 : set.metro == METRO_REC ? 1 : 2;
+        const uint8_t m = ORDER[clamp(at + (e > 0 ? 1 : -1), 0, 2)];
+        if (m != set.metro) {
+            set.metro = m;
             set_dirty = 1;
         }
-        app_say("METRONOME", set.metro_off ? "OFF" : "REC");
+        app_say("METRONOME", METRO_NAME[set.metro]);
     }
 }
 
@@ -1517,14 +1547,22 @@ static void seq_turn(uint32_t index, int32_t e)
         int_text(seq.bpm, t);
         app_say("TEMPO", t);
         set_dirty = 1;
-    } else if (index == 1u) {                /* the pattern's */
+    } else if (index == 1u) {                /* the selected track's own (0.25); SEQ held: the pattern's, every track's */
+        const int all = ui.seq_down;
         uint32_t f = plat_lock();
-        seq.pat.swing = (uint8_t)clamp((int32_t)seq.pat.swing + e, SEQ_SWING_MIN, SEQ_SWING_MAX);
+        if (all) {
+            seq.pat.swing = (uint8_t)clamp((int32_t)seq.pat.swing + e, SEQ_SWING_MIN, SEQ_SWING_MAX);
+            for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+                seq.pat.track[k].swing = 0;
+        } else
+            TRK.swing = (uint8_t)clamp((int32_t)seq_track_swing(&seq.pat, track_sel) + e, SEQ_SWING_MIN, SEQ_SWING_MAX);
         seq.edits++;
         plat_unlock(f);
-        int_text(seq.pat.swing, t);
+        if (all)
+            ui.seq_used = 1;                 /* (SEQ let go: no step mode) */
+        int_text((int32_t)seq_track_swing(&seq.pat, track_sel), t);
         text_cat(t, "%");
-        app_say("SWING", t);
+        app_say(all ? "SWING ALL" : "SWING", t);
     } else {
         length_set((int32_t)TRK.length + e);
         int_text(TRK.length, t);
@@ -1705,7 +1743,7 @@ static void chord_done(void)
  * LIVE_CHORD_MS of it join it as a chord (up to four). Its velocity is the key's (or GLO's fixed one); its length,
  * how long the key is held, in steps (at least one). A drum track's: the drum's note, whatever the key. */
 #define LIVE_CHORD_MS 60u
-static void live_note(uint32_t k, int32_t note, uint32_t vel)
+static void live_note(uint32_t slot, int32_t note, uint32_t vel)
 {
     const uint32_t now = plat_ms(), t = track_sel;
     const uint8_t n8 = (uint8_t)(SYNTH_IS_DRUM(t) ? DRUM_NOTE[t - SYNTH_S_TRACKS] : clamp(note, 0, 127));
@@ -1744,29 +1782,52 @@ static void live_note(uint32_t k, int32_t note, uint32_t vel)
         ui.live_ahead = (uint8_t)ahead;
         ui.live_pattern = seq.pattern;
     }
-    ui.live_keys |= 1u << k;
-    ui.live_key_step[k] = (uint8_t)s;
-    ui.live_key_track[k] = (uint8_t)t;
-    ui.live_key_at[k] = now;
+    ui.live_held[slot] = 1;
+    ui.live_slot_step[slot] = (uint8_t)s;
+    ui.live_slot_track[slot] = (uint8_t)t;
+    ui.live_slot_note[slot] = (uint8_t)clamp(note, 0, 127);
+    ui.live_slot_at[slot] = now;
 }
 
-static void live_release(uint32_t k)         /* a key recorded live let go: its step's length, as long as it was held */
+static void live_release(uint32_t slot)      /* a note recorded live let go: its step's length, as long as it was held */
 {
-    if (!(ui.live_keys & 1u << k))
+    if (!ui.live_held[slot])
         return;
-    ui.live_keys &= ~(1u << k);
+    ui.live_held[slot] = 0;
     if (ui.live_pattern != seq.pattern)      /* (another pattern came in meanwhile) */
         return;
     const uint32_t step_ms = 15000u / (seq_bpm(&seq) ? seq_bpm(&seq) : 120u);
-    const uint32_t len = (uint32_t)clamp((int32_t)((plat_ms() - ui.live_key_at[k] + step_ms / 2u) / step_ms), 1,
+    const uint32_t len = (uint32_t)clamp((int32_t)((plat_ms() - ui.live_slot_at[slot] + step_ms / 2u) / step_ms), 1,
                                          (int32_t)SEQ_STEPS);
     uint32_t f = plat_lock();
-    seq_step_t *st = &seq.pat.track[ui.live_key_track[k]].step[ui.live_key_step[k]];
+    seq_step_t *st = &seq.pat.track[ui.live_slot_track[slot]].step[ui.live_slot_step[slot]];
     if (st->on && len > st->len) {           /* (a chord: its longest) */
         st->len = (uint8_t)len;
         seq.edits++;
     }
     plat_unlock(f);
+}
+
+/* (0.25) MIDI in's notes while recording live (rec_midi_on): queued by the audio interrupt (midi_in), recorded here as
+ * the keys' are, each in a slot of its own (NKEYS on) until its note-off */
+static void rec_midi(void)
+{
+    while (rec_midi_tail != rec_midi_head) {
+        const uint32_t e = rec_midi_q[rec_midi_tail % REC_MIDI_N], note = e & 127u, vel = e >> 8;
+        rec_midi_tail++;
+        uint32_t slot = LIVE_SLOTS;
+        for (uint32_t i = NKEYS; i < LIVE_SLOTS; i++)
+            if (ui.live_held[i] && ui.live_slot_note[i] == note)
+                slot = i;
+        if (vel) {
+            if (slot < LIVE_SLOTS)           /* (on again before its off: that one let go first) */
+                live_release(slot);
+            for (slot = NKEYS; slot < LIVE_SLOTS && ui.live_held[slot]; slot++) {}
+            if (slot < LIVE_SLOTS && ui.rec && seq.playing)
+                live_note(slot, (int32_t)note, vel);
+        } else if (slot < LIVE_SLOTS)
+            live_release(slot);
+    }
 }
 
 /* SEQ held, REC: the selected track's steps all off (its length kept) */
@@ -1809,7 +1870,26 @@ static void lights(uint32_t btn, uint32_t keys)
     }
     if (!ui.rec)
         ui.rec_live = 0;
-    seq.beats = (uint8_t)(ui.rec && seq.playing && !set.metro_off);   /* the metronome: while recording live */
+    seq.beats = (uint8_t)(ui.rec && seq.playing && set.metro != METRO_OFF);   /* the metronome: while recording live */
+    rec_midi_on = (uint8_t)(ui.rec && seq.playing);   /* (MIDI in's notes recorded too) */
+    if (ui.rec && seq.playing && ui.seq_down && now - ui.seq_at >= 150u) {   /* SEQ held while recording live: the
+                                                                              * selected track's steps erased as they come */
+        const int32_t st = seq.step[track_sel];
+        if (st >= 0 && TRK.step[st].on) {
+            uint32_t f = plat_lock();
+            TRK.step[st].on = 0;
+            seq.edits++;
+            plat_unlock(f);
+        }
+        if (!ui.erasing) {
+            ui.erasing = 1;
+            ui.seq_used = 1;                 /* (SEQ let go: no step mode) */
+            app_say("ERASE", TRACK_NAME[track_sel]);
+        }
+    } else if (ui.erasing && !ui.seq_down) {
+        ui.erasing = 0;
+        ui.redraw = 1;
+    }
     for (uint32_t t = 0; t < SEQ_TRACKS; t++)    /* a track's note begun: its lights flash */
         if (seq.hits[t] != ui.shown_hits[t]) {
             ui.shown_hits[t] = seq.hits[t];
@@ -2060,9 +2140,11 @@ static void input(void)
             if (seq.playing) {
                 seq.want = SEQ_WANT_STOP;
                 app_say("STOP", "");
-            } else {                         /* (REC on: recording live from the start) */
+            } else {                         /* (REC on: recording live from the start; COUNT: after a bar) */
+                const int count = ui.rec && set.metro == METRO_COUNT && !seq.ext;
+                seq.count_in = count ? 16u : 0u;
                 seq.want = SEQ_WANT_PLAY;
-                app_say(ui.rec ? "REC" : "PLAY", ui.rec ? "LIVE" : seq.ext ? "MIDI CLOCK" : "");
+                app_say(ui.rec ? "REC" : "PLAY", ui.rec ? (count ? "COUNT IN" : "LIVE") : seq.ext ? "MIDI CLOCK" : "");
             }
         } else if (k == B_REC) {             /* stopped: step recording, the keys' notes and chords one step each;
                                               * playing: live recording; SEQ held: the track cleared */
@@ -2097,6 +2179,7 @@ static void input(void)
         } else if (k == B_SEQ) {             /* step mode on or off when let go; held, a white key is the length */
             ui.seq_down = 1;
             ui.seq_used = 0;
+            ui.seq_at = plat_ms();
         } else if (k == B_EDIT) {            /* FREEZE: the effect's recording held, or let go */
             fx_freeze = !fx_freeze;
             app_say("FREEZE", fx_freeze ? "ON" : "OFF");
@@ -2267,6 +2350,7 @@ static void input(void)
         ui.redraw = 1;
     ui.keys = keys;
     ui.btn = btn;
+    rec_midi();                              /* (MIDI in's notes, recording live) */
     if (ui.step_mode && active_page != PAGE_SEQ) {   /* another page opened (LFO, ENV, FX, GLO, HOME + SELECT): the
                                                   * white keys play again; step mode is SEQ's page alone */
         ui.step_mode = 0;
@@ -2399,6 +2483,7 @@ typedef struct {
     char value[16];
     int32_t frac;
     uint8_t centred;
+    uint8_t inherit;                     /* (SEQ's SWING) the pattern's, not the track's own: its value grey */
     const char *hint;
 } knob_t;
 
@@ -2406,6 +2491,7 @@ static void knob_get(uint32_t i, knob_t *k)
 {
     k->hint = "";
     k->centred = 0;
+    k->inherit = 0;
     k->value[0] = 0;
     if (active_page == PAGE_SEQ) {
         static const char *const HELD[3] = {"NOTE", "VELOCITY", "LENGTH"};
@@ -2429,11 +2515,12 @@ static void knob_get(uint32_t i, knob_t *k)
                 int_text(bpm, k->value);
                 k->frac = clamp(bpm - (int32_t)SEQ_BPM_MIN, 0, SEQ_BPM_MAX - SEQ_BPM_MIN) * 25600 /
                           (int32_t)(SEQ_BPM_MAX - SEQ_BPM_MIN);
-            } else if (i == 1u) {
-                int_text(seq.pat.swing, k->value);
+            } else if (i == 1u) {            /* the selected track's (grey: the pattern's) */
+                const int32_t sw = (int32_t)seq_track_swing(&seq.pat, track_sel);
+                int_text(sw, k->value);
                 text_cat(k->value, "%");
-                k->frac = ((int32_t)seq.pat.swing - (int32_t)SEQ_SWING_MIN) * 25600 /
-                          (int32_t)(SEQ_SWING_MAX - SEQ_SWING_MIN);
+                k->inherit = !TRK.swing;
+                k->frac = (sw - (int32_t)SEQ_SWING_MIN) * 25600 / (int32_t)(SEQ_SWING_MAX - SEQ_SWING_MIN);
             } else {
                 int_text(TRK.length, k->value);
                 k->frac = ((int32_t)TRK.length - 1) * 25600 / ((int32_t)SEQ_STEPS - 1);
@@ -2451,8 +2538,8 @@ static void knob_get(uint32_t i, knob_t *k)
             text_cat(k->value, set.velocity_off ? "OFF" : "ON");
             k->frac = set.velocity_off ? 0 : 25600;
         } else {
-            text_cat(k->value, set.metro_off ? "OFF" : "REC");
-            k->frac = set.metro_off ? 0 : 25600;
+            text_cat(k->value, METRO_NAME[set.metro]);
+            k->frac = set.metro == METRO_OFF ? 0 : set.metro == METRO_REC ? 12800 : 25600;
         }
         return;
     }
@@ -2595,7 +2682,7 @@ static void draw_chips(int32_t y0, uint32_t mask, int32_t xoffset)
         dial_face(x, y, 10 + knob_grow(i, 2), &k, i, hot, 2, 4);
         cv_text(x + 17, y0 + 2, &FONT_T, k.name, hot ? C_HI : C_GRAY);
         const felucca_font_t *font = text_w(&FONT_S, k.value) <= 46 ? &FONT_S : &FONT_XS;
-        cv_text(x + 17, y0 + 16, font, k.value, C_WHITE);
+        cv_text(x + 17, y0 + 16, font, k.value, k.inherit ? C_GRAY : C_WHITE);
     }
 }
 static void draw_knobs(void)
@@ -3056,8 +3143,12 @@ static void draw_seq_band(void)
         cv_text(8, y, &FONT_XS, seq.playing ? "PLAY" : "STOP", seq.playing ? C_HI : C_GRAY);
         if (ui.rec) {                        /* REC and its step; recording live: LIVE (and the metronome's state) */
             cv_text(48, y, &FONT_XS, "REC", RGB(240, 55, 45));
-            if (seq.playing)
-                cv_text(74, y, &FONT_XS, "LIVE", C_WHITE);
+            if (seq.playing && ui.shown_count) {   /* counting in: the beats to come */
+                t[0] = 'I'; t[1] = 'N'; t[2] = ' ';
+                int_text(ui.shown_count, t + 3);
+                cv_text(74, y, &FONT_XS, t, C_HI);
+            } else if (seq.playing)
+                cv_text(74, y, &FONT_XS, ui.erasing ? "ERASE" : "LIVE", ui.erasing ? C_HI : C_WHITE);
             else {
                 int_text(ui.rec_pos + 1, t);
                 cv_text(74, y, &FONT_XS, t, C_WHITE);
@@ -3302,6 +3393,14 @@ void app_frame(void)
             ui.redraw_grid = 1;
         if (ui.tracks_until || ui.patterns_until || ui.home_shown || ui.preset_shown || ui.splash_until)
             ui.redraw_grid = 0;              /* (a list over the strip: left as it is until the list goes) */
+        {                                    /* counting in: its beats to come, 4 .. 1 (in the bottom band) */
+            const uint32_t c = seq.count_in, n = !seq.playing ? 0u : c >= 16u ? 4u : c ? 4u - (15u - c) / 4u :
+                               seq.start_due ? 1u : 0u;
+            if (n != ui.shown_count) {
+                ui.shown_count = (uint8_t)n;
+                ui.redraw = 1;
+            }
+        }
         if (ui.vol_at && now - ui.vol_at >= 1300u) {   /* the volume's moment over */
             ui.vol_at = 0;
             ui.redraw = 1;
@@ -3511,7 +3610,7 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "seq_bpm"))       /* the tempo playing (the clock in's when following one) */
         *got = (int)seq_bpm(&seq);
     else if (!strcmp(what, "seq_swing"))
-        *got = seq.pat.swing;
+        *got = (int)seq_track_swing(&seq.pat, track_sel);   /* (0.25: the selected track's) */
     else if (!strcmp(what, "seq_length"))
         *got = TRK.length;
     else if (!strcmp(what, "seq_ext"))       /* following MIDI clock in */
@@ -3526,8 +3625,12 @@ int app_expect(const char *what, int *got)
         *got = ui.rec_live;
     else if (!strcmp(what, "clicks"))
         *got = (int)clicks;
-    else if (!strcmp(what, "metro_off"))
-        *got = set.metro_off;
+    else if (!strcmp(what, "metro"))         /* METRO_*: 0 REC, 1 OFF, 2 COUNT */
+        *got = set.metro;
+    else if (!strcmp(what, "count_in"))      /* the count-in's steps still to come */
+        *got = seq.count_in;
+    else if (!strcmp(what, "track_swing"))   /* the selected track's own swing (0: the pattern's) */
+        *got = TRK.swing;
     else if (!strcmp(what, "seq_skip"))      /* the selected track's step + 1 not played next (0: none) */
         *got = seq.skip[track_sel];
     else if (!strcmp(what, "seq_ahead")) {   /* a note now would go to the next step (late in the one playing) */

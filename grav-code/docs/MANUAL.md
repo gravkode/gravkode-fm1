@@ -206,7 +206,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002400, version 0.24.0](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002500, version 0.25.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -214,7 +214,7 @@ The firmware and its global settings:
 | --- | --- | --- |
 | K1 | VOICES | The selected synth track's: OFF, MONO (each track's at first), 2, 3, 4; four in all (section 8). A drum track's: DRUM, its own |
 | K2 | VELOCITY | ON (right: the keys play as they land), OFF (left: at a fixed 100) |
-| K3 | METRONOME | REC (right: a click on each quarter note while recording live, the bar's first higher and louder), OFF (left) |
+| K3 | METRONOME | OFF (left); REC (middle: a click on each quarter note while recording live, the bar's first higher and louder); COUNT (right: REC, and a bar's count-in when recording starts from a stop) |
 
 Under them, the package's identity (the installer's) and the firmware's version. Section 8 has more on VOICES and
 VELOCITY, section 5 on the metronome.
@@ -266,7 +266,8 @@ The page shows the selected track alone, as a piano roll:
 - **The pages:** four bars under it, the one shown amber, with a white mark travelling through all four where the
   track plays.
 - **In the bottom band**, small: **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's),
-  **K2 SWING** (50 % straight to 75 %, the pattern's), **K3 LENGTH** (the selected track's, 1 to 64 steps). A step
+  **K2 SWING** (the selected track's, 50 % straight to 75 %: grey while it follows the pattern's; with SEQ held, the
+  pattern's, every track's), **K3 LENGTH** (the selected track's, 1 to 64 steps). A step
   held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead. Under them: PLAY or STOP; REC and the
   step while step recording, REC LIVE while recording live, STEP in step mode, or CLOCK while following a MIDI clock; the pattern (P1 to P16) and,
   blinking, the next one (>3); UNSAVED while the sound's preset has changes not saved (PENDING while it waits to
@@ -315,7 +316,8 @@ recording, live.
 While the sequencer plays, REC records what you play into the selected track as it goes round (PLAY red, REC
 lighting on each beat, REC LIVE in the bottom band; the page shows the track's piano roll, following the page
 playing). REC again stops recording and the sequencer plays on; stopping (PLAY) ends it too. REC while stopped and
-then PLAY records from the first step.
+then PLAY records from the first step (with METRONOME at COUNT, after a bar of clicks: IN 4 .. IN 1 in the bottom
+band; nothing plays or records meanwhile but a note in the last half step, which goes to the first).
 
 - **Each note goes to the nearest step** (always quantized): to the step playing if you played it in the first half
   of that step, or to the next one if in the second half. That next step does not play it again this time round:
@@ -325,11 +327,15 @@ then PLAY records from the first step.
 - **A step's first note replaces** what the step held; every other step stays as it was. Play over a loop to change
   some notes and keep the rest.
 - **On a drum track** any key records the drum's hit.
+- **MIDI in's notes** (a keyboard over USB or TRS) are recorded the same way, with their own velocity and length.
+- **Hold SEQ while recording to erase:** the selected track's steps are switched off as the sequencer passes them
+  (ERASE in the bottom band), for as long as SEQ is held. Letting SEQ go then does not switch step mode.
 - SELECT picks the track as usual, so you can record one track, then the next, without stopping.
 
 **The metronome:** GLO's K3 METRONOME at REC (as it comes) clicks on each quarter note while recording live, the
-bar's first higher and louder; at OFF it stays silent. The click is mixed after the effect, at MASTER's volume. It is
-saved with the settings.
+bar's first higher and louder; at COUNT it also counts a bar in when recording starts from a stop (REC, then PLAY;
+not while following a MIDI clock); at OFF it stays silent. The click is mixed after the effect, at MASTER's volume.
+It is saved with the settings.
 
 **Clearing a track:** hold SEQ and press REC: the selected track's steps all go off (its length stays), playing or
 stopped. SEQ let go then does not switch step mode.
@@ -338,7 +344,9 @@ stopped. SEQ let go then does not switch step mode.
 
 PLAY starts from step 1; PLAY again stops, and every note it holds ends. PLAY's green LED flashes on each beat,
 longer on the first of each bar. A step's note lasts its length in steps, ending an eighth of a step before the
-next. SWING delays every second step: 50 % is straight, about 67 % a triplet feel, 75 % the most.
+next. SWING delays every second step: 50 % is straight, about 67 % a triplet feel, 75 % the most. Each track has its
+own (K2 on the selected one), or follows the pattern's (SEQ held and K2 sets that one and makes every track follow
+it): a swung hi-hat over a straight kick, say.
 
 ### Patterns (HOME held, K4)
 

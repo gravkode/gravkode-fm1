@@ -13,12 +13,12 @@
 
 ---
 
-Текущая версия: **0.24.0**, живая запись: REC во время игры записывает сыгранное в выбранную дорожку, каждую ноту на
-ближайший шаг, с её силой и длиной; ноты, взятые вместе, — аккорд; при записи щёлкает метроном (GLO, METRONOME: REC
-или OFF); SEQ зажат + REC очищает дорожку. До этого: 0.23 — экран секвенсора (на HOME piano roll выбранной дорожки,
-в шаговом режиме сетка всех восьми); 0.22 — редактор звука (дополнительные настройки движков, полный редактор шести
-операторов FM, ручки в духе Octatrack); 0.21 — ALGO выбирает движок, PRESET — его звуки. HOME листает страницы; HOME
-зажат + SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
+Текущая версия: **0.25.0**, доводка записи: у каждой дорожки свой свинг (SWING на SEQ; SEQ зажат — свинг паттерна);
+такт отсчёта перед записью со стопа (GLO, METRONOME: COUNT); ноты с MIDI-клавиатуры тоже записываются; SEQ зажат во
+время записи стирает проходимые шаги. До этого: 0.24 — живая запись (REC во время игры, с квантованием и метрономом;
+SEQ зажат + REC очищает дорожку); 0.23 — экран секвенсора (на HOME piano roll дорожки, в шаговом режиме сетка всех
+восьми); 0.22 — редактор звука. HOME листает страницы; HOME зажат + SELECT переключает их быстро. [Все параметры и
+управление](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: piano roll одной дорожки на HOME и сетка всех восьми в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
@@ -122,7 +122,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.24.0.fwsc 0.24.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.25.0.fwsc 0.25.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -137,7 +137,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.24.0      # grav-code/build/grav_code-0.24.0.fwsc
+python3 tools/build.py grav-code --release 0.25.0      # grav-code/build/grav_code-0.25.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
