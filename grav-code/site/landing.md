@@ -11,7 +11,8 @@ and comes in over USB and TRS. ALGO chooses the engine, PRESET its sound: four f
 engine and 64 user slots, saved with held SAVE and a white key. The sound editor (0.22) adds independent engine
 controls, all six FM operators, small animated knobs and extended preset storage; HOME advances pages, held
 HOME with SELECT jumps between them. The sequencer's screen (0.23) shows the selected track as a piano roll on
-HOME, and all eight tracks as a grid in step mode, both moving as they play.
+HOME, and all eight tracks as a grid in step mode, both moving as they play. Live recording (0.24): REC while
+playing records the keys into the selected track, quantized, with a metronome.
 
 ![GRAV CODE on the FM-1's screen: a chord on CHORDS, its sound page with its knobs](manual/img/screen-playing.png "A chord on CHORDS")
 

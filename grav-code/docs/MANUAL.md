@@ -92,7 +92,7 @@ From the top:
 | SEL | SEED: a grain by hand; held 2 s, the grains on their own again. Lit while they come on their own |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
-| REC | Stopped: step recording (section 5) |
+| REC | Stopped: step recording; playing: live recording (section 5). Held SEQ, then REC: the selected track cleared |
 | MASTER | The volume, glided: no step in the sound |
 | SAVE | Tap: stores settings and pattern. Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
@@ -206,7 +206,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, version 0.23.0, ID FM-1_73002300, 24 engines](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002400, version 0.24.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -214,9 +214,10 @@ The firmware and its global settings:
 | --- | --- | --- |
 | K1 | VOICES | The selected synth track's: OFF, MONO (each track's at first), 2, 3, 4; four in all (section 8). A drum track's: DRUM, its own |
 | K2 | VELOCITY | ON (right: the keys play as they land), OFF (left: at a fixed 100) |
-| K3 | VERSION | the firmware's version, said aloud |
+| K3 | METRONOME | REC (right: a click on each quarter note while recording live, the bar's first higher and louder), OFF (left) |
 
-Under them, the package's identity (the installer's) and the number of engines. Section 8 has more on both settings.
+Under them, the package's identity (the installer's) and the firmware's version. Section 8 has more on VOICES and
+VELOCITY, section 5 on the metronome.
 GLO again opens DEBUG, the two cores' timings (section 11).
 
 ### FX GRAIN, FX SHAPE, FX MIX (FX)
@@ -267,7 +268,7 @@ The page shows the selected track alone, as a piano roll:
 - **In the bottom band**, small: **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's),
   **K2 SWING** (50 % straight to 75 %, the pattern's), **K3 LENGTH** (the selected track's, 1 to 64 steps). A step
   held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead. Under them: PLAY or STOP; REC and the
-  step while recording, STEP in step mode, or CLOCK while following a MIDI clock; the pattern (P1 to P16) and,
+  step while step recording, REC LIVE while recording live, STEP in step mode, or CLOCK while following a MIDI clock; the pattern (P1 to P16) and,
   blinking, the next one (>3); UNSAVED while the sound's preset has changes not saved (PENDING while it waits to
   be written); CPU. A message (OCTAVE, PATTERN, the volume as it moves) takes the line's left part for a moment.
 - **SELECT** picks the track (recording: moves the step).
@@ -306,8 +307,32 @@ selected one lit, one with voices mid (a drum track always), one without dim, ea
 
 Stopped, REC starts step recording (PLAY red, REC blinking): the notes you play go into the steps one after the
 other, from the first step of the page shown. A chord (keys held together, up to four) or a single note fills one
-step, at its velocity. SELECT moves to another step (to leave one as it is). REC again, or PLAY, ends it. Recording
-while the sequencer plays comes in a later version.
+step, at its velocity. SELECT moves to another step (to leave one as it is). REC again ends it; PLAY goes on
+recording, live.
+
+### Live recording (REC while playing)
+
+While the sequencer plays, REC records what you play into the selected track as it goes round (PLAY red, REC
+lighting on each beat, REC LIVE in the bottom band; the page shows the track's piano roll, following the page
+playing). REC again stops recording and the sequencer plays on; stopping (PLAY) ends it too. REC while stopped and
+then PLAY records from the first step.
+
+- **Each note goes to the nearest step** (always quantized): to the step playing if you played it in the first half
+  of that step, or to the next one if in the second half. That next step does not play it again this time round:
+  you have just heard it.
+- **Its velocity** is the key's (or GLO's fixed one); **its length**, how long you hold the key, in steps (at least
+  one). Notes played within 60 ms of each other make a chord on one step, up to four.
+- **A step's first note replaces** what the step held; every other step stays as it was. Play over a loop to change
+  some notes and keep the rest.
+- **On a drum track** any key records the drum's hit.
+- SELECT picks the track as usual, so you can record one track, then the next, without stopping.
+
+**The metronome:** GLO's K3 METRONOME at REC (as it comes) clicks on each quarter note while recording live, the
+bar's first higher and louder; at OFF it stays silent. The click is mixed after the effect, at MASTER's volume. It is
+saved with the settings.
+
+**Clearing a track:** hold SEQ and press REC: the selected track's steps all go off (its length stays), playing or
+stopped. SEQ let go then does not switch step mode.
 
 ### Playing (PLAY)
 

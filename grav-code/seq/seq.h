@@ -69,7 +69,9 @@ typedef struct {                         /* 0.15's record: one track */
 } seq_pattern_v1_t;
 
 /* a block's events, in the order to apply them: by offset, a note's end before a note's start at the same one */
-enum { SEQ_EV_OFF = 1, SEQ_EV_STOP, SEQ_EV_START, SEQ_EV_CLOCK, SEQ_EV_ON };
+enum { SEQ_EV_OFF = 1, SEQ_EV_STOP, SEQ_EV_START, SEQ_EV_CLOCK, SEQ_EV_ON,
+       SEQ_EV_BEAT };                    /* (0.24) a quarter note begins, while beats is set: the metronome's click
+                                          * (note 1: the bar's first) */
 typedef struct {
     uint16_t at;                         /* sample offset in the block, a multiple of SEQ_GRID */
     uint8_t type, note, vel, track;      /* a note's track (0..SEQ_TRACKS - 1) */
@@ -100,6 +102,9 @@ typedef struct {
     volatile int32_t step[SEQ_TRACKS];   /* each track's step playing, 0..its length - 1; -1: none yet */
     volatile uint32_t hits[SEQ_TRACKS];  /* notes each track began (the screen's and the lights' flashes) */
     volatile uint32_t count;             /* steps played since the start (their parity swings them) */
+    volatile uint8_t skip[SEQ_TRACKS];   /* (0.24) a step + 1 a track does not play when it next comes (a note
+                                          * recorded live just ahead of it: already heard); 0: none */
+    volatile uint8_t beats;              /* (0.24) SEQ_EV_BEAT on every quarter note (the UI: the metronome on) */
     int32_t due_q8;                      /* samples x 256 from this block's start to the next step (SEQ_FAR: none) */
     int32_t clock_q8;                    /* to the next MIDI clock out (24 a quarter note, straight) */
     uint32_t ext_ticks;                  /* MIDI clocks in since the start: every 6th is a step */
@@ -118,6 +123,9 @@ void seq_midi_clock(seq_t *s);           /* audio interrupt, MIDI in: a clock (F
 void seq_midi_start(seq_t *s, int cont); /* audio interrupt, MIDI in: start (FA) or continue (FB); stop (FC) is
                                           * want = SEQ_WANT_STOP */
 uint32_t seq_bpm(const seq_t *s);        /* the tempo playing: the song's, or the clock in's */
+/* (0.24) live recording, under plat_lock: the step of a track a note played now goes to, quantized: the one playing
+ * while in its first half, else the next (*ahead = 1: it has not played yet); -1 when not playing */
+int32_t seq_quantize(const seq_t *s, uint32_t track, int *ahead);
 /* a pattern's length: its longest track's of those with a step on (SEQ_PAGE if none has) */
 uint32_t seq_length(const seq_pattern_t *p);
 int seq_has_steps(const seq_pattern_t *p);

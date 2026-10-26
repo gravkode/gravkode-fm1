@@ -13,12 +13,13 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.23.0**, the sequencer's screen: HOME shows the selected track as a piano roll (its notes at
-their pitch and length, a line sweeping across in time, notes flashing as they play); step mode (SEQ) shows all
-eight tracks as a grid, a row each, every track's step playing moving; SEQ's knobs small in the bottom band. After
-0.22, the sound editor — independent engine controls, a complete six-operator FM editor, small animated knobs in the
-Octatrack's manner and extended presets (0.21: ALGO picks the engine, PRESET its sounds). HOME advances pages; hold
-HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.24.0**, live recording: REC while playing records what you play into the selected track, each
+note on its nearest step, with its velocity and length; notes together make a chord; a metronome clicks while
+recording (GLO's METRONOME: REC or OFF); SEQ held and REC clears a track. Before it: 0.23, the sequencer's screen
+(HOME the selected track as a piano roll, step mode all eight tracks as a grid); 0.22, the sound editor (independent
+engine controls, a complete six-operator FM editor, knobs in the Octatrack's manner); 0.21, ALGO picks the engine
+and PRESET its sounds. HOME advances pages; hold HOME and turn SELECT to jump. [All sound
+controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's piano roll of one track, and step mode's grid of all eight"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
@@ -120,7 +121,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.23.0.fwsc 0.23.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.24.0.fwsc 0.24.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -135,7 +136,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.23.0      # grav-code/build/grav_code-0.23.0.fwsc
+python3 tools/build.py grav-code --release 0.24.0      # grav-code/build/grav_code-0.24.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -143,7 +144,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

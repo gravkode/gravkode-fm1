@@ -13,12 +13,12 @@
 
 ---
 
-Текущая версия: **0.23.0**, экран секвенсора: на HOME выбранная дорожка — piano roll (ноты на своей высоте и своей
-длины, линия проигрывания идёт в такт, ноты вспыхивают); в шаговом режиме (SEQ) — сетка всех восьми дорожек, по
-строке на дорожку, у каждой движется свой играющий шаг; ручки SEQ — маленькие, в нижней полосе. До этого, в 0.22,
-редактор звука — дополнительные настройки всех движков, полный редактор шести операторов FM, небольшие анимированные
-ручки в духе Octatrack и расширенные пресеты (0.21: ALGO выбирает движок, PRESET — его звуки). HOME листает
-страницы; HOME зажат + SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
+Текущая версия: **0.24.0**, живая запись: REC во время игры записывает сыгранное в выбранную дорожку, каждую ноту на
+ближайший шаг, с её силой и длиной; ноты, взятые вместе, — аккорд; при записи щёлкает метроном (GLO, METRONOME: REC
+или OFF); SEQ зажат + REC очищает дорожку. До этого: 0.23 — экран секвенсора (на HOME piano roll выбранной дорожки,
+в шаговом режиме сетка всех восьми); 0.22 — редактор звука (дополнительные настройки движков, полный редактор шести
+операторов FM, ручки в духе Octatrack); 0.21 — ALGO выбирает движок, PRESET — его звуки. HOME листает страницы; HOME
+зажат + SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: piano roll одной дорожки на HOME и сетка всех восьми в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
@@ -122,7 +122,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.23.0.fwsc 0.23.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.24.0.fwsc 0.24.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -137,7 +137,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.23.0      # grav-code/build/grav_code-0.23.0.fwsc
+python3 tools/build.py grav-code --release 0.24.0      # grav-code/build/grav_code-0.24.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
@@ -145,7 +145,7 @@ python3 tools/build.py grav-code --web                 # эмулятор в б�
 
 Тесты (`grav-code/tests/`): `basic.txt` (клавиши, октава, сохранение, MIDI), `engines.txt` (все движки звучат),
 `voices.txt` (полифония, MONO, velocity), `fx.txt` (эффект: страницы, FREEZE, SEED, QUALITY, сохранение),
-`seq.txt` (секвенсор), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
+`seq.txt` (секвенсор), `rec.txt` (живая запись, метроном), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
 (паттерны во флеше): `run_seq_test.py`, `screens.txt` (скриншоты). Подробнее — в
 [grav-code/README.md](grav-code/README.md).
 

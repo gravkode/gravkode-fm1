@@ -323,10 +323,50 @@ int main(void)
         CHECK(!seq_from_record(&r, &q) && q.bpm == 133, "not a record: refused");
     }
 
+    /* (0.24) live recording's quantizing: the step playing in its first half, the next in its second; stopped, none */
+    {
+        int ahead = 7;
+        fresh(&s);
+        CHECK(seq_quantize(&s, 0, &ahead) == -1 && ahead == 0, "stopped: no step");
+        s.want = SEQ_WANT_PLAY;
+        run(&s, 1);                      /* step 0 began at 0; 256 samples in */
+        CHECK(seq_quantize(&s, 0, &ahead) == 0 && !ahead, "early in step 0: step 0");
+        run(&s, 12);                     /* 3328 samples: past step 0's half (2756) */
+        CHECK(seq_quantize(&s, 0, &ahead) == 1 && ahead, "late in step 0: step 1, ahead");
+        s.pat.track[0].length = 1;       /* a track of one step: late, the same again */
+        CHECK(seq_quantize(&s, 0, &ahead) == 0 && ahead, "length 1: step 0 again, ahead");
+    }
+    /* the skip: the next step (+ 1) not played as it comes, once (any other step comes first: none); the beats: a quarter note each 4 steps, the bar's
+     * first marked, only while beats is set */
+    fresh(&s);
+    s.want = SEQ_WANT_PLAY;
+    s.beats = 1;
+    s.skip[0] = 3;                       /* (a start clears it) */
+    run(&s, 1);
+    CHECK(s.skip[0] == 0, "a start: no skip");
+    s.skip[0] = 2;                       /* step 1, the next, set while playing */
+    run(&s, 399);                        /* 18.6 steps in all */
+    CHECK(count(SEQ_EV_ON) == 18 && s.skip[0] == 0, "step 1 skipped once: %u notes", count(SEQ_EV_ON));
+    CHECK(find(SEQ_EV_ON, 1) == grid(2 * step), "the note after step 0's is step 2's: %u", find(SEQ_EV_ON, 1));
+    CHECK(count(SEQ_EV_BEAT) == 5, "5 beats in 18.6 steps: %u", count(SEQ_EV_BEAT));
+    for (uint32_t k = 0; k < 5; k++)
+        CHECK(find(SEQ_EV_BEAT, k) == grid(4 * k * step), "beat %u at %u", k, find(SEQ_EV_BEAT, k));
+    {
+        uint32_t marked = 0;
+        for (uint32_t i = 0; i < nlog; i++)
+            if (log_[i].e.type == SEQ_EV_BEAT)
+                marked += log_[i].e.note;
+        CHECK(marked == 2, "the bars' first beats (0 and 16): %u", marked);
+    }
+    fresh(&s);
+    s.want = SEQ_WANT_PLAY;
+    run(&s, 100);
+    CHECK(count(SEQ_EV_BEAT) == 0, "no beats unless asked");
+
     if (fails) {
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns)\n");
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats)\n");
     return 0;
 }

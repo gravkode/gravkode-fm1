@@ -130,16 +130,22 @@ expect rec_pos 2
 turn SELECT 1
 wait 30
 expect rec_pos 3
-# PLAY ends the recording and plays
+# PLAY plays, recording live from the start (0.24; tests/rec.txt); stopped, the recording ends
 tap PLAY
 wait 200
-expect rec 0
+expect rec 1
+expect rec_live 1
 expect seq_playing 1
 tap PLAY
 wait 60
-# REC while playing: not yet (live recording comes later)
+expect rec 0
+# REC while playing: recording live (0.24), REC again: no more
 tap PLAY
 wait 30
+tap REC
+wait 30
+expect rec 1
+expect rec_live 1
 tap REC
 wait 30
 expect rec 0

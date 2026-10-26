@@ -137,6 +137,30 @@ uint32_t seq_bpm(const seq_t *s)
     return SEQ_STEP_Q8_BPM / (uint32_t)straight_q8(s);
 }
 
+int32_t seq_quantize(const seq_t *s, uint32_t track, int *ahead)
+{
+    *ahead = 0;
+    if (!s->playing || track >= SEQ_TRACKS)
+        return -1;
+    const int32_t step = s->step[track];
+    const uint32_t length = s->pat.track[track].length ? s->pat.track[track].length : 1u;
+    if (step < 0) {                      /* started, its first step not yet played: that one, ahead */
+        *ahead = 1;
+        return 0;
+    }
+    int late;                            /* past the step's first half */
+    if (s->ext)                          /* by the clock in: 6 ticks a step, the step's on the first */
+        late = s->ext_ticks && (s->ext_ticks - 1u) % SEQ_CLOCKS_PER_STEP >= SEQ_CLOCKS_PER_STEP / 2u;
+    else {                               /* by the time to the next step, of the one playing's */
+        const int32_t len = step_q8(s, s->count ? s->count - 1u : 0u);
+        late = s->due_q8 != SEQ_FAR && s->due_q8 * 2 < len;
+    }
+    if (!late)
+        return step;
+    *ahead = 1;
+    return (int32_t)(((uint32_t)step + 1u) % length);
+}
+
 static void put(seq_event_t *ev, uint32_t *ne, uint32_t max, int32_t at_q8, uint8_t type, uint8_t note, uint8_t vel,
                 uint8_t track)
 {
@@ -160,8 +184,10 @@ static void all_off(seq_t *s, seq_event_t *ev, uint32_t *ne, uint32_t max)
 
 static void steps_reset(seq_t *s)
 {
-    for (uint32_t k = 0; k < SEQ_TRACKS; k++)
+    for (uint32_t k = 0; k < SEQ_TRACKS; k++) {
         s->step[k] = -1;
+        s->skip[k] = 0;
+    }
     s->pat_steps = 0;
 }
 
@@ -214,6 +240,8 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
         }
     }
     s->pat_steps++;
+    if (s->beats && count % 4u == 0u)    /* a quarter note: the metronome's click (the bar's first: its accent) */
+        put(ev, ne, max, at_q8, SEQ_EV_BEAT, count % 16u == 0u, 0, 0);
     for (uint32_t track = 0; track < SEQ_TRACKS; track++) {
         const seq_track_t *tr = &s->pat.track[track];
         const uint32_t length = tr->length ? tr->length : 1u;
@@ -222,6 +250,12 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
             step = 0;
         s->step[track] = step;
         const seq_step_t *t = &tr->step[step];
+        if (s->skip[track]) {            /* a note recorded live just ahead of this step: heard already, once */
+            const int here = s->skip[track] == (uint8_t)(step + 1);
+            s->skip[track] = 0;
+            if (here)
+                continue;
+        }
         if (!t->on)
             continue;
         s->hits[track]++;
