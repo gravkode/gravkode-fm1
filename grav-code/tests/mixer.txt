@@ -60,14 +60,55 @@ wait 2100
 expect_out USB 90 3C 64
 tap PLAY
 wait 60
-# black key 5 (key 10): D1 selected; the meters fall to rest once silent
-key 10 down 100 0
+# (0.26.1) black key 2 (key 3): S2 soloed: only it sounds, S1's step plays no note; black 1 too: S1 sounds again;
+# both off: as before, S1's mute kept beneath
+tap PLAY
 wait 30
-key 10 up
+key 3 down 100 0
 wait 30
+key 3 up
+wait 30
+expect solo 2
+expect mute 64768
+said S2 SOLO
+out
+wait 2100
+expect_no_out USB 90 3C 64
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+expect solo 3
+out
+wait 2100
+expect_out USB 90 3C 64
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect mute 64513
+key 1 down 100 0
+wait 30
+key 1 up
+key 3 down 100 0
+wait 30
+key 3 up
+wait 30
+expect solo 0
+expect mute 257
+said SOLO OFF
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect mute 0
+tap PLAY
+wait 60
+# SELECT: D1 selected (its LEVEL, SEND); the meters fall to rest once silent
+turn SELECT 4
+wait 1600
 expect send 100
 expect level 100
-said D1
 wait 900
 expect meter 0
 # SEL again: back to SEQ's page; on an FX page SEL is SEED

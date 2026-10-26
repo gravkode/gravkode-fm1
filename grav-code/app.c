@@ -837,6 +837,8 @@ static struct {
     uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
     uint8_t seed_down;                   /* SEL pressed as SEED (on an FX page) and still held */
     uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
+    uint8_t solo;                        /* (0.26.1) the tracks soloed, a bit each (black keys 1..8 on the mixer; not
+                                          * saved): some, and only they sound, whatever their mutes */
     uint32_t patterns_until;             /* K4 turned: the patterns' grid shown until then */
     uint8_t save_req;                    /* SAVE: the pattern too, then SAVED */
     uint8_t full_said;                   /* (no free slot while playing: said once) */
@@ -1893,13 +1895,27 @@ static void rec_midi(void)
 }
 
 /* (0.26) the mixer: a track muted (its steps start no notes, the ones sounding end), or on again */
+static void mutes_apply(void)               /* the tracks the sequencer silences: all but the soloed, or the muted */
+{
+    seq.mute = ui.solo ? (uint8_t)~ui.solo : set.mute;
+}
+
 static void mute_toggle(uint32_t t)
 {
     set.mute ^= (uint8_t)(1u << t);
-    seq.mute = set.mute;
+    mutes_apply();
     set_dirty = 1;
     ui.redraw = 1;
     app_say(TRACK_NAME[t], set.mute >> t & 1u ? "MUTE" : "ON");
+}
+
+/* (0.26.1) a track soloed (the others silent while any is), or not; several at once; the mutes kept beneath */
+static void solo_toggle(uint32_t t)
+{
+    ui.solo ^= (uint8_t)(1u << t);
+    mutes_apply();
+    ui.redraw = 1;
+    app_say(TRACK_NAME[t], ui.solo >> t & 1u ? "SOLO" : "SOLO OFF");
 }
 
 /* the mixer's knobs: K1 the selected track's LEVEL (OUTPUT's, its sound's), K2 its SEND (its share through the
@@ -2078,7 +2094,7 @@ static void lights(uint32_t btn, uint32_t keys)
         }
     }
     if (active_page == PAGE_MIXER && !ui.step_mode) {   /* (0.26) the mixer: white 1..8 a track playing lit, muted
-                                                      * dim; black 1..8 the tracks (selected lit, a note flashes) */
+                                                      * dim; black 1..8 a track soloed lit, else dim (a note flashes) */
         lit_keys = mid_keys = 0;
         for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
             const uint32_t w = 1u << WHITE_KEYS[t], b = 1u << BLACK_KEYS[t];
@@ -2086,10 +2102,12 @@ static void lights(uint32_t btn, uint32_t keys)
                 dim_keys |= w;
             else
                 lit_keys |= w;
-            if (t == track_sel || now - ui.hit_at[t] < 80u)
+            if (ui.solo >> t & 1u)
                 lit_keys |= b;
-            else
+            else if (now - ui.hit_at[t] < 80u)
                 mid_keys |= b;
+            else
+                dim_keys |= b;
         }
     }
     if (ui.home_down) {                      /* HOME held: the patterns on the white keys: the one playing lit, the
@@ -2192,13 +2210,13 @@ static void input(void)
                 continue;
             }
             if (active_page == PAGE_MIXER) {   /* (0.26) the mixer: white 1..8 mute a track (again: on), black 1..8
-                                              * pick one; the other keys silent */
+                                              * solo one (0.26.1; again: not); the other keys silent */
                 int w = key_index(WHITE_KEYS, 16, k), b = key_index(BLACK_KEYS, 11, k);
                 ui.key_mix |= bit;
                 if (w >= 0 && w < (int)SYNTH_TRACKS)
                     mute_toggle((uint32_t)w);
                 else if (b >= 0 && b < (int)SYNTH_TRACKS)
-                    track_select((uint32_t)b);
+                    solo_toggle((uint32_t)b);
                 continue;
             }
             if (ui.step_mode) {              /* step mode: a white key is a step, black 1..8 the tracks */
@@ -3075,7 +3093,7 @@ static void draw_grid(int32_t dy, uint32_t now)
         const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
         if (sel)                             /* the selected track: its row on a warm ground */
             cv_rect(0, y - 1, 240, 13, mix565(C_BLACK, C_AMB, 34));
-        const int muted = set.mute >> t & 1u;   /* (0.26) muted: its name red, its steps dim */
+        const int muted = seq.mute >> t & 1u;   /* (0.26) silent (muted, or another soloed): its name red, steps dim */
         cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], muted ? RGB(240, 55, 45) : sel ? C_HI : C_GRAY);
         for (uint32_t i = 0; i < SEQ_PAGE; i++) {
             const uint32_t s = page * SEQ_PAGE + i;
@@ -3122,13 +3140,15 @@ static void draw_seq(void)
 
 /* (0.26) the mixer (SEL), under the track's line: the eight tracks a strip each, S1..S4 then D1..D4: its name (the
  * selected one's in the theme's colour), its LEVEL as a fader, a meter of its sound beside it (falling back over
- * 0.6 s), its SEND as a bar (its share through the effect), M lit red when it is muted. While it sounds, the strip
- * under the track's line redraws alone, as SEQ's does */
+ * 0.6 s), its SEND as a bar (its share through the effect), M lit red when it is muted, S lit when it is soloed (a
+ * silent track's strip dim). While it sounds, the strip under the track's line redraws alone, as SEQ's does */
 static void draw_mixer_body(int32_t dy)
 {
     const int32_t H = 64;
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
-        const int32_t x = 8 + (int32_t)t * 28, top = 40 + dy, sel = t == track_sel, muted = set.mute >> t & 1u;
+        const int32_t x = 8 + (int32_t)t * 28, top = 40 + dy, sel = t == track_sel;
+        const int muted = seq.mute >> t & 1u, mute = set.mute >> t & 1u, solo = ui.solo >> t & 1u;   /* (silent:
+                                                                     * muted, or another soloed) */
         const int32_t lv = (int32_t)set.controls[t].level * H / 100, m = (int32_t)ui.meter[t] * H / 256;
         if (sel)
             cv_rect(x, 22 + dy, 26, 15, C_HI);
@@ -3142,13 +3162,18 @@ static void draw_mixer_body(int32_t dy)
             cv_rect(x + 16, top + H - 1 - r, 6, 1, r >= H * 7 / 8 ? C_WHITE : r >= H / 2 ? C_HI : C_AMB);
         cv_rect(x + 1, 110 + dy, 22, 4, RGB(24, 24, 30));   /* the send */
         cv_rect(x + 1, 110 + dy, (int32_t)set.send[t] * 22 / 100, 4, muted ? C_DIM : sel ? C_HI : C_GRAY);
-        if (muted)                           /* M: muted, lit */
-            cv_rect(x + 1, 120 + dy, 22, 14, RGB(240, 55, 45));
-        else {
-            cv_rect(x + 1, 120 + dy, 22, 14, C_LINE);
-            cv_rect(x + 2, 121 + dy, 20, 12, C_BLACK);
+        for (uint32_t b = 0; b < 2u; b++) {  /* M: muted, lit red; S (0.26.1): soloed, lit in the theme's colour */
+            const int on = b ? solo : mute;
+            const int32_t bx = x + 1 + (int32_t)b * 12;
+            const char *l = b ? "S" : "M";
+            if (on)
+                cv_rect(bx, 120 + dy, 11, 14, b ? C_HI : RGB(240, 55, 45));
+            else {
+                cv_rect(bx, 120 + dy, 11, 14, C_LINE);
+                cv_rect(bx + 1, 121 + dy, 9, 12, C_BLACK);
+            }
+            cv_text(bx + 6 - text_w(&FONT_T, l) / 2, 121 + dy, &FONT_T, l, on ? C_BLACK : C_DIM);
         }
-        cv_text(x + 12 - text_w(&FONT_XS, "M") / 2, 119 + dy, &FONT_XS, "M", muted ? C_BLACK : C_DIM);
     }
 }
 
@@ -3416,7 +3441,7 @@ static void draw_mixer_band(void)
     if (band_message(t, 160))
         cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
     else
-        cv_text(8, y + 2, &FONT_T, "WHITE 1-8 MUTE  BLACK 1-8 TRACK", C_GRAY);
+        cv_text(8, y + 2, &FONT_T, "WHITE 1-8 MUTE  BLACK 1-8 SOLO", C_GRAY);
     draw_cpu(178, y);
 }
 
@@ -3493,8 +3518,11 @@ static void draw(void)
     cv_text(30, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
     if (fx_freeze)                           /* the effect frozen: on every page (and EDIT lit) */
         cell(172, 2, 60, "FREEZE", 1);
-    if (set.mute >> track_sel & 1u)          /* (0.26) the selected track muted (the mixer): on every page */
+    if (seq.mute >> track_sel & 1u)          /* (0.26) the selected track silent (muted, or another soloed): on every
+                                              * page; soloed (0.26.1): SOLO */
         cv_text(fx_freeze ? 132 : 200, 6, &FONT_XS, "MUTE", RGB(240, 55, 45));
+    else if (ui.solo >> track_sel & 1u)
+        cv_text(fx_freeze ? 132 : 200, 6, &FONT_XS, "SOLO", C_HI);
 
     if (active_page == PAGE_GLO)
         draw_glo();
@@ -3907,6 +3935,8 @@ int app_expect(const char *what, int *got)
         *got = (int)clicks;
     else if (!strcmp(what, "mute"))          /* (0.26) the mixer: the tracks muted (a bit each), the sequencer's too */
         *got = set.mute | seq.mute << 8;
+    else if (!strcmp(what, "solo"))          /* (0.26.1) the tracks soloed */
+        *got = ui.solo;
     else if (!strcmp(what, "send"))          /* the selected track's SEND, LEVEL; the effect's RETURN (DRY/WET) */
         *got = set.send[track_sel];
     else if (!strcmp(what, "level"))

@@ -13,11 +13,11 @@
 
 ---
 
-Текущая версия: **0.26.0**, микшер: SEL открывает полосы восьми дорожек — у каждой фейдер LEVEL, индикатор уровня в
-такт игре, SEND (сколько идёт в эффект) и мьют на белых клавишах 1–8; K3 — RETURN эффекта. До этого: 0.25.1 — экран
-в бирюзовом, цвета выбираются на второй странице GLO; 0.25 — доводка записи (свинг дорожек, отсчёт, запись с
-MIDI-клавиатуры, стирание); 0.24 — живая запись с метрономом; 0.23 — экран секвенсора. HOME листает страницы; HOME
-зажат + SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
+Текущая версия: **0.26.1**, микшер: SEL открывает полосы восьми дорожек — у каждой фейдер LEVEL, индикатор уровня в
+такт игре, SEND (сколько идёт в эффект) мьют на белых клавишах 1–8 и соло на чёрных 1–8; K3 — RETURN эффекта. До
+этого: 0.25.1 — экран в бирюзовом, цвета выбираются на второй странице GLO; 0.25 — доводка записи (свинг дорожек,
+отсчёт, запись с MIDI-клавиатуры, стирание); 0.24 — живая запись с метрономом; 0.23 — экран секвенсора. HOME листает
+страницы; HOME зажат + SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: piano roll одной дорожки на HOME и сетка всех восьми в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
@@ -61,7 +61,7 @@ MIDI-клавиатуры, стирание); 0.24 — живая запись �
 | FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
 | FX ещё раз | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | GLO ещё раз | DEBUG | одно/два ядра | сброс пиков и счётчиков | — |
-| SEL | MIXER | LEVEL (выбранной дорожки) | SEND (доля в эффект) | RETURN (DRY/WET эффекта); белые клавиши 1–8 — мьют дорожек |
+| SEL | MIXER | LEVEL (выбранной дорожки) | SEND (доля в эффект) | RETURN (DRY/WET эффекта); белые клавиши 1–8 — мьют дорожек, чёрные 1–8 — соло |
 
 SELECT выбирает дорожку (S1–S4, D1–D4), для неё работают клавиши, ALGO, PRESET, OSC, VOICES и шаги. Ручка ALGO
 выбирает её движок (на барабанной дорожке: бочка, малый барабан, хай-хэт), OCT- и OCT+ — октаву (от -2 до +2),
@@ -123,7 +123,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.0.fwsc 0.26.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.1.fwsc 0.26.1 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -138,7 +138,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.26.0      # grav-code/build/grav_code-0.26.0.fwsc
+python3 tools/build.py grav-code --release 0.26.1      # grav-code/build/grav_code-0.26.1.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)

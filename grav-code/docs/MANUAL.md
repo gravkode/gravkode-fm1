@@ -206,7 +206,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ### MIXER (SEL)
 
-![The mixer playing: the eight tracks a strip each, S1 selected; each with its fader, its meter moving, its send bar and its M; LEVEL, SEND, RETURN below](img/screen-mixer.png "The mixer")
+![The mixer playing: the eight tracks a strip each, S1 selected; each with its fader, its meter moving, its send bar, its M and S; LEVEL, SEND, RETURN below](img/screen-mixer.png "The mixer")
 
 SEL opens the mixer (from any page but the FX pages, where SEL is SEED); SEL again goes back to the page it was
 opened on. Each track is a strip, S1 to S4 then D1 to D4:
@@ -215,7 +215,8 @@ opened on. Each track is a strip, S1 to S4 then D1 to D4:
 - **its LEVEL** as a fader (its sound's OUTPUT level, the same as on its last sound page, and kept with its preset);
 - **a meter** of its sound beside it, moving as it plays and falling back over 0.6 s;
 - **its SEND** as a bar under them: how much of it goes through the effect; the rest goes past it, dry;
-- **M**, lit red while it is muted.
+- **M**, lit red while it is muted; **S**, lit in the theme's colour while it is soloed. A track silent (muted, or
+  another soloed) has its strip dim.
 
 | Control | What it does |
 | --- | --- |
@@ -223,15 +224,16 @@ opened on. Each track is a strip, S1 to S4 then D1 to D4:
 | K2 SEND | its share through the effect, 0 to 100 % (100 %: all of it, as before 0.26; 0: none, it stays dry) |
 | K3 RETURN | how much of the effect comes back: FX MIX's DRY/WET, the same knob |
 | White keys 1–8 | mute a track (S1 to D4): its steps start no notes and its notes sounding end; again: on. The keys are lit while their track plays, dim while it is muted |
-| Black keys 1–8 | pick a track (as SELECT does) |
+| Black keys 1–8 | solo a track (again: not); several at once. While any track is soloed, only the soloed ones sound, whatever their mutes; the mutes come back as they were once no track is. The keys are lit while their track is soloed. Solos are not saved |
+| SELECT | pick the track K1 and K2 are for |
 
-The other keys do not play on the mixer. A muted track shows MUTE at the top of every page and its row red in step
-mode; the keys still play it. Live recording goes on while muted. SEND and the mutes are saved with the settings
+The other keys do not play on the mixer. A silent track (muted, or another soloed) shows MUTE at the top of every
+page and its row red in step mode; a soloed one shows SOLO. The keys still play a silent track. Live recording goes on while muted. SEND and the mutes are saved with the settings
 (SAVE); settings saved before 0.26 have every track sent whole and none muted.
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002600, version 0.26.0](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002601, version 0.26.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
