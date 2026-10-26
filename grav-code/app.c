@@ -2462,24 +2462,26 @@ static int animate_dials(uint32_t now)
     return 1;
 }
 
-/* SEQ, the sequencer's page, under the track's line:
- *   the selected track's 16 steps of the page shown, in four groups of four: a step on is a bar as tall as its
- *   velocity, a tick at its note's height among the track's notes (a drum's: none), a dot for each further note of a
- *   chord; the step playing flashes white and leaps a little as it begins, then settles; a cursor glides under them;
- *   the pattern's four pages, the one shown lit, the place playing travelling across them;
- *   every track's steps as they play (S1..S4, then D1..D4): the 16 of the page its step playing is in (stopped: of
- *   the page shown, or its last if shorter), each with its own length and step playing (polymeters shown as they
- *   go), a note flashing as it begins, the selected track's in the theme's colour.
+/* SEQ, the sequencer's page, under the track's line, in two views:
+ *   HOME (the page as it opens): the selected track alone, as a piano roll. Its 16 steps of a page across, in four
+ *   beats of four, numbered under them; its notes up and down, the track's lowest and highest named at the left, a
+ *   line at each C: a note is a bar at its pitch, as long as its length, brighter the harder it plays; a chord, a bar
+ *   for each note; a drum track's hits, a block each, bigger the harder. It shows the page playing (stopped, or
+ *   recording: the page shown). As it plays a line sweeps across in time, a note flashes white as it begins.
+ *   SEQ (step mode: the white keys the steps, the black ones the tracks): every track's 16 steps of the page shown,
+ *   a row each, S1..S4 then D1..D4, named at the left; a step on lit (the selected track's in the theme's colour,
+ *   brighter the harder), each track's own length and step playing, a note flashing white as it begins.
+ *   Under either the pattern's four pages, the one shown lit, the place playing travelling across them.
  * TEMPO, SWING and LENGTH are knobs in the bottom band. While it plays the strip under the track's line redraws alone,
- * ~25 times a second (10 while the sound is busy). */
-#define LANE_Y 22                            /* the steps' bars: rows 22..73 */
-#define LANE_H 52
-#define CURSOR_Y 77                          /* the cursor under them */
-#define POS_Y 84                             /* the pages, and where in them it plays */
-#define MAP_Y 93                             /* every track's steps: 8 rows, to 141 */
-#define STRIP_Y LANE_Y                       /* the strip redrawn as it plays: from here to the page's end */
+ * ~30 times a second (10 while the sound is busy). */
+#define STRIP_Y 22                           /* the strip redrawn as it plays: from here to the page's end */
+#define ROLL_Y 22                            /* HOME: the roll, rows 22..109 */
+#define ROLL_H 88
+#define NUM_Y 112                            /* its steps' numbers */
+#define GRID_Y 23                            /* SEQ: the tracks' rows, 13 apart (the drums' 3 lower), to 127 */
+#define POS_Y 132                            /* the pages */
 
-static int32_t step_x(uint32_t i) { return 6 + (int32_t)i * 14 + (int32_t)(i / 4u) * 2; }   /* (16: to 234) */
+static int32_t step_x(uint32_t i) { return 24 + (int32_t)i * 13 + (int32_t)(i / 4u) * 2; }   /* 12 wide (16: to 237) */
 
 static uint16_t mix565(uint16_t a, uint16_t b, int32_t t)   /* a to b, t 0..256 */
 {
@@ -2492,93 +2494,168 @@ static int32_t flash256(uint32_t since, uint32_t ms)   /* a flash's strength: 25
     return since < ms ? 256 - (int32_t)(since * 256u / ms) : 0;
 }
 
-static void draw_seq_body(int32_t dy)        /* the strip (rows STRIP_Y on), drawn dy rows up or down */
+static int32_t step_frac(uint32_t now)       /* how far through the step playing, 0..256 */
 {
-    const uint32_t now = plat_ms(), length = TRK.length, page = ui.view_page;
-    const int32_t playing = seq.playing ? seq.step[track_sel] : -1, drum = SYNTH_IS_DRUM(track_sel);
-    const uint16_t off_cell = RGB(24, 24, 30), bar_lo = mix565(C_LINE, C_AMB, 80);
-    const int32_t flash = playing >= 0 ? flash256(now - ui.step_at, 180u) : 0;
-    const uint32_t step_ms = 15000u / (seq_bpm(&seq) ? seq_bpm(&seq) : 120u);
-    const int32_t frac = playing >= 0 ? clamp((int32_t)((now - ui.step_at) * 256u / step_ms), 0, 256) : 0;
-    int32_t lo = 127, hi = 0;
-    for (uint32_t s = 0; s < length; s++)    /* the track's notes' range, for the ticks' heights */
-        if (TRK.step[s].on) {
-            if (TRK.step[s].note[0] < lo) lo = TRK.step[s].note[0];
-            if (TRK.step[s].note[0] > hi) hi = TRK.step[s].note[0];
-        }
-    for (uint32_t i = 0; i < SEQ_PAGE; i++) {   /* the selected track's steps */
-        const uint32_t s = page * SEQ_PAGE + i;
-        const seq_step_t *st = &TRK.step[s];
-        const int32_t x = step_x(i), y = LANE_Y + dy, here = playing == (int32_t)s;
-        if (s >= length) {                   /* past the length: a dot */
-            cv_rect(x + 5, y + LANE_H - 2, 2, 2, C_LINE);
-            continue;
-        }
-        /* its slot, rounded: a beat's first a little lighter; the one playing lit, brighter as it begins */
-        cv_rect(x, y, 12, LANE_H, here ? mix565(C_LINE, RGB(78, 78, 90), flash) : i % 4u ? RGB(15, 15, 19) : RGB(22, 22, 28));
-        cv_pset(x, y, C_BLACK); cv_pset(x + 11, y, C_BLACK);
-        cv_pset(x, y + LANE_H - 1, C_BLACK); cv_pset(x + 11, y + LANE_H - 1, C_BLACK);
-        if (st->on) {                        /* the bar: dark to the theme's colour as it rises; the one playing white */
-            const int32_t leap = here ? 6 * flash / 256 : 0;
-            const int32_t v = clamp(8 + (int32_t)st->vel * (LANE_H - 12) / 127 + leap, 4, LANE_H);
-            for (int32_t r = 0; r < v; r++) {
-                const uint16_t c = mix565(bar_lo, C_AMB, r * 256 / (LANE_H - 4));
-                cv_rect(x + 1, y + LANE_H - 1 - r, 10, 1, here ? mix565(c, C_WHITE, flash) : c);
-            }
-            cv_rect(x + 1, y + LANE_H - v, 10, 2, here ? mix565(C_HI, C_WHITE, flash) : C_HI);   /* its top */
-            if (!drum) {                     /* its note's height among the track's */
-                const int32_t at = hi > lo ? (int32_t)(st->note[0] - lo) * (LANE_H - 10) / (hi - lo) : (LANE_H - 10) / 2;
-                cv_rect(x + 2, y + LANE_H - 5 - at, 8, 2, C_WHITE);
-            }
-            for (uint32_t k = 1; k < st->n && k < SEQ_NOTES; k++)   /* a chord: a dot for each further note */
-                cv_rect(x + 2 + (int32_t)(k - 1) * 3, y + 3, 2, 2, C_HI);
-        } else
-            cv_rect(x + 3, y + LANE_H - 3, 6, 1, here ? C_GRAY : C_LINE);
-        if (ui.step_held == (int8_t)s) {     /* the step held: framed */
-            cv_rect(x - 1, y - 1, 14, 1, C_WHITE);
-            cv_rect(x - 1, y + LANE_H, 14, 1, C_WHITE);
-            cv_rect(x - 1, y, 1, LANE_H, C_WHITE);
-            cv_rect(x + 12, y, 1, LANE_H, C_WHITE);
-        }
-        if (ui.rec && ui.rec_pos == s)       /* the step recording goes to */
-            cv_rect(x, CURSOR_Y + dy, 12, 2, RGB(240, 55, 45));
-    }
-    {                                        /* the cursor: under the step playing, gliding to the next */
-        const uint32_t last = length > page * SEQ_PAGE ? (length - page * SEQ_PAGE < SEQ_PAGE ?
-                              length - page * SEQ_PAGE : SEQ_PAGE) : 0u;
-        if (last)
-            cv_rect(step_x(0), CURSOR_Y + dy + 1, step_x(last - 1) + 12 - step_x(0), 1, C_LINE);
-        if (playing >= 0 && (uint32_t)playing / SEQ_PAGE == page) {
-            const uint32_t i = (uint32_t)playing % SEQ_PAGE;
-            const int32_t x = step_x(i) + (i + 1u < last ? (step_x(i + 1u) - step_x(i)) * frac / 256 : 0);
-            cv_rect(x, CURSOR_Y + dy, 12, 3, mix565(C_GRAY, C_WHITE, 128 + flash / 2));
-        }
-    }
-    for (uint32_t p = 0; p < SEQ_PAGES; p++) {   /* the pages: the one shown lit; where it plays, travelling */
+    const uint32_t bpm = seq_bpm(&seq), ms = 15000u / (bpm ? bpm : 120u);
+    return clamp((int32_t)((now - ui.step_at) * 256u / ms), 0, 256);
+}
+
+/* the pattern's four pages under either view: the one shown lit; where the selected track plays, travelling */
+static void draw_pages(int32_t dy, uint32_t page, int32_t playing, int32_t frac)
+{
+    for (uint32_t p = 0; p < SEQ_PAGES; p++) {
         const int32_t x = step_x(p * 4u), w = step_x(p * 4u + 3u) + 12 - x;
-        cv_rect(x, POS_Y + dy, w, 3, p * SEQ_PAGE >= length ? off_cell : p == page ? C_HI : C_DIM);
+        cv_rect(x, POS_Y + dy, w, 3, p * SEQ_PAGE >= TRK.length ? RGB(24, 24, 30) : p == page ? C_HI : C_DIM);
     }
     if (playing >= 0) {
         const int32_t x = step_x(0) + (playing * 256 + frac) * (step_x(15) + 12 - step_x(0)) / (int32_t)(SEQ_STEPS * 256u);
         cv_rect(x - 1, POS_Y + dy - 2, 3, 7, C_WHITE);
     }
-    for (uint32_t t = 0; t < SEQ_TRACKS; t++) {   /* every track's steps as they play */
-        const seq_track_t *tr = &seq.pat.track[t];
-        const int32_t y = MAP_Y + dy + (int32_t)t * 6 + (t >= SEQ_S_TRACKS ? 2 : 0);
-        const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
-        const uint32_t last = (tr->length - 1u) / SEQ_PAGE;
-        const uint32_t its = at >= 0 ? (uint32_t)at / SEQ_PAGE : page < last ? page : last;
-        if (t == track_sel)
-            cv_rect(1, y, 3, 4, C_HI);
-        for (uint32_t i = 0; i < SEQ_PAGE; i++) {
-            const uint32_t s = its * SEQ_PAGE + i;
-            if (s >= tr->length)
-                continue;
-            const uint16_t base = tr->step[s].on ? (t == track_sel ? C_HI : C_GRAY) : off_cell;
-            const uint16_t c = at == (int32_t)s ? (tr->step[s].on ? mix565(base, C_WHITE, 96 + hit * 160 / 256) : C_DIM) : base;
-            cv_rect(step_x(i), y, 12, 4, c);
+}
+
+/* HOME: the selected track as a piano roll */
+static void draw_roll(int32_t dy, uint32_t now)
+{
+    const uint32_t length = TRK.length;
+    const int32_t playing = seq.playing ? seq.step[track_sel] : -1, drum = SYNTH_IS_DRUM(track_sel);
+    const uint32_t page = playing >= 0 && !ui.rec ? (uint32_t)playing / SEQ_PAGE : ui.view_page;
+    const int32_t flash = playing >= 0 ? flash256(now - ui.step_at, 180u) : 0, frac = playing >= 0 ? step_frac(now) : 0;
+    const int32_t top = ROLL_Y + dy, bottom = top + ROLL_H;
+    const uint16_t note_lo = mix565(C_LINE, C_AMB, 110);
+    const uint32_t first = page * SEQ_PAGE, shown = length > first ? (length - first < SEQ_PAGE ? length - first : SEQ_PAGE) : 0u;
+    int32_t lo = 127, hi = 0, n;
+    char t[8];
+    for (uint32_t s = 0; s < length; s++)    /* the track's notes, low to high: the roll's height */
+        if (TRK.step[s].on)
+            for (uint32_t k = 0; k < TRK.step[s].n && k < SEQ_NOTES; k++) {
+                if (TRK.step[s].note[k] < lo) lo = TRK.step[s].note[k];
+                if (TRK.step[s].note[k] > hi) hi = TRK.step[s].note[k];
+            }
+    const int32_t any = lo <= hi, real_lo = lo, real_hi = hi;
+    if (!any)
+        lo = hi = 60;
+    n = hi - lo + 1;
+    if (n < 12) {                            /* at least an octave tall */
+        lo = clamp(lo - (12 - n) / 2, 0, 116);
+        n = 12;
+    }
+    for (uint32_t i = 0; i < SEQ_PAGE; i++) {   /* the steps' columns: a beat's first a little lighter; the one playing lit */
+        const int32_t x = step_x(i);
+        if (i >= shown) {
+            cv_rect(x + 5, bottom - 2, 2, 2, C_LINE);
+            continue;
+        }
+        cv_rect(x, top, 12, ROLL_H, playing == (int32_t)(first + i) ? mix565(RGB(30, 30, 38), RGB(64, 64, 76), flash) :
+                                     i % 4u ? RGB(13, 13, 17) : RGB(20, 20, 25));
+    }
+    if (!drum) {                             /* a line at each C; the lowest and highest notes named */
+        int32_t label_y[8], labels = 0;
+        if (any) {
+            note_name(real_hi, t);
+            label_y[labels++] = bottom - (real_hi - lo + 1) * ROLL_H / n + (ROLL_H / n - 12) / 2;
+            cv_text(2, label_y[0], &FONT_T, t, C_GRAY);
+            if (real_lo != real_hi) {
+                note_name(real_lo, t);
+                label_y[labels++] = bottom - (real_lo - lo + 1) * ROLL_H / n + (ROLL_H / n - 12) / 2;
+                cv_text(2, label_y[1], &FONT_T, t, C_GRAY);
+            }
+        }
+        for (int32_t c = lo + (12 - lo % 12) % 12; c < lo + n; c += 12) {
+            const int32_t y = bottom - (c - lo) * ROLL_H / n - 1, ly = y - (ROLL_H / n + 12) / 2 + 1;
+            int free = 1;
+            cv_rect(step_x(0), y, step_x(shown ? shown - 1u : 0u) + 12 - step_x(0), 1, RGB(36, 36, 46));
+            for (int32_t k = 0; k < labels; k++)
+                free &= ly - label_y[k] >= 12 || label_y[k] - ly >= 12;
+            if (free && labels < 8) {
+                note_name(c, t);
+                label_y[labels++] = ly;
+                cv_text(2, ly, &FONT_T, t, C_DIM);
+            }
         }
     }
+    for (uint32_t i = 0; i < shown; i++) {   /* the notes */
+        const seq_step_t *st = &TRK.step[first + i];
+        if (!st->on)
+            continue;
+        const int here = playing == (int32_t)(first + i);
+        const uint16_t c0 = mix565(note_lo, C_HI, 64 + (int32_t)st->vel * 192 / 127);
+        const uint16_t c = here ? mix565(c0, C_WHITE, flash) : c0;
+        if (drum) {                          /* a hit: a block, bigger the harder */
+            const int32_t h = 10 + (int32_t)st->vel * 40 / 127 + (here ? 6 * flash / 256 : 0);
+            cv_rect(step_x(i), top + (ROLL_H - h) / 2, 12, h, c);
+            continue;
+        }
+        const uint32_t end = i + (st->len ? st->len : 1u) - 1u, last = end < shown ? end : shown - 1u;
+        const int32_t x0 = step_x(i), x1 = step_x(last) + 12;
+        for (uint32_t k = 0; k < st->n && k < SEQ_NOTES; k++) {
+            const int32_t y0 = bottom - (st->note[k] - lo + 1) * ROLL_H / n, y1 = bottom - (st->note[k] - lo) * ROLL_H / n;
+            const int32_t h = y1 - y0 - 1 > 2 ? y1 - y0 - 1 : 2;
+            cv_rect(x0, y0, x1 - x0, h, c);
+            cv_rect(x0, y0, 2, h, here ? C_WHITE : C_HI);   /* its start */
+        }
+    }
+    if (playing >= 0 && (uint32_t)playing / SEQ_PAGE == page) {   /* the line playing, sweeping across in time */
+        const uint32_t i = (uint32_t)playing % SEQ_PAGE;
+        const int32_t x = step_x(i) + (i + 1u < shown ? step_x(i + 1u) - step_x(i) : 12) * frac / 256;
+        cv_rect(x, top, 1, ROLL_H, mix565(C_GRAY, C_WHITE, 128 + flash / 2));   /* (within the strip) */
+    }
+    for (uint32_t g = 0; g < 4u && g * 4u < shown; g++) {   /* each beat's first step's number */
+        int_text((int32_t)(first + g * 4u + 1u), t);
+        cv_text(step_x(g * 4u), NUM_Y + dy, &FONT_T, t, C_DIM);
+    }
+    if (ui.rec && ui.rec_pos >= first && ui.rec_pos < first + SEQ_PAGE)   /* the step recording goes to */
+        cv_rect(step_x(ui.rec_pos - first), bottom + 1, 12, 2, RGB(240, 55, 45));
+    draw_pages(dy, page, playing, frac);
+}
+
+/* SEQ (step mode): every track's steps of the page shown, a row each */
+static void draw_grid(int32_t dy, uint32_t now)
+{
+    const uint32_t page = ui.view_page;
+    const uint16_t sel_lo = mix565(C_LINE, C_AMB, 110), other_lo = RGB(64, 64, 72), other_hi = RGB(205, 205, 212);
+    for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
+        const seq_track_t *tr = &seq.pat.track[t];
+        const int32_t y = GRID_Y + dy + (int32_t)t * 13 + (t >= SEQ_S_TRACKS ? 3 : 0), sel = t == track_sel;
+        const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
+        if (sel)                             /* the selected track: its row on a warm ground */
+            cv_rect(0, y - 1, 240, 13, mix565(C_BLACK, C_AMB, 34));
+        cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], sel ? C_HI : C_GRAY);
+        for (uint32_t i = 0; i < SEQ_PAGE; i++) {
+            const uint32_t s = page * SEQ_PAGE + i;
+            const int32_t x = step_x(i);
+            if (s >= tr->length) {           /* past its length: a dot */
+                cv_rect(x + 5, y + 5, 2, 1, C_LINE);
+                continue;
+            }
+            const seq_step_t *st = &tr->step[s];
+            uint16_t c = i % 4u ? RGB(20, 20, 25) : RGB(28, 28, 34);
+            if (st->on)
+                c = sel ? mix565(sel_lo, C_HI, 96 + (int32_t)st->vel * 160 / 127)
+                        : mix565(other_lo, other_hi, (int32_t)st->vel * 256 / 127);
+            if (at == (int32_t)s)            /* its step playing: lit; a note, flashing as it begins */
+                c = st->on ? mix565(c, C_WHITE, 64 + hit * 192 / 256) : RGB(70, 70, 82);
+            cv_rect(x, y, 12, 11, c);
+            if (st->on && st->n > 1u)        /* a chord: a notch */
+                cv_rect(x + 9, y, 3, 3, sel ? sel_lo : RGB(20, 20, 25));
+            if (sel && ui.step_held == (int8_t)s) {   /* the step held: framed */
+                cv_rect(x - 1, y - 1, 14, 1, C_WHITE);
+                cv_rect(x - 1, y + 11, 14, 1, C_WHITE);
+                cv_rect(x - 1, y, 1, 11, C_WHITE);
+                cv_rect(x + 12, y, 1, 11, C_WHITE);
+            }
+            if (sel && ui.rec && ui.rec_pos == s)
+                cv_rect(x, y + 9, 12, 2, RGB(240, 55, 45));
+        }
+    }
+    draw_pages(dy, page, seq.playing ? seq.step[track_sel] : -1, seq.playing ? step_frac(now) : 0);
+}
+
+static void draw_seq_body(int32_t dy)        /* the strip (rows STRIP_Y on), drawn dy rows up or down */
+{
+    if (ui.step_mode)
+        draw_grid(dy, plat_ms());
+    else
+        draw_roll(dy, plat_ms());
 }
 
 static void draw_seq(void)

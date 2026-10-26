@@ -64,9 +64,9 @@ wait 30
 tap GLO
 wait 400
 shot screen-debug.png
-# SEQ (HOME, the one shown last of SEQ and OSC, then again): a pattern playing. Step mode: steps 1, 5, 9, 13 on, step
-# 9 a fifth up and softer; step recording: a chord on step 3; swing 58 %; PLAY, the shot as step 13 begins (its
-# flash; PLAY's message gone)
+# SEQ (HOME, the one shown last of SEQ and OSC, then again): a pattern playing, S1 as a piano roll. Step mode:
+# steps 1, 5, 9, 13 on, step 9 a fifth up and softer; step recording: a chord on step 3; swing 58 %; PLAY, the shot
+# as step 13 begins (its flash; PLAY's message gone)
 tap HOME
 wait 30
 tap HOME
@@ -173,6 +173,12 @@ turn K2 8
 tap PLAY
 wait 1476
 shot screen-seq.png
+# SEQ (step mode): every track's steps of the page shown, still playing, a bar later (STEP ON's message gone)
+tap SEQ
+wait 2000
+shot screen-seq-steps.png
+tap SEQ
+wait 30
 tap PLAY
 wait 30
 # SELECT: the tracks' list, all eight

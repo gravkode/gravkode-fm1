@@ -227,9 +227,11 @@ The effect's three pages: section 7.
 
 ## 5. The sequencer
 
-![The SEQ page playing S1 (CHORDS): its 16 steps as amber bars, as tall as their velocity, with a white tick at their note and dots for a chord; step 13 flashing white as it begins, the cursor under it; the four pages, the first shown; the eight tracks' steps below, each with its step playing; TEMPO 120, SWING 58 %, LENGTH 16 as small knobs; PLAY, P1, CPU](img/screen-seq.png "The SEQ page")
+![The SEQ page (HOME) playing S1 (CHORDS) as a piano roll: its notes as amber bars at their pitch, A3 to D5 named at the left with a line at C4, a chord stacked on step 3, the line playing on step 13 and its notes flashing white; steps 1, 5, 9, 13 numbered; the four pages, the first shown; TEMPO 120, SWING 58 %, LENGTH 16 as small knobs; PLAY, P1, CPU](img/screen-seq.png "The SEQ page: one track")
 
-![One bar of the pattern playing on SEQ, in the simulator: each step flashes and leaps as it begins, the cursor glides under the steps, every track's step playing moves in the map below](img/seq-playing.gif "SEQ playing")
+![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, S1 on an amber ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
+
+![One bar playing, in the simulator: HOME's piano roll at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
 
 ![SELECT turned: the eight tracks, S2 (VA VCF) selected, each with its engine and voices (DRUM: a drum track's own)](img/screen-tracks.png "The tracks' list")
 
@@ -248,18 +250,20 @@ and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 
 ### The SEQ page (HOME)
 
-- **The steps** of the selected track, the 16 of the page shown, in four beats of four (each beat's first slot a
-  little lighter): a step on is an amber bar as tall as its velocity, with a white tick at its note's height among
-  the track's notes (a drum track's: none) and a dot for each further note of a chord; an empty step is a short
-  line, a step past the LENGTH a dot. While it plays, the step playing lights its slot; a step on flashes white and
-  leaps a little as it begins, then settles back. A held step is framed in white; recording, the step the next
-  chord goes to is marked red under it.
-- **The cursor** under the steps glides from the step playing to the next, in time.
-- **The pages:** four bars under the cursor, the one shown amber (OCT- / OCT+ in step mode), with a white mark
-  travelling through all four where the selected track plays.
-- **The tracks' map:** every track's steps (S1 to S4, then D1 to D4; the selected one amber, marked at the left), the
-  16 of the page each is playing (stopped: of the page shown, or its last page if it is shorter), each with its own
-  LENGTH and its step playing: tracks of different lengths drift apart in it. A note flashes white as it begins.
+The page shows the selected track alone, as a piano roll:
+
+- **Across:** its 16 steps of a page, in four beats of four (each beat's first column a little lighter), the first
+  step of each beat numbered under them (1, 5, 9, 13; on page 2: 17, 21 ...); past the LENGTH, a dot.
+- **Up and down:** the track's notes, from its lowest to its highest (at least an octave), the two named at the left,
+  a line at each C (named too where there is room).
+- **A note** is a bar at its pitch, as long as its length in steps, with a bright start; the harder it plays (its
+  velocity), the brighter. A chord is a bar for each of its notes, stacked. A drum track's hits are a block each,
+  bigger the harder.
+- **It shows the page playing** (stopped, or recording: the page shown). As it plays, the step's column lights, a
+  white line sweeps across in time, and the notes flash white as they begin. Recording, the step the next chord goes
+  to is marked red under the roll.
+- **The pages:** four bars under it, the one shown amber, with a white mark travelling through all four where the
+  track plays.
 - **In the bottom band**, small: **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's),
   **K2 SWING** (50 % straight to 75 %, the pattern's), **K3 LENGTH** (the selected track's, 1 to 64 steps). A step
   held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead. Under them: PLAY or STOP; REC and the
@@ -268,7 +272,7 @@ and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
   be written); CPU. A message (OCTAVE, PATTERN, the volume as it moves) takes the line's left part for a moment.
 - **SELECT** picks the track (recording: moves the step).
 
-While it plays, only the strip under the track's line redraws, about 30 times a second (10 while the sound takes
+While it plays, only the part under the track's line redraws, about 30 times a second (10 while the sound takes
 75 % or more); stopped, nothing moves. A list over it (the tracks, the patterns, a preset's slots) stops it until
 the list goes.
 
@@ -276,6 +280,12 @@ the list goes.
 
 SEQ turns step mode on (SEQ lit): the 16 white keys are the steps of the page shown, and the keys no longer play.
 SEQ again turns it off.
+
+The screen shows every track then, as the keys do: eight rows, S1 to S4 then D1 to D4, named at the left, the
+selected one on an amber ground; the 16 steps of the page shown across (the white keys), in beats of four. A step on
+is lit, brighter the harder it plays (the selected track's amber, the others' grey); a notch at its corner marks a
+chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
+note flashing white as it begins. A held step is framed in white. The pages are under the rows, as on HOME.
 
 | Do | What happens |
 | --- | --- |

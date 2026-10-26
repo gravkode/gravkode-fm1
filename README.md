@@ -13,13 +13,14 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.23.0**, the sequencer's screen: the selected track's steps as tall amber bars that flash as they
-play, a cursor gliding under them in time, the pattern's pages, and every track's steps playing in a map below; SEQ's
-knobs small in the bottom band. After 0.22, the sound editor — independent engine controls, a complete six-operator
-FM editor, small animated knobs in the Octatrack's manner and extended presets (0.21: ALGO picks the engine, PRESET
-its sounds). HOME advances pages; hold HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.23.0**, the sequencer's screen: HOME shows the selected track as a piano roll (its notes at
+their pitch and length, a line sweeping across in time, notes flashing as they play); step mode (SEQ) shows all
+eight tracks as a grid, a row each, every track's step playing moving; SEQ's knobs small in the bottom band. After
+0.22, the sound editor — independent engine controls, a complete six-operator FM editor, small animated knobs in the
+Octatrack's manner and extended presets (0.21: ALGO picks the engine, PRESET its sounds). HOME advances pages; hold
+HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="240" alt="The SEQ page playing a bar, in the simulator: the steps flash as they begin, the cursor glides, every track's step moves in the map"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
+<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's piano roll of one track, and step mode's grid of all eight"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
 ## What it does
 
