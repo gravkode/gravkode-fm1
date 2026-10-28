@@ -3445,11 +3445,12 @@ static void ground_under(const int16_t *x, const int16_t *y, uint32_t n, int32_t
         }
 }
 
-static uint16_t sky_at(int32_t y, int32_t base)   /* the sky's colour on row y: one colour (0.29.2; 0.29 darker up) */
+static uint16_t sky_at(int32_t y, int32_t base)   /* the sky's colour on row y: one colour (0.29.2; 0.29 darker up;
+                                                   * 0.30 by day a lighter blue) */
 {
     (void)y;
     (void)base;
-    return set.sky == SKY_DAY ? RGB(18, 52, 110) : RGB(2, 3, 10);
+    return set.sky == SKY_DAY ? RGB(66, 124, 204) : RGB(2, 3, 10);
 }
 
 static float sky_flare(uint32_t look, uint32_t now, float ms)   /* the last hit of a track of this look, fading */
@@ -3522,6 +3523,43 @@ static void draw_moon(int32_t cx, int32_t cy, int32_t base, float time)
     }
 }
 
+/* (0.30) a cloud, soft and see-through: eleven puffs of different sizes, each densest in its middle, thinning to its
+ * edge; the sky shows through it (three quarters of it white at most), its top bright, its underside a little greyer
+ * and bluer, as a lit cloud's. (x0, y0): its first puff's middle; sc its size; n its shape (each cloud its own) */
+static void draw_cloud(float x0, float y0, float sc, int32_t base, uint32_t n)
+{
+    static const int8_t PUFF[11][3] = {{0, 2, 7}, {7, -4, 8}, {15, -8, 10}, {24, -9, 11}, {33, -5, 9}, {40, 0, 7},
+                                       {6, 5, 7}, {15, 5, 8}, {25, 4, 8}, {34, 4, 7}, {20, -1, 10}};
+    float cx[11], cy[11], r2[11];
+    for (uint32_t k = 0; k < 11u; k++) {     /* (each cloud its puffs a little apart: its own shape) */
+        const float r = (float)PUFF[k][2] * sc * (0.85f + 0.3f * ic_rnd(n * 31u + k));
+        cx[k] = x0 + (float)PUFF[k][0] * sc;
+        cy[k] = y0 + (float)PUFF[k][1] * sc;
+        r2[k] = r * r;
+    }
+    const int32_t xa = (int32_t)(x0 - 10.0f * sc), xb = (int32_t)(x0 + 50.0f * sc);
+    const int32_t ya = (int32_t)(y0 - 22.0f * sc), yb = (int32_t)(y0 + 13.0f * sc);
+    for (int32_t y = ya; y <= yb; y++) {
+        if (y < 0 || y >= base)
+            continue;
+        const uint16_t sky = sky_at(y, base);
+        const float v = fm_clampf(((float)y - (y0 - 20.0f * sc)) / (32.0f * sc), 0.0f, 1.0f);   /* (0 its top, 1 its foot) */
+        const uint16_t tint = mix565(RGB(250, 252, 255), RGB(176, 192, 222), (int32_t)(256.0f * v * v));
+        for (int32_t x = xa; x <= xb; x++) {
+            float dens = 0.0f;
+            for (uint32_t k = 0; k < 11u; k++) {
+                const float dx = (float)x - cx[k], dy = (float)y - cy[k], f = 1.0f - (dx * dx + dy * dy) / r2[k];
+                if (f > dens)
+                    dens = f;
+            }
+            if (dens <= 0.0f)
+                continue;
+            const float a = fm_minf(1.0f, dens * 2.2f) * 0.78f;   /* (soft at its edge, the sky through it) */
+            cv_rect(x, y, 1, 1, mix565(sky, tint, (int32_t)(256.0f * a)));
+        }
+    }
+}
+
 static void draw_sky(int32_t base, int32_t dy, uint32_t now)
 {
     if (set.sky == SKY_OFF)
@@ -3533,8 +3571,6 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
         const float kick = sky_flare(LOOK_KICK, now, 120.0f);   /* the sun, flaring at each kick */
         sky_light(196, 26 + dy, 11.0f + 2.0f * kick, 15.0f, RGB(255, 226, 110), RGB(255, 220, 90), 0.45f + 0.4f * kick, base,
                   0, 0, 0.0f);
-        static const int8_t PUFF[7][3] = {{0, 0, 8}, {9, -6, 10}, {20, -8, 11}, {31, -4, 9}, {38, 1, 8}, {18, 3, 10},
-                                          {8, 4, 8}};   /* (0.29.3: puffier, seven puffs) */
         static const uint8_t AT[3] = {0, 90, 170}, Y[3] = {36, 50, 28}, SCALE[3] = {100, 80, 70};   /* (low in the
                                                                                    * sky, over the heaps' tops) */
         const float speed = 12.0f * (float)seq_bpm(&seq) / 60.0f;   /* the clouds: at the tempo's pace */
@@ -3542,21 +3578,7 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
             const float sc = (float)SCALE[c] * 0.01f;
             float pos = (float)AT[c] + time * speed * sc;
             pos -= fm_floorf(pos / 300.0f) * 300.0f;
-            const int32_t x0 = (int32_t)pos - 40, y0 = Y[c] + dy;
-            for (int32_t y = y0 - (int32_t)(20.0f * sc); y <= y0 + (int32_t)(14.0f * sc); y++) {
-                if (y < 0 || y >= base)
-                    continue;
-                const uint16_t cloud = mix565(sky_at(y, base), RGB(235, 240, 250), 218);
-                for (int32_t x = x0 - (int32_t)(10.0f * sc); x <= x0 + (int32_t)(48.0f * sc); x++)
-                    for (uint32_t k = 0; k < 7u; k++) {
-                        const float fx = (float)(x - x0) - (float)PUFF[k][0] * sc, fy = (float)(y - y0) - (float)PUFF[k][1] * sc;
-                        const float rr = (float)PUFF[k][2] * sc;
-                        if (fx * fx + fy * fy <= rr * rr) {
-                            cv_rect(x, y, 1, 1, cloud);
-                            break;
-                        }
-                    }
-            }
+            draw_cloud((float)pos - 40.0f, (float)(Y[c] + dy), sc, base, c);
         }
     } else {
         const float hat = sky_flare(LOOK_HAT, now, 90.0f);
@@ -4249,7 +4271,10 @@ static void draw_header(void)
 {
     char t[4];
     cv_begin(240, 32, C_BLACK);
-    cv_text(6, 6, &FONT_B, "GRAV CODE", C_WHITE);
+    {                                        /* (0.30) the selected track's engine, where GRAV CODE was */
+        const char *e = grav_engine_name(*track_engine(track_sel));
+        cv_text(6, text_w(&FONT_B, e) <= 88 ? 6 : 8, text_w(&FONT_B, e) <= 88 ? &FONT_B : &FONT_XS, e, C_WHITE);
+    }
     {
         const int32_t w = text_w(&FONT_B, ui.bpm_text) + 3 + text_w(&FONT_T, "BPM"), x = 120 - w / 2;
         cv_text(x, 6, &FONT_B, ui.bpm_text, ui.shown_ext ? C_HI : C_WHITE);

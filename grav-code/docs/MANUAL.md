@@ -49,11 +49,12 @@ your own risk.
 
 ## 2. The screen
 
-![The OSC page at rest: GRAV CODE and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; FOLD 65, ASYMMETRY 50, CURVE 75 as knobs; the page's state, OCT +0, PRESET INIT, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
+![The OSC page at rest: the engine (WAVESHAPE) and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; FOLD 65, ASYMMETRY 50, CURVE 75 as knobs; the page's state, OCT +0, PRESET INIT, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
 
 From the top:
 
-- **The header:** GRAV CODE; in the middle the tempo, the whole song's, in BPM (in the theme's teal while a MIDI clock coming in
+- **The header:** the selected track's engine (since 0.30; GRAV CODE before), as SELECT and ALGO change it;
+  in the middle the tempo, the whole song's, in BPM (in the theme's teal while a MIDI clock coming in
   leads, section 5); the pattern playing (P01) and a triangle while it plays, a square stopped, a red dot recording
   (0.27); the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1
   runs on USB power. The page you are on is the one whose button blinks (faster on its second and third pages).
@@ -236,7 +237,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002903, version 0.29.3](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003000, version 0.30.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -297,10 +298,11 @@ one ground line, each in a colour of its own (rose, orange, amber, yellow, green
 right). They are spoil heaps as the Donbas has them (since 0.29): their tops flat, a terrace on each slope, gullies
 running down them. Each has its own height and place; where they overlap, the lower one stands in front.
 
-![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
+![HOME by day, in the simulator: the sun at the top right, soft clouds drifting, the terricons dark against a clear blue sky](img/home-day.gif "HOME by day") ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
 
-- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a deep blue sky (one colour since 0.29.2), its sun at the top right
-  flaring at each kick, three clouds drifting across at the tempo's pace, low over the heaps' tops, the heaps dark against it (their tracks'
+- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a clear blue sky (one colour since 0.29.2, lighter since 0.30), its sun at the top
+  right flaring at each kick, three soft clouds drifting across at the tempo's pace, low over the heaps' tops
+  (since 0.30 see-through, each its own shape, bright on top and greyer below, thinning at their edges), the heaps dark against it (their tracks'
   colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a clean crescent moon at the top right (its dark part the sky's, its glow by its lit edge),
   its light shimmering, its glow breathing, a ripple of light going out from it now and again, and stars that come
   out, shine a few seconds, fade and come out again elsewhere, twinkling, the brighter ones flashing at each hi-hat;
