@@ -237,7 +237,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003001, version 0.30.1](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003002, version 0.30.2](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -252,9 +252,9 @@ lit) and FREE, those no track has. Under them, the package's identity (the insta
 Section 8 has more on VOICES and VELOCITY, section 5 on the metronome.
 GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
 AMBER (GRAV CODE's until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown under the knobs as
-a swatch of its two colours, the one shown framed. K2 SKY (0.29) picks HOME's sky: OFF (black, as before), DAY (as
-it comes: a sun flaring at each kick, soft clouds drifting slowly at the tempo's pace, on black) or NIGHT (a moon, stars
-twinkling at each hi-hat). Only the theme's two brightest colours change (values, the knob
+a swatch of its two colours, the one shown framed. K2 SKY (0.29) picks HOME's sky: OFF (black, as before), DAY (a
+light blue sky, a sun flaring at each kick, soft clouds drifting slowly at the tempo's pace) or NIGHT (as it comes since
+0.30.2: a moon, stars twinkling at each hi-hat). Only the theme's two brightest colours change (values, the knob
 turned, the selected track, the steps and notes); the greys stay, REC stays red. It is saved with the settings (SAVE).
 The splash at power-on keeps its teal: it is drawn before the settings are read.
 
@@ -298,17 +298,17 @@ one ground line, each in a colour of its own (rose, orange, amber, yellow, green
 right). They are spoil heaps as the Donbas has them (since 0.29): their tops flat, a terrace on each slope, gullies
 running down them. Each has its own height and place; where they overlap, the lower one stands in front.
 
-![HOME by day, in the simulator: the sun at the top right, soft clouds drifting slowly, the terricons; no sky behind them](img/home-day.gif "HOME by day") ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
+![HOME by day, in the simulator: a light blue sky, the sun at the top right, soft clouds drifting slowly, the terricons](img/home-day.gif "HOME by day") ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
 
-- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, no sky behind (since 0.30.1; a blue one before), its sun at the top
-  right flaring at each kick, three soft white clouds drifting slowly across at the tempo's pace, low over the heaps'
-  tops (each its own shape, bright on top and greyer below, thinning at their edges, the sun showing through), the
-  heaps dark (their tracks'
-  colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a clean crescent moon at the top right (its dark part the sky's, its glow by its lit edge),
+- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY a light blue sky (0.30.2; 0.30.1 had none), its sun at the top
+  right flaring at each kick, three soft clouds drifting slowly across at the tempo's pace, low over the heaps' tops
+  (each its own shape, see-through, bright on top and greyer below, thinning at their edges, the sun showing through),
+  the heaps dark (their tracks' colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT, as it
+  comes (since 0.30.2), a clean crescent moon at the top right (its dark part the sky's, its glow by its lit edge),
   its light shimmering, its glow breathing, a ripple of light going out from it now and again, and stars that come
   out, shine a few seconds, fade and come out again elsewhere, twinkling, the brighter ones flashing at each hi-hat;
-  now and then a shooting star (0.29.1); OFF, black as before. With a sky the page moves on its own, about 20 times
-  a second while all is quiet.
+  now and then a shooting star (0.29.1); OFF, black as before. With a sky the page moves on its own, about 20 times a
+  second while all is quiet.
 
 - **A track with no step on** in the pattern has no terricon; its place stays empty, so every one keeps its place.
 - **A quiet track's terricon** is its colour, dim and still. **A sounding one** lives: its slopes bend with the

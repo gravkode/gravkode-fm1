@@ -99,17 +99,20 @@ expect seq_step -1
 expect voices_held 0
 expect_out USB FC 00 00
 expect_out USB 80 41 00
-# (stopped, once every sound has faded: 0.28, a sky on (DAY, as it comes), the page goes on, its clouds drifting, 20
-# frames a second; the sky OFF (GLO's SCREEN, K2), the page still, as before: 0.27, HOME's rings, 0.28 its terricons,
-# follow the tracks' sound)
+# (stopped, once every sound has faded: a sky on (NIGHT, as it comes since 0.30.2), the page goes on, its stars
+# coming and going, 20 frames a second; the sky OFF (GLO's SCREEN, K2: left of DAY), the page still, as before: 0.27,
+# HOME's rings, 0.28 its terricons, follow the tracks' sound)
 wait 2500
-expect sky 0
+expect sky 1
 expect grid_since <60
 tap GLO
 wait 30
 tap GLO
 wait 30
 expect page 12
+turn K2 -1
+wait 30
+expect sky 3
 turn K2 -1
 wait 30
 expect sky 2
@@ -123,7 +126,10 @@ wait 30
 expect page 12
 turn K2 1
 wait 30
-expect sky 0
+expect sky 3
+turn K2 1
+wait 30
+expect sky 1
 tap HOME
 wait 30
 # step recording: a chord (keys 0 4 7: F3 A3 C4) to step 1, a note (key 9: D4) to step 2; SELECT skips one

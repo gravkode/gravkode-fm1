@@ -27,8 +27,8 @@ static const uint8_t FX_DEFAULT[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};   /* (DR
 enum { METRO_REC, METRO_OFF, METRO_COUNT };
 /* (0.28) GLO's SCREEN, K2 SKY: HOME's sky. DAY (as it comes) a blue one, its sun flaring at each kick, clouds drifting
  * at the tempo; NIGHT a moon, stars twinkling at each hi-hat; OFF black, as before */
-enum { SKY_DAY, SKY_NIGHT, SKY_OFF };
-static const char *const SKY_NAME[3] = {"DAY", "NIGHT", "OFF"};
+enum { SKY_NIGHT = 1, SKY_OFF = 2, SKY_DAY = 3 };   /* (0.30.2: NIGHT as it comes; 0, as saved before, is NIGHT) */
+static const char *const SKY_NAME[4] = {"NIGHT", "NIGHT", "OFF", "DAY"};
 #define PREV_SET_MAGIC 0x54504C32u
 #define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -44,7 +44,8 @@ typedef struct {
     uint8_t env[3];
     uint8_t voices;                      /* 1 MONO, 2..4 POLY (GLO); 0, in a record saved before 0.12: the default */
     uint8_t velocity_off;                /* the FM-1's keys play at a fixed velocity (GLO); MIDI in keeps its own */
-    uint8_t sky;                         /* (0.28) GLO's SCREEN, K2: HOME's sky, SKY_*: DAY (0, as saved before), NIGHT, OFF */
+    uint8_t sky;                         /* (0.29) GLO's SCREEN, K2: HOME's sky, SKY_*: NIGHT (1; 0 as saved before),
+                                          * OFF (2), DAY (3) */
     uint8_t fx[FX_N];                    /* 0.13: the effect's knobs; in a record saved before (20 bytes): defaults */
     uint8_t fx_quality;                  /* GRAV_FX_* (dsp/grav_beads.h) */
     uint8_t fx_reserved[3];
@@ -565,7 +566,7 @@ static void settings_defaults(void)
     set.env[0] = 10; set.env[1] = 50; set.env[2] = 30;
     set.voices = VOICES_DEFAULT;
     set.velocity_off = 0;
-    set.sky = SKY_DAY;
+    set.sky = SKY_NIGHT;
     fx_defaults(&set);
     track_defaults(&set);
     drum_defaults(&set);
@@ -638,8 +639,9 @@ static void settings_upgrade(settings_t *s, int loaded)
             s->vol[t] = 100;
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
-    if (s->sky > SKY_OFF)                    /* (a byte reserved before 0.28) */
-        s->sky = SKY_DAY;
+    if (s->sky == 0 || s->sky > SKY_DAY)     /* (a byte reserved before 0.29; 0.29..0.30.1 kept DAY, their default, as
+                                              * 0: NIGHT now, as it comes) */
+        s->sky = SKY_NIGHT;
     if (s->metro > METRO_COUNT)              /* (a byte reserved before 0.24) */
         s->metro = METRO_REC;
 }
@@ -3452,7 +3454,7 @@ static uint16_t sky_at(int32_t y, int32_t base)   /* the sky's colour on row y: 
 {
     (void)y;
     (void)base;
-    return set.sky == SKY_DAY ? C_BLACK : RGB(2, 3, 10);   /* (0.30.1: by day no sky, its sun and clouds on black) */
+    return set.sky == SKY_DAY ? RGB(92, 152, 228) : RGB(2, 3, 10);   /* (0.30.2: by day a light blue again) */
 }
 
 static float sky_flare(uint32_t look, uint32_t now, float ms)   /* the last hit of a track of this look, fading */
@@ -3554,7 +3556,7 @@ static void draw_cloud(float x0, float y0, float sc, int32_t base, uint32_t n)
         if (y < 0 || y >= base)
             continue;
         const float v = fm_clampf(((float)y - (y0 - 20.0f * sc)) / (32.0f * sc), 0.0f, 1.0f);   /* (0 its top, 1 its foot) */
-        const uint16_t tint = mix565(RGB(255, 255, 255), RGB(196, 206, 228), (int32_t)(256.0f * v * v));
+        const uint16_t tint = mix565(RGB(250, 252, 255), RGB(176, 192, 222), (int32_t)(256.0f * v * v));
         for (int32_t x = xa; x <= xb; x++) {
             float dens = 0.0f;
             for (uint32_t k = 0; k < 11u; k++) {
@@ -3564,7 +3566,7 @@ static void draw_cloud(float x0, float y0, float sc, int32_t base, uint32_t n)
             }
             if (dens <= 0.0f)
                 continue;
-            const float a = fm_minf(1.0f, dens * 2.2f) * 0.92f;   /* (soft at its edge, the dark through it) */
+            const float a = fm_minf(1.0f, dens * 2.2f) * 0.78f;   /* (soft at its edge, the sky through it) */
             cv_rect(x, y, 1, 1, mix565(cv_get(x, y), tint, (int32_t)(256.0f * a)));   /* (over what is there:
                                                                               * the sun shows through) */
         }
@@ -3575,9 +3577,8 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
 {
     if (set.sky == SKY_OFF)
         return;
-    if (set.sky != SKY_DAY)                  /* (the night's; by day none) */
-        for (int32_t y = 0; y < base; y++)
-            cv_rect(0, y, 240, 1, sky_at(y, base));
+    for (int32_t y = 0; y < base; y++)
+        cv_rect(0, y, 240, 1, sky_at(y, base));
     const float time = (float)(now % 600000u) * 0.001f;
     if (set.sky == SKY_DAY) {
         const float kick = sky_flare(LOOK_KICK, now, 120.0f);   /* the sun, flaring at each kick */
@@ -4646,8 +4647,8 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
     (void)a; (void)b; (void)c; (void)d;
     if (!strcmp(cmd, "preset_fail")) { preset_store_test_fail(atoi(a)); return 1; }
     if (!strcmp(cmd, "soundpage")) { sound_activate((uint32_t)atoi(a)); return 1; }
-    if (!strcmp(cmd, "sky")) {               /* (0.28) HOME's sky at once (the pictures): 0 DAY, 1 NIGHT, 2 OFF */
-        set.sky = (uint8_t)clamp(atoi(a), SKY_DAY, SKY_OFF);
+    if (!strcmp(cmd, "sky")) {               /* (0.28) HOME's sky at once (the pictures): 1 NIGHT, 2 OFF, 3 DAY */
+        set.sky = (uint8_t)clamp(atoi(a), SKY_NIGHT, SKY_DAY);
         ui.redraw = 1;
         return 1;
     }
@@ -4838,7 +4839,7 @@ int app_expect(const char *what, int *got)
         *got = fx_params[FX_DRY_WET];
     else if (!strcmp(what, "meter"))         /* the selected track's meter, 0..256 */
         *got = ui.meter[track_sel];
-    else if (!strcmp(what, "sky"))           /* (0.28) GLO's SCREEN: HOME's sky, SKY_* (0 DAY, 1 NIGHT, 2 OFF) */
+    else if (!strcmp(what, "sky"))           /* (0.29) GLO's SCREEN: HOME's sky, SKY_* (1 NIGHT, 2 OFF, 3 DAY) */
         *got = set.sky;
     else if (!strcmp(what, "theme"))         /* (0.25.1) GLO's SCREEN: the palette chosen + 1 (0: the app's); shown */
         *got = set.theme;
