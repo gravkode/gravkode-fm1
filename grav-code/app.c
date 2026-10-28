@@ -3476,19 +3476,20 @@ static void draw_terricons(int32_t dy, uint32_t now)
     }
 }
 
-/* SEQ (step mode): every track's steps of the page shown, a row each */
+/* SEQ (step mode): every track's steps of the page shown, a row each, in the track's colour (its terricon's, 0.28):
+ * a step on brighter the harder; the selected track's row on a ground of its colour, its steps at their brightest */
 static void draw_grid(int32_t dy, uint32_t now)
 {
     const uint32_t page = ui.view_page;
-    const uint16_t sel_lo = mix565(C_LINE, C_AMB, 110), other_lo = RGB(64, 64, 72), other_hi = RGB(205, 205, 212);
     for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
         const seq_track_t *tr = &seq.pat.track[t];
         const int32_t y = GRID_Y + dy + (int32_t)t * 13 + (t >= SEQ_S_TRACKS ? 3 : 0), sel = t == track_sel;
         const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
-        if (sel)                             /* the selected track: its row on a warm ground */
-            cv_rect(0, y - 1, 240, 13, mix565(C_BLACK, C_AMB, 34));
+        const uint16_t hue = TRACK_HUE[t], sel_lo = mix565(C_BLACK, hue, 90);
+        if (sel)                             /* the selected track: its row on a ground of its colour */
+            cv_rect(0, y - 1, 240, 13, mix565(C_BLACK, hue, 40));
         const int muted = seq.mute >> t & 1u;   /* (0.26) silent (muted, or another soloed): its name red, steps dim */
-        cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], muted ? C_RED : sel ? C_HI : C_GRAY);
+        cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], muted ? C_RED : sel ? C_WHITE : hue);
         for (uint32_t i = 0; i < SEQ_PAGE; i++) {
             const uint32_t s = page * SEQ_PAGE + i;
             const int32_t x = step_x(i);
@@ -3499,8 +3500,7 @@ static void draw_grid(int32_t dy, uint32_t now)
             const seq_step_t *st = &tr->step[s];
             uint16_t c = i % 4u ? RGB(20, 20, 25) : RGB(28, 28, 34);
             if (st->on)
-                c = muted ? C_DIM : sel ? mix565(sel_lo, C_HI, 96 + (int32_t)st->vel * 160 / 127)
-                                        : mix565(other_lo, other_hi, (int32_t)st->vel * 256 / 127);
+                c = muted ? C_DIM : mix565(C_BLACK, hue, (sel ? 150 : 90) + (int32_t)st->vel * (sel ? 106 : 120) / 127);
             if (at == (int32_t)s)            /* its step playing: lit; a note, flashing as it begins */
                 c = st->on ? mix565(c, C_WHITE, 64 + hit * 192 / 256) : RGB(70, 70, 82);
             cv_rect(x, y, 12, 11, c);

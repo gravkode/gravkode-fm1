@@ -27,14 +27,14 @@ for i, im in enumerate(pages):
 grid.save(HERE / "readme-pages.png", optimize=True)
 print("readme-playing.png, readme-pages.png")
 
-icons = sorted(HERE.glob("icon-*.png"))   # tests/icon_sheet.txt's: each engine's track line, icon and line
+icons = sorted(HERE.glob("icon-*.png"))   # tests/icon_sheet.txt's: each engine's splash, a moment after a note
 if icons:
-    # The 0.22 sound header has the compact live icon beside the page title; keep partial dials out of the atlas.
-    tiles = [Image.open(p).convert("RGB").crop((0, 36, 240, 82)) for p in icons]
+    # (0.28) a poster: each engine's icon at its biggest and its name, six across, as the engines' poster has them
+    tiles = [Image.open(p).convert("RGB").crop((44, 58, 196, 150)) for p in icons]
     tw, th = tiles[0].size
-    sheet = Image.new("RGB", (3 * tw + 2 * GAP, 9 * th + 8 * GAP), BACK)
+    sheet = Image.new("RGB", (6 * tw + 5 * GAP, 5 * th + 4 * GAP), BACK)
     for i, im in enumerate(tiles):
-        sheet.paste(im, ((i % 3) * (tw + GAP), (i // 3) * (th + GAP)))
+        sheet.paste(im, ((i % 6) * (tw + GAP), (i // 6) * (th + GAP)))
     sheet.save(HERE / "readme-icons.png", optimize=True)
     for p in icons:
         p.unlink()

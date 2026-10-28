@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-/* GRAV CODE's engine icons (0.20): each engine drawn by code, alive. An icon is drawn into a box of the canvas
- * (device/gfx.c, in scope: the app is part of the unity build), clipped to it, from the time, the engine's three
- * knobs (a drum's TONE, DECAY and SHAPE's first) and a note's strike, so that turning a knob or playing a note shows
- * on it: FOLD folds WAVESHAPE's wave further, INDEX widens FM's orbit, a kick's ring jumps at each hit. Lines in the
- * theme's two hues, the strike's flash white; small (the track's line, the tracks' list): fewer details. A few
- * hundred bytes of code an icon, no bitmaps. Included by app.c. */
+/* GRAV CODE's engine icons: each engine drawn by code, alive (0.20; redrawn in 0.28 as neon pictures, each engine in
+ * its own colour). An icon is drawn into a box of the canvas (device/gfx.c, in scope: the app is part of the unity
+ * build), clipped to it, from the time, the engine's three knobs (a drum's TONE, DECAY and SHAPE's first) and a
+ * note's strike, so that turning a knob or playing a note shows on it: FOLD folds WAVESHAPE's ribbons further, INDEX
+ * bends FM's loops, a kick's rings jump at each hit. Light is added, not painted (the box is black under it): lines
+ * crossing grow brighter, towards white, as neon does; a big icon's lines glow round them. Small (the tracks' list,
+ * the presets' browser): fewer details, no glow. A few hundred bytes of code an icon, no bitmaps. Included by app.c. */
 
 typedef struct {
     int32_t x, y, w, h;                  /* the box on the canvas: drawing is clipped to it */
@@ -18,24 +19,72 @@ typedef struct {
 #define IC_TAU 6.2831853f
 
 static const icon_t *ic;                 /* the icon being drawn */
+static uint16_t ic_halo;                 /* the glow added round each pixel of a line (0: none) */
 
-static void ic_pset(int32_t x, int32_t y, uint16_t c)
+static uint16_t ic_dim(uint16_t c, int32_t t)   /* c at t/256 */
 {
-    if (x >= ic->x && x < ic->x + ic->w && y >= ic->y && y < ic->y + ic->h)
-        cv_pset(x, y, c);
+    return (uint16_t)(((uint32_t)((c >> 11) * t >> 8) << 11) | ((uint32_t)(((c >> 5) & 63) * t >> 8) << 5) |
+                      (uint32_t)((c & 31) * t >> 8));
+}
+
+static uint16_t ic_mix(uint16_t a, uint16_t b, float u)   /* a to b, u 0..1 */
+{
+    const int32_t t = (int32_t)(fm_clampf(u, 0.0f, 1.0f) * 256.0f);
+    const int32_t ar = a >> 11, ag = (a >> 5) & 63, ab = a & 31, br = b >> 11, bg = (b >> 5) & 63, bb = b & 31;
+    return (uint16_t)(((ar + (br - ar) * t / 256) << 11) | ((ag + (bg - ag) * t / 256) << 5) | (ab + (bb - ab) * t / 256));
+}
+
+/* light added to the pixel (clipped to the box): saturating, so that crossings brighten */
+static void ic_add(int32_t x, int32_t y, uint16_t c)
+{
+    if (x < ic->x || x >= ic->x + ic->w || y < ic->y || y >= ic->y + ic->h)
+        return;
+    const int32_t yy = y + cv_oy;
+    if ((uint32_t)x >= cv_w || yy < cv_y0 || yy >= cv_y1)
+        return;
+    uint16_t *p = &cv_px[(uint32_t)yy * cv_w + (uint32_t)x];
+    const uint32_t a = swap16(*p), r = (a >> 11) + (uint32_t)(c >> 11), g = ((a >> 5) & 63u) + ((c >> 5) & 63u),
+                   b = (a & 31u) + (c & 31u);
+    *p = swap16((r > 31u ? 31u : r) << 11 | (g > 63u ? 63u : g) << 5 | (b > 31u ? 31u : b));
+}
+
+static void ic_lit(int32_t x, int32_t y, uint16_t c)   /* a pixel of a line, and its glow */
+{
+    ic_add(x, y, c);
+    if (ic_halo) {
+        ic_add(x - 1, y, ic_halo);
+        ic_add(x + 1, y, ic_halo);
+        ic_add(x, y - 1, ic_halo);
+        ic_add(x, y + 1, ic_halo);
+    }
+}
+
+static void ic_glow(uint16_t c, int32_t t)   /* the lines that follow glow (big icons alone), t/256 of c */
+{
+    ic_halo = ic->small || ic->h < 30 ? 0 : ic_dim(c, t);
 }
 
 static int32_t ic_round(float v) { return (int32_t)(v < 0.0f ? v - 0.5f : v + 0.5f); }
 
-static void ic_line(float fx0, float fy0, float fx1, float fy1, uint16_t c)
+static float ic_penx, ic_peny;           /* a path's pen */
+static int ic_pen_new;
+
+/* a line to (x, y) from the pen, its first pixel left out but for a path's first (light is added: each pixel once) */
+static void ic_to(float fx, float fy, uint16_t c)
 {
-    int32_t x0 = ic_round(fx0), y0 = ic_round(fy0), x1 = ic_round(fx1), y1 = ic_round(fy1);
-    int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
-    int32_t dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
-    int32_t err = dx + dy, guard = 600;
+    int32_t x0 = ic_round(ic_penx), y0 = ic_round(ic_peny);
+    const int32_t x1 = ic_round(fx), y1 = ic_round(fy);
+    const int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
+    const int32_t dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
+    int32_t err = dx + dy, guard = 600, first = ic_pen_new;
+    ic_penx = fx;
+    ic_peny = fy;
+    ic_pen_new = 0;
     while (guard--) {
-        int32_t e2 = 2 * err;
-        ic_pset(x0, y0, c);
+        const int32_t e2 = 2 * err;
+        if (first)
+            ic_lit(x0, y0, c);
+        first = 1;
         if (x0 == x1 && y0 == y1)
             break;
         if (e2 >= dy) {
@@ -49,24 +98,17 @@ static void ic_line(float fx0, float fy0, float fx1, float fy1, uint16_t c)
     }
 }
 
-static void ic_rect(float x, float y, float w, float h, uint16_t c)
+static void ic_move(float x, float y)
 {
-    for (int32_t j = ic_round(y); j < ic_round(y + h); j++)
-        for (int32_t i = ic_round(x); i < ic_round(x + w); i++)
-            ic_pset(i, j, c);
+    ic_penx = x;
+    ic_peny = y;
+    ic_pen_new = 1;
 }
 
-static void ic_circle(float cx, float cy, float r, uint16_t c, int dotted)
+static void ic_line(float x0, float y0, float x1, float y1, uint16_t c)
 {
-    const int32_t n = (int32_t)(r * 6.3f) + 8;
-    float px = cx + r, py = cy;
-    for (int32_t i = 1; i <= n; i++) {
-        const float a = IC_TAU * (float)i / (float)n, x = cx + r * fm_cosf(a), y = cy + r * fm_sinf(a);
-        if (!dotted || (i & 2))
-            ic_line(px, py, x, y, c);
-        px = x;
-        py = y;
-    }
+    ic_move(x0, y0);
+    ic_to(x1, y1, c);
 }
 
 static void ic_disc(float cx, float cy, float r, uint16_t c)
@@ -75,21 +117,31 @@ static void ic_disc(float cx, float cy, float r, uint16_t c)
         for (int32_t i = ic_round(cx - r); i <= ic_round(cx + r); i++) {
             const float dx = (float)i - cx, dy = (float)j - cy;
             if (dx * dx + dy * dy <= r * r + 0.5f)
-                ic_pset(i, j, c);
+                ic_add(i, j, c);
         }
+}
+
+/* an ellipse about (cx, cy), radii rx and ry, turned by a radians; dotted: every other stretch */
+static void ic_ellipse(float cx, float cy, float rx, float ry, float a, uint16_t c, int dotted)
+{
+    const int32_t n = (int32_t)((rx + ry) * 3.2f) + 8;
+    const float ca = fm_cosf(a), sa = fm_sinf(a);
+    for (int32_t i = 0; i <= n; i++) {
+        const float t = IC_TAU * (float)i / (float)n, ex = rx * fm_cosf(t), ey = ry * fm_sinf(t);
+        const float x = cx + ex * ca - ey * sa, y = cy + ex * sa + ey * ca;
+        if (i == 0 || (dotted && (i & 2)))
+            ic_move(x, y);
+        else
+            ic_to(x, y, c);
+    }
 }
 
 /* a wave across the box: f(u) in -1..1 for u 0..1, drawn about row cy, amp pixels up and down */
 static void ic_wave(float (*f)(float u), float cy, float amp, uint16_t c)
 {
-    float px = (float)ic->x, py = cy - f(0.0f) * amp;
-    const int32_t n = ic->w;
-    for (int32_t i = 1; i <= n; i++) {
-        const float x = (float)(ic->x + i), y = cy - f((float)i / (float)n) * amp;
-        ic_line(px, py, x, y, c);
-        px = x;
-        py = y;
-    }
+    ic_move((float)ic->x, cy - f(0.0f) * amp);
+    for (int32_t i = 1; i <= ic->w; i++)
+        ic_to((float)(ic->x + i), cy - f((float)i / (float)ic->w) * amp, c);
 }
 
 static uint32_t ic_hash(uint32_t x)      /* a fixed scatter of points */
@@ -103,429 +155,592 @@ static uint32_t ic_hash(uint32_t x)      /* a fixed scatter of points */
 
 static float ic_rnd(uint32_t i) { return (float)(ic_hash(i) & 0xFFFFu) / 65535.0f; }
 
+static float ic_gauss(uint32_t i)        /* -1..1, gathered towards 0 */
+{
+    return (ic_rnd(i) + ic_rnd(i + 0x9E37u) + ic_rnd(i + 0x7F4Au)) * (2.0f / 3.0f) - 1.0f;
+}
+
 #define CX ((float)ic->x + (float)ic->w * 0.5f)
 #define CY ((float)ic->y + (float)ic->h * 0.5f)
 #define W ((float)ic->w)
 #define H ((float)ic->h)
+#define X0 ((float)ic->x)
+#define Y0 ((float)ic->y)
 #define K0 (ic->k[0])
 #define K1 (ic->k[1])
 #define K2 (ic->k[2])
 #define T (ic->t)
 #define HIT (ic->hit)
-#define LIVE (0.3f + 0.7f * HIT)         /* a wave's amplitude: playing, full */
+#define LIVE (0.45f + 0.55f * HIT)       /* a wave's amplitude: still, a little less; playing, full */
+#define SMALL (ic->small || ic->h < 16)
+
+/* each engine's colour, as on the engines' poster (GRAV_ENGINE_*) */
+static const uint16_t ENGINE_HUE[GRAV_ENGINE_ALL] = {
+    RGB(200, 90, 255),                   /* WAVESHAPE: violet */
+    RGB(50, 170, 255),                   /* FM 2-OP: blue */
+    RGB(255, 150, 40),                   /* ANALOG: orange */
+    RGB(60, 175, 255),                   /* MODAL: sky blue */
+    RGB(40, 220, 200),                   /* GRAIN: teal */
+    RGB(255, 150, 40),                   /* ADDITIVE: orange to pink */
+    RGB(170, 80, 255),                   /* WAVETABLE: purple */
+    RGB(190, 80, 255),                   /* CHORDS: purple */
+    RGB(60, 140, 255),                   /* SPEECH: blue */
+    RGB(255, 140, 30),                   /* SWARM: orange */
+    RGB(190, 215, 255),                  /* NOISE: white blue */
+    RGB(230, 70, 230),                   /* PARTICLE: magenta */
+    RGB(255, 90, 40),                    /* STRING: red orange */
+    RGB(255, 50, 40),                    /* KICK: red */
+    RGB(90, 150, 255),                   /* SNARE: blue white */
+    RGB(255, 200, 40),                   /* HI-HAT: gold */
+    RGB(60, 230, 110),                   /* VA VCF: green */
+    RGB(225, 70, 240),                   /* PHASE DIST: magenta */
+    RGB(50, 110, 255),                   /* 6-OP FM 1: blue */
+    RGB(40, 210, 200),                   /* 6-OP FM 2: teal */
+    RGB(150, 80, 255),                   /* 6-OP FM 3: purple */
+    RGB(40, 210, 140),                   /* TERRAIN: green */
+    RGB(255, 160, 30),                   /* STRING MCH: gold */
+    RGB(40, 130, 255),                   /* CHIPTUNE: blue */
+    RGB(255, 70, 50),                    /* SYN KICK: red */
+    RGB(90, 150, 255),                   /* SYN SNARE: blue */
+    RGB(255, 200, 40),                   /* RING HAT: gold */
+};
+static uint16_t ic_hue;                     /* the engine being drawn's */
 
 /* ------------------------------------------------------------- the waves --- */
 static float f_fold(float u)             /* WAVESHAPE: a sine through a folder */
 {
-    const float s = fm_sinf(u * IC_TAU * 1.5f + T * 2.0f) * LIVE;
+    const float s = fm_sinf(u * IC_TAU * 1.2f + T * 1.6f) * LIVE;
     return fm_sinf((s * (1.0f + K0 * 5.0f) + (K1 - 0.5f) * 1.4f) * (0.8f + K2 * 0.6f));
 }
 
-static float f_fm(float u)               /* FM 2-OP's output */
+static float f_analog(float u)           /* ANALOG: a saw and a pulse in turn, its width K0, the saw's slope K1 */
 {
-    const float ph = u * IC_TAU * 2.0f + T * 3.0f, ratio = 1.0f + (float)(int32_t)(K2 * 4.0f);
-    return fm_sinf(ph + K0 * 3.0f * LIVE * fm_sinf(ph * ratio));
+    const float v = u * 3.0f + T * 0.4f, p = v - fm_floorf(v), half = v * 0.5f - fm_floorf(v * 0.5f);
+    if (half < 0.5f)                     /* the pulse */
+        return p < 0.15f + 0.7f * K0 ? 0.9f : -0.9f;
+    const float a = 0.55f + 0.44f * K1;  /* the saw, rising to a drop */
+    return p < a ? p / a * 1.8f - 0.9f : 0.9f - (p - a) / (1.0f - a) * 1.8f;
 }
-
-static float f_pulse(float u)            /* ANALOG: a pulse, its width K0 */
-{
-    const float v = u * 2.0f + T * 0.5f;
-    return (v - fm_floorf(v) < 0.1f + 0.8f * K0 ? 1.0f : -1.0f) * LIVE;
-}
-
-static float f_saw(float u)              /* ANALOG: triangle to saw (K1), detuned (K2) */
-{
-    const float v = u * 2.0f + T * (0.5f + K2 * 0.6f), p = v - fm_floorf(v), a = 0.5f + 0.49f * K1;
-    return (p < a ? p / a * 2.0f - 1.0f : 1.0f - (p - a) / (1.0f - a) * 2.0f) * LIVE;
-}
-
-static float f_grains(float u)           /* GRAIN: windowed sine packets */
-{
-    const float g = u * 4.0f, v = g - fm_floorf(g), win = fm_sinf(IC_PI * fm_minf(1.0f, v / (0.4f + 0.6f * K1)));
-    return win * win * fm_sinf(IC_TAU * (2.0f + K0 * 8.0f) * v + T * 5.0f) * LIVE;
-}
-
-static float f_bent(float u)             /* PHASE DIST: a sine, its phase bent */
-{
-    const float v = u * 2.0f + T * 0.4f, p = v - fm_floorf(v), d = 0.5f - 0.45f * K0 * LIVE;
-    const float q = p < d ? p * 0.5f / d : 0.5f + (p - d) * 0.5f / (1.0f - d);
-    return fm_sinf(q * IC_TAU + K1 * fm_sinf(p * IC_TAU));
-}
-
-static float f_sine(float u) { return fm_sinf(u * IC_TAU * 2.0f + T * 0.4f); }
 
 static float f_chirp(float u)            /* SYN KICK: a sine, its pitch falling (PUNCH the depth) */
 {
     const float sweep = (1.0f + 6.0f * K2) * (1.0f - fm_expf(-u * 6.0f)) / 6.0f;
-    const float env = fm_expf(-u * (1.0f + 4.0f * (1.0f - K1))) * (0.2f + 0.8f * HIT);
+    const float env = fm_expf(-u * (1.0f + 4.0f * (1.0f - K1))) * (0.3f + 0.7f * HIT);
     return fm_sinf(IC_TAU * (1.5f * u + sweep * 6.0f)) * env;
 }
 
-static float f_chip(float u)             /* CHIPTUNE: a pulse stepping up an arpeggio, in steps of 3 px */
-{
-    static const float ARP[4] = {1.0f, 1.25f, 1.5f, 2.0f};
-    const float q = fm_floorf(u * W / 3.0f) * 3.0f / W, a = ARP[(int32_t)(q * 4.0f) & 3];
-    const float v = q * 4.0f * a + T * 2.0f, p = v - fm_floorf(v);
-    return p < 0.25f + 0.5f * K1 ? 0.8f : -0.8f;
-}
-
 /* ------------------------------------------------------------- the icons --- */
-static void i_waveshape(void) { ic_line(ic->x, CY, ic->x + W, CY, C_LINE); ic_wave(f_fold, CY, H * 0.4f, C_HI); }
-
-static void i_fm(void)
+static void i_analog(void)               /* a square and saw wave, neon; detuned (K2): a second one drifting by */
 {
-    const float cx = (float)ic->x + W * 0.42f, cy = (float)ic->y + H * (ic->small ? 0.5f : 0.42f);
-    const float r = H * (0.16f + 0.22f * K0), ratio = 1.0f + (float)(int32_t)(K2 * 4.0f), a = T * (1.5f + ratio);
-    const float mx = cx + fm_cosf(a) * r, my = cy + fm_sinf(a) * r;
-    ic_disc(cx, cy, H * 0.11f * (1.0f + 0.3f * HIT), C_AMB);
-    if (!ic->small)
-        ic_circle(cx, cy, r, C_DIM, 1);
-    ic_line(cx, cy, mx, my, C_DIM);
-    ic_disc(mx, my, ic->small ? 1.0f : 2.0f, HIT > 0.7f ? C_WHITE : C_HI);
-    if (K1 > 0.05f && !ic->small)
-        ic_circle(mx, my, 3.0f + K1 * 5.0f, C_HI, 1);
-    if (!ic->small)
-        ic_wave(f_fm, (float)ic->y + H * 0.88f, H * 0.09f, C_HI);
-}
-
-static void i_analog(void)
-{
-    ic_wave(f_pulse, (float)ic->y + H * 0.3f, H * 0.17f, C_AMB);
-    ic_wave(f_saw, (float)ic->y + H * 0.72f, H * 0.17f, C_HI);
-}
-
-static void i_modal(void)                /* a struck plate, its rings spreading as the note rings out */
-{
-    const float cx = CX, cy = CY, r = H * 0.46f;
-    for (int32_t i = 0; i < 3; i++) {
-        const float s = fm_minf(1.0f, (1.0f - HIT) + 0.25f * (float)i);
-        ic_circle(cx, cy, r * s * (0.4f + 0.6f * K1), i == 0 ? C_HI : i == 1 ? C_AMB : C_DIM, 0);
+    const float amp = H * 0.36f * LIVE;
+    ic_glow(ic_hue, 60);
+    ic_wave(f_analog, CY, amp, ic_hue);
+    if (!SMALL && K2 > 0.05f) {
+        ic_glow(ic_hue, 0);
+        const float shift = K2 * 0.08f * fm_sinf(T * 1.3f);
+        ic_move(X0, CY - f_analog(shift) * amp);
+        for (int32_t i = 1; i <= ic->w; i++)
+            ic_to(X0 + (float)i, CY - f_analog((float)i / W + shift) * amp, ic_dim(ic_hue, 90));
     }
-    ic_rect(cx - W * (0.1f + 0.12f * K2), cy - 1.0f, W * (0.2f + 0.24f * K2), 2.0f, HIT > 0.6f ? C_WHITE : C_HI);
 }
 
-static void i_grain(void) { ic_line(ic->x, CY, ic->x + W, CY, C_LINE); ic_wave(f_grains, CY, H * 0.42f, C_HI); }
-
-static void i_additive(void)             /* harmonics in bumps: where (K0), how wide (K1), how many (K2) */
+static void i_waveshape(void)            /* a ribbon of folded waves */
 {
-    const int32_t n = ic->small ? 8 : 14;
+    const int32_t n = SMALL ? 2 : 5;
+    for (int32_t j = 0; j < n; j++) {
+        const float sc = 1.0f - 0.07f * (float)j, ph = (float)j * 0.035f;
+        ic_glow(ic_hue, j == 0 ? 50 : 0);
+        ic_move(X0, CY - f_fold(ph) * H * 0.4f * sc);
+        for (int32_t i = 1; i <= ic->w; i++)
+            ic_to(X0 + (float)i, CY - f_fold((float)i / W + ph) * H * 0.4f * sc, ic_dim(ic_hue, j == 0 ? 256 : 130 - 18 * j));
+    }
+}
+
+static void i_fm(void)                   /* lens-shaped loops: as many as the ratio (K2), bent by the index (K0) */
+{
+    const int32_t n = SMALL ? 2 : 5;
+    const float lobes = 2.0f + (float)(int32_t)(K2 * 3.0f), fb = K1 * 0.35f;
+    for (int32_t j = 0; j < n; j++) {
+        const float a = H * 0.42f * (1.0f - 0.16f * (float)j) * (0.75f + 0.25f * LIVE);
+        const uint16_t c = ic_dim(ic_hue, j == 0 ? 256 : 150 - 20 * j);
+        ic_glow(ic_hue, j == 0 ? 55 : 0);
+        for (int32_t side = -1; side <= 1; side += 2) {
+            for (int32_t i = 0; i <= ic->w; i++) {
+                const float u = (float)i / W;
+                const float ph = IC_PI * lobes * u + K0 * LIVE * fm_sinf(IC_TAU * lobes * u + T * 2.0f) * 0.6f;
+                const float s = fm_sinf(ph), y = CY + (float)side * a * (s + fb * s * s);
+                if (i == 0)
+                    ic_move(X0, y);
+                else
+                    ic_to(X0 + (float)i, y, c);
+            }
+        }
+    }
+}
+
+static void i_grain(void)                /* grains, a cloud of dots along a wave: its formant (K0), its width (K1) */
+{
+    const int32_t n = SMALL ? 14 : 60 + (int32_t)W;
+    const float spread = H * (0.1f + 0.24f * K1);
+    if (!SMALL) {                        /* the path, faint */
+        ic_glow(ic_hue, 0);
+        ic_move(X0, CY - H * 0.26f * fm_sinf(T * 0.7f) * LIVE);
+        for (int32_t i = 1; i <= ic->w; i++)
+            ic_to(X0 + (float)i, CY - H * 0.26f * fm_sinf(IC_TAU * (1.0f + K0) * (float)i / W + T * 0.7f) * LIVE,
+                  ic_dim(ic_hue, 50));
+    }
+    for (int32_t i = 0; i < n; i++) {
+        float u = ic_rnd((uint32_t)i * 5u) + T * 0.04f;
+        u -= fm_floorf(u);
+        const float path = CY - H * 0.26f * fm_sinf(IC_TAU * (1.0f + K0) * u + T * 0.7f) * LIVE;
+        const float y = path + ic_gauss((uint32_t)i * 5u + 1u) * spread;
+        const float tw = 0.5f + 0.5f * fm_sinf(T * 5.0f + (float)i * 1.7f);
+        const uint16_t c = ic_dim(ic_hue, 130 + (int32_t)(126.0f * tw));
+        ic_add(ic_round(X0 + u * W), ic_round(y), c);
+        if (!SMALL && (i % 3) == 0)
+            ic_add(ic_round(X0 + u * W) + 1, ic_round(y), ic_dim(c, 160));
+    }
+}
+
+static void i_additive(void)             /* the harmonics as lines, orange to pink: where (K0), how wide (K1), how many
+                                          * bumps (K2) */
+{
+    const uint16_t pink = RGB(255, 60, 190);
+    const int32_t n = SMALL ? 8 : ic->w / 3;
     const float bw = W / (float)n, centre = K0 * (float)(n - 1), width = 1.0f + K1 * 4.0f, bumps = 1.0f + K2 * 3.0f;
+    ic_glow(ic_hue, 0);
     for (int32_t i = 0; i < n; i++) {
         const float d = ((float)i - centre) * bumps / (float)n * 3.0f, rep = d - fm_floorf(d + 0.5f);
         const float a = fm_expf(-rep * rep * 30.0f / width) * (0.75f + 0.25f * fm_sinf(T * 3.0f + (float)i));
-        const float bh = H * (0.08f + 0.85f * a * LIVE);
-        ic_rect((float)ic->x + bw * (float)i + 0.5f, (float)ic->y + H - bh, fm_maxf(1.0f, bw - 1.0f), bh,
-                a > 0.6f ? C_HI : C_AMB);
+        const float bh = H * (0.08f + 0.85f * a * LIVE), x = X0 + bw * ((float)i + 0.5f), base = Y0 + H - 1.0f;
+        const uint16_t c = ic_mix(ic_hue, pink, (float)i / (float)n);
+        ic_halo = SMALL || ic->h < 30 ? 0 : ic_dim(c, 45);
+        ic_line(x, base, x, base - bh, c);
+        ic_add(ic_round(x), ic_round(base - bh) - 1, c);
     }
 }
 
-static void i_wavetable(void)            /* rows of waves in perspective: the row (K0) lit, its shape (K1) */
+static void i_wavetable(void)            /* sheets of waves in perspective: the row (K0) lit, the shape (K1), the
+                                          * bank (K2) */
 {
-    const int32_t rows = ic->small ? 3 : 5;
-    for (int32_t j = 0; j < rows; j++) {
-        const float y0 = (float)ic->y + H * (0.25f + 0.62f * (float)j / (float)(rows - 1)), sh = (float)j * 3.0f;
+    const int32_t rows = SMALL ? 2 : 4;
+    const float dx = W * 0.14f, dy = H * 0.14f, w = W - dx - 2.0f;
+    for (int32_t j = rows - 1; j >= 0; j--) {
+        const float y0 = Y0 + H * (0.38f + 0.5f * (float)j / (float)(rows > 1 ? rows - 1 : 1)) - H * 0.12f;
         const int lit = (int32_t)(K0 * (float)(rows - 1) + 0.5f) == j;
-        float px = (float)ic->x + sh, py = y0;
-        for (int32_t i = 1; i <= ic->w - (int32_t)sh * 2; i++) {
-            const float u = (float)i / (W - sh * 2.0f), m = fm_minf(1.0f, K1 + (float)j * 0.15f);
-            const float s = fm_sinf(u * IC_TAU * 2.0f + T * (lit ? 2.0f : 0.5f));
-            const float v = s * (1.0f - m) + (s > 0.0f ? 1.0f : -1.0f) * m;
-            const float x = (float)ic->x + sh + (float)i, y = y0 - v * H * 0.1f * (lit ? LIVE * 1.4f : 0.7f);
-            ic_line(px, py, x, y, lit ? C_HI : C_DIM);
-            px = x;
-            py = y;
+        const uint16_t c = lit ? ic_hue : ic_dim(ic_hue, 160);
+        float fy[2][48];
+        const int32_t m = w > 46.0f ? 46 : (int32_t)w;
+        for (int32_t i = 0; i <= m; i++)
+            for (int32_t b = 0; b < 2; b++) {
+                const float u = (float)i / (float)m, mm = fm_minf(1.0f, K1 + (float)j * 0.12f);
+                const float s = fm_sinf(u * IC_TAU * (1.5f + K2) + T * (lit ? 1.6f : 0.4f) + (float)b * 0.9f);
+                const float v = s * (1.0f - mm) + (s > 0.0f ? 1.0f : -1.0f) * mm;
+                fy[b][i] = y0 - (float)b * dy - v * H * 0.1f * (lit ? LIVE * 1.3f : 0.8f);
+            }
+        ic_glow(ic_hue, lit ? 50 : 0);
+        for (int32_t b = 0; b < 2; b++) {
+            ic_move(X0 + 1.0f + (float)b * dx, fy[b][0]);
+            for (int32_t i = 1; i <= m; i++)
+                ic_to(X0 + 1.0f + (float)b * dx + w * (float)i / (float)m, fy[b][i], b ? ic_dim(c, 150) : c);
         }
+        if (!SMALL)
+            for (int32_t i = 0; i <= m; i += m / 6 > 0 ? m / 6 : 1)   /* the sheet's mesh */
+                ic_line(X0 + 1.0f + w * (float)i / (float)m, fy[0][i], X0 + 1.0f + dx + w * (float)i / (float)m,
+                        fy[1][i], ic_dim(c, 90));
     }
 }
 
-static void i_chords(void)               /* the chord's notes as bars: its type (K2), its inversion (K0) */
+static void i_chords(void)               /* the chord's notes as stacked planes: how many (its type, K2), the
+                                          * inversion (K0) the brightest, spreading as it plays */
 {
-    static const uint8_t TYPES[5][4] = {{0, 4, 7, 12}, {0, 3, 7, 10}, {0, 5, 7, 12}, {0, 4, 7, 11}, {0, 2, 7, 14}};
-    int32_t iv[4], lo = 99;
-    const uint8_t *ty = TYPES[(int32_t)fm_minf(4.0f, K2 * 5.0f)];
-    const int32_t inv = (int32_t)(K0 * 3.99f);
-    for (int32_t i = 0; i < 4; i++) {
-        iv[i] = ty[(i + inv) & 3] + ((i + inv) >= 4 ? 12 : 0);
-        lo = iv[i] < lo ? iv[i] : lo;
-    }
-    const float bw = W / 6.0f;
-    for (int32_t i = 0; i < 4; i++) {
-        const float bounce = 1.0f + 0.12f * HIT * fm_sinf(T * 9.0f + (float)i);
-        const float bh = H * (0.25f + 0.045f * (float)(iv[i] - lo)) * bounce;
-        const float bx = (float)ic->x + bw * (0.8f + (float)i * 1.15f), by = (float)ic->y + H - bh;
-        if (K1 > 0.5f)
-            ic_rect(bx, by, bw * 0.8f, bh, i & 1 ? C_AMB : C_HI);
-        else {
-            ic_line(bx, by, bx + bw * 0.8f - 1.0f, by, C_HI);
-            ic_line(bx, by, bx, by + bh - 1.0f, C_HI);
-            ic_line(bx + bw * 0.8f - 1.0f, by, bx + bw * 0.8f - 1.0f, by + bh - 1.0f, C_HI);
-        }
-    }
-}
-
-static void i_speech(void)               /* a mouth opening on the words, its formants below */
-{
-    const float cx = CX, cy = (float)ic->y + H * (ic->small ? 0.5f : 0.38f);
-    const float open = H * (0.04f + 0.22f * fm_fabsf(fm_sinf(T * 7.0f + K1 * 3.0f)) * LIVE);
-    const float wide = W * (0.18f + 0.1f * K0);
-    for (int32_t i = 0; i <= 20; i++) {  /* the lips: two arcs */
-        const float a0 = IC_PI * (float)i / 20.0f, a1 = IC_PI * (float)(i + 1) / 20.0f;
-        if (i < 20) {
-            const float x0 = cx - fm_cosf(a0) * wide, x1 = cx - fm_cosf(a1) * wide;
-            const float o0 = fm_sinf(a0) * open, o1 = fm_sinf(a1) * open;
-            ic_line(x0, cy - o0, x1, cy - o1, C_HI);
-            ic_line(x0, cy + o0, x1, cy + o1, C_AMB);
-        }
-    }
-    if (!ic->small)
-        for (int32_t i = 0; i < 3; i++) {  /* the formants */
-            const float drift = 0.08f * fm_sinf(T * 2.0f + (float)i + K2 * 4.0f);
-            const float fx = (float)ic->x + W * (0.2f + 0.3f * (float)i + drift);
-            const float fh = H * (0.08f + 0.12f * LIVE * (1.0f - 0.3f * (float)i));
-            ic_rect(fx - 1.0f, (float)ic->y + H - fh, 3.0f, fh, i ? C_AMB : C_HI);
-        }
-}
-
-static void i_swarm(void)                /* the swarm's dots: how many (K0), how far apart (K2) */
-{
-    const int32_t n = ic->small ? 8 : 10 + (int32_t)(K0 * 40.0f);
+    static const uint8_t NOTES[5] = {4, 4, 3, 4, 3};
+    const int32_t n = SMALL ? 3 : NOTES[(int32_t)fm_minf(4.0f, K2 * 5.0f)];
+    const int32_t top = (int32_t)(K0 * 3.99f) % n;
+    const float rx = fm_minf(W * 0.3f, H * 0.7f), ry = rx * 0.42f;
+    const float gap = H * (0.13f + 0.04f * HIT * fm_sinf(T * 9.0f) + 0.05f * K1);
+    const float y0 = CY + gap * (float)(n - 1) * 0.5f;
     for (int32_t i = 0; i < n; i++) {
-        const float a = T * (0.4f + (float)(i % 7) * 0.12f) + (float)i * 2.39f;
-        const float breathe = (0.85f + 0.15f * fm_sinf(T * 3.0f + (float)i)) * (1.0f + 0.3f * HIT);
-        const float r = (0.15f + 0.75f * ic_rnd((uint32_t)i)) * H * 0.5f * breathe;
-        const float j = K2 * 4.0f * fm_sinf(T * 7.0f + (float)i * 1.7f);
-        ic_rect(CX + fm_cosf(a) * r * 1.4f + j, CY + fm_sinf(a) * r + j, 2.0f, 2.0f, i % 3 ? C_AMB : C_HI);
+        const float y = y0 - gap * (float)i, cx = CX;
+        const uint16_t c = i == top ? ic_hue : ic_dim(ic_hue, 150);
+        ic_glow(ic_hue, i == top ? 60 : 30);
+        ic_move(cx - rx, y);
+        ic_to(cx, y - ry, c);
+        ic_to(cx + rx, y, c);
+        ic_to(cx, y + ry, c);
+        ic_to(cx - rx, y, c);
+        ic_halo = 0;
+        if (!SMALL)                      /* its face, faint */
+            for (float k = -0.6f; k <= 0.61f; k += 0.3f)
+                ic_line(cx - rx * (1.0f - fm_fabsf(k)) + 1.0f, y + ry * k, cx + rx * (1.0f - fm_fabsf(k)) - 1.0f,
+                        y + ry * k, ic_dim(ic_hue, 40));
     }
 }
 
-/* noise under a filter's curve: LP, BP, HP (K2), cutoff (K0), resonance (K1) */
-static void i_noise(void)
+static void i_speech(void)               /* a face of dots in profile, speaking (its jaw opening on the words), the
+                                          * words' wave beside it */
+{
+    static const int8_t FACE[][2] = {    /* the profile, facing right, brow to chin: x, y in 1/34 of the height */
+        {-2, -15}, {2, -14}, {4, -11}, {5, -8}, {5, -6}, {7, -3}, {9, 0}, {7, 1}, {6, 3}, {7, 4}, {6, 6},
+        {6, 7}, {6, 9}, {4, 12}, {0, 14}};
+    const int32_t nf = (int32_t)(sizeof FACE / sizeof FACE[0]);
+    const float s = H / 34.0f, fx = X0 + (SMALL ? W * 0.3f : W * 0.3f);
+    const float open = (0.3f + 1.4f * fm_fabsf(fm_sinf(T * 7.0f + K1 * 3.0f)) * LIVE) * s;
+    float px[16], py[16];
+    for (int32_t i = 0; i < nf; i++) {   /* (below the lips: the jaw, opening) */
+        px[i] = fx + (float)FACE[i][0] * s;
+        py[i] = CY + (float)FACE[i][1] * s + (FACE[i][1] > 5 ? open : 0.0f);
+    }
+    if (!SMALL) {                        /* the head behind the profile: a scatter of dots */
+        for (int32_t i = 0; i < 90; i++) {
+            const float v = ic_rnd((uint32_t)i * 3u), y = CY + (v * 29.0f - 15.0f) * s;
+            int32_t k = 0;
+            while (k + 2 < nf && py[k + 1] < y)
+                k++;
+            const float back = fx - 11.0f * s * fm_sqrtf(fm_maxf(0.0f, 1.0f - ((v - 0.45f) * 2.0f) * ((v - 0.45f) * 2.0f)));
+            const float x = back + (px[k] - back) * ic_rnd((uint32_t)i * 3u + 1u);
+            ic_add(ic_round(x), ic_round(y), ic_dim(ic_hue, 70 + (int32_t)(150.0f * (x - back) / fm_maxf(1.0f, px[k] - back))));
+        }
+    }
+    ic_glow(ic_hue, 60);                 /* the profile itself, dotted, bright */
+    for (int32_t i = 0; i + 1 < nf; i++) {
+        const float d = fm_maxf(fm_fabsf(px[i + 1] - px[i]), fm_fabsf(py[i + 1] - py[i]));
+        const int32_t m = SMALL ? 1 : (int32_t)(d / 2.0f) + 1;
+        for (int32_t k = 0; k < m; k++) {
+            const float u = (float)k / (float)m;
+            ic_lit(ic_round(px[i] + (px[i + 1] - px[i]) * u), ic_round(py[i] + (py[i + 1] - py[i]) * u), ic_hue);
+        }
+    }
+    const float wx = X0 + W * (SMALL ? 0.5f : 0.48f), ww = W - (wx - X0) - 1.0f;   /* the words: bursts of lines */
+    const uint16_t cyan = RGB(70, 200, 255);
+    ic_glow(cyan, 40);
+    for (int32_t i = 0; i < (int32_t)ww; i += SMALL ? 2 : 1) {
+        const float u = (float)i / ww, syl = fm_fabsf(fm_sinf(IC_PI * (u * (2.0f + K0 * 2.0f) - T * 1.5f)));
+        const float a = H * 0.42f * syl * (0.35f + 0.65f * ic_rnd((uint32_t)i + (uint32_t)(T * 20.0f) * 101u)) * LIVE;
+        ic_line(wx + (float)i, CY - a, wx + (float)i, CY + a, ic_dim(cyan, 120 + (int32_t)(136.0f * syl)));
+    }
+}
+
+static void i_swarm(void)                /* a spiral of dots turning, the inner faster: how many (K0), how loose (K2) */
+{
+    const int32_t n = SMALL ? 14 : 80 + (int32_t)(K0 * 100.0f);
+    const float R = fm_minf(W * 0.48f, H * 0.95f);
+    if (!SMALL) {
+        ic_glow(ic_hue, 0);
+        ic_ellipse(CX, CY, R * 0.95f, R * 0.32f, -0.25f, ic_dim(ic_hue, 60), 1);
+        ic_ellipse(CX, CY, R * 0.6f, R * 0.2f, -0.25f, ic_dim(ic_hue, 70), 1);
+    }
+    for (int32_t i = 0; i < n; i++) {
+        const float r = fm_sqrtf(ic_rnd((uint32_t)i * 7u)) * (1.0f + 0.15f * HIT), arm = (float)(i & 1) * IC_PI;
+        const float a = arm + r * 4.0f + T * (0.3f + 0.9f * (1.0f - r)) + ic_gauss((uint32_t)i * 7u + 3u) * (0.3f + K2);
+        const float x = CX + fm_cosf(a) * r * R, y = CY + fm_sinf(a) * r * R * 0.36f;
+        const uint16_t c = ic_dim(ic_hue, 256 - (int32_t)(100.0f * r));
+        ic_add(ic_round(x), ic_round(y), c);
+        if (!SMALL && r < 0.35f)
+            ic_add(ic_round(x) + 1, ic_round(y), ic_dim(c, 140));
+    }
+    ic_disc(CX, CY, SMALL ? 1.0f : 2.0f + HIT, ic_dim(RGB(255, 230, 180), 200));
+}
+
+static void i_noise(void)                /* a cloud of white noise, new each frame: its spread (K0, the cutoff),
+                                          * a ring in it (K1, the resonance) */
 {
     const uint32_t frame = (uint32_t)(T * 20.0f);
-    const int32_t n = ic->small ? 20 : 120;
-    for (int32_t i = 0; i < n; i++)
-        ic_pset(ic->x + (int32_t)(ic_rnd(frame * 977u + (uint32_t)i) * W),
-                ic->y + (int32_t)(ic_rnd(frame * 131u + (uint32_t)i + 7777u) * H), C_DIM);
-    const int mode = K2 < 0.33f ? 0 : K2 < 0.66f ? 1 : 2;
-    float px = 0.0f, py = 0.0f;
-    for (int32_t i = 0; i <= ic->w; i++) {
-        const float u = (float)i / W, d = (u - (0.1f + 0.8f * K0)) * 8.0f;
-        const float lp = 1.0f / (1.0f + fm_expf(d * 1.5f)), hp = 1.0f - lp, peak = K1 * 0.6f * fm_expf(-d * d);
-        const float g = (mode == 0 ? lp : mode == 1 ? fm_expf(-d * d * 0.5f) : hp) + peak;
-        const float x = (float)(ic->x + i);
-        const float y = (float)ic->y + H * (0.9f - 0.7f * fm_minf(1.2f, g) * (0.7f + 0.3f * LIVE));
-        if (i)
-            ic_line(px, py, x, y, C_HI);
-        px = x;
-        py = y;
-    }
-}
-
-static void i_particle(void)             /* sparks falling, a flash at each note */
-{
-    const int32_t n = ic->small ? 5 : 6 + (int32_t)(K0 * 20.0f);
+    const int32_t n = SMALL ? 18 : 120 + (int32_t)(W * 2.0f);
+    const float rx = W * (0.3f + 0.4f * K0) * (0.85f + 0.15f * LIVE), ry = H * (0.42f + 0.3f * K0);
     for (int32_t i = 0; i < n; i++) {
-        const float sp = 0.3f + 0.7f * ic_rnd((uint32_t)i * 3u), ph = T * sp + ic_rnd((uint32_t)i * 3u + 1u);
-        const float y = (float)ic->y + (ph - fm_floorf(ph)) * H, x = (float)ic->x + ic_rnd((uint32_t)i * 3u + 2u) * W;
-        ic_line(x, y - 3.0f * sp - 1.0f, x, y, C_DIM);
-        ic_pset((int32_t)x, (int32_t)y, HIT > 0.6f && (i & 1) ? C_WHITE : C_HI);
+        const uint32_t s = frame * 977u + (uint32_t)i * 3u;
+        float gx = ic_gauss(s), gy = ic_gauss(s + 1u);
+        if (K1 > 0.5f && (i & 3) == 0) { /* resonance: some on a ring */
+            const float a = ic_rnd(s + 2u) * IC_TAU;
+            gx = fm_cosf(a) * 0.8f;
+            gy = fm_sinf(a) * 0.8f;
+        }
+        const float lum = 1.0f - 0.6f * fm_fabsf(gx) - 0.3f * fm_fabsf(gy);
+        ic_add(ic_round(CX + gx * rx), ic_round(CY + gy * ry), ic_dim(ic_hue, (int32_t)(110.0f + 146.0f * lum * ic_rnd(s + 5u))));
     }
 }
 
-static void i_string(void)               /* a string between two pegs, ringing after each pluck */
+static void i_particle(void)             /* orbs on tilted orbits, sparkling: how many (K0), a flash at each note */
 {
-    const float x0 = (float)ic->x + 4.0f, x1 = (float)ic->x + W - 4.0f, cy = CY, a = (0.06f + 0.94f * HIT) * H * 0.36f;
-    ic_rect(x0 - 3.0f, cy - 4.0f, 3.0f, 8.0f, C_GRAY);
-    ic_rect(x1, cy - 4.0f, 3.0f, 8.0f, C_GRAY);
-    float px = x0, py = cy;
-    for (int32_t i = 1; i <= (int32_t)(x1 - x0); i++) {
-        const float u = (float)i / (x1 - x0);
-        const float d = a * fm_sinf(IC_PI * u) * fm_sinf(T * 38.0f) +
-                        a * 0.5f * K2 * fm_sinf(3.0f * IC_PI * u) * fm_sinf(T * 61.0f);
-        ic_line(px, py, x0 + (float)i, cy - d, C_HI);
-        px = x0 + (float)i;
-        py = cy - d;
+    const int32_t orbs = SMALL ? 3 : 4 + (int32_t)(K0 * 6.0f);
+    const float R = fm_minf(W * 0.46f, H * 0.95f);
+    if (!SMALL) {
+        ic_glow(ic_hue, 0);
+        ic_ellipse(CX, CY, R, R * 0.34f, 0.35f, ic_dim(ic_hue, 110), 0);
+        ic_ellipse(CX, CY, R * 0.7f, R * 0.42f, -0.5f, ic_dim(ic_hue, 90), 0);
+    }
+    for (int32_t i = 0; i < orbs; i++) {
+        const float a = T * (0.6f + 0.25f * (float)(i % 3)) + (float)i * 2.1f, tilt = i & 1 ? -0.5f : 0.35f;
+        const float rx = (i & 1 ? 0.7f : 1.0f) * R, ry = (i & 1 ? 0.42f : 0.34f) * R;
+        const float ex = rx * fm_cosf(a), ey = ry * fm_sinf(a);
+        const float x = CX + ex * fm_cosf(tilt) - ey * fm_sinf(tilt), y = CY + ex * fm_sinf(tilt) + ey * fm_cosf(tilt);
+        const float size = SMALL ? 0.6f : 1.2f + 1.2f * ic_rnd((uint32_t)i) + 1.5f * HIT;
+        ic_disc(x, y, size + 1.0f, ic_dim(ic_hue, 70));
+        ic_disc(x, y, size, ic_mix(ic_hue, C_WHITE, 0.25f + 0.5f * HIT));
+    }
+    if (!SMALL)
+        for (int32_t i = 0; i < 16; i++) {   /* sparks */
+            const uint32_t s = (uint32_t)i * 13u + (uint32_t)(T * 8.0f) * 131u;
+            ic_add(ic_round(CX + ic_gauss(s) * R), ic_round(CY + ic_gauss(s + 1u) * R * 0.5f), ic_dim(ic_hue, 160));
+        }
+}
+
+static void i_string(void)               /* a ribbon of strings swaying, ringing after each pluck: the material (K2)
+                                          * a shimmer on it */
+{
+    const int32_t n = SMALL ? 2 : 6;
+    const float a = H * (0.12f + 0.24f * HIT);
+    for (int32_t j = 0; j < n; j++) {
+        const float off = ((float)j - (float)(n - 1) * 0.5f) * (SMALL ? 2.0f : 1.6f);
+        ic_glow(ic_hue, j == n / 2 ? 55 : 0);
+        for (int32_t i = 0; i <= ic->w; i++) {
+            const float u = (float)i / W;
+            const float y = CY + off + a * fm_sinf(IC_PI * u * 1.6f + T * 1.6f + (float)j * 0.18f) +
+                            a * 0.3f * K2 * fm_sinf(5.0f * IC_PI * u + T * 9.0f);
+            if (i == 0)
+                ic_move(X0, y);
+            else
+                ic_to(X0 + (float)i, y, ic_dim(ic_hue, j == n / 2 ? 256 : 120 + 15 * j));
+        }
     }
 }
 
-static void i_kick(void)                 /* a membrane's rings jumping at each hit, the pitch's sweep beside */
+static void i_modal(void)                /* a struck dome, its ripples spreading round it as it rings */
 {
-    const float cx = (float)ic->x + W * (ic->small ? 0.5f : 0.36f), cy = CY, r = H * 0.32f;
-    for (int32_t i = 2; i >= 0; i--)
-        ic_circle(cx, cy, r * (0.45f + 0.28f * (float)i) * (1.0f + 0.3f * HIT * (1.0f - (float)i * 0.25f)),
-                  i == 0 ? C_HI : i == 1 ? C_AMB : C_DIM, 0);
-    ic_disc(cx, cy, r * 0.22f * (1.0f + HIT), HIT > 0.7f ? C_WHITE : C_HI);
-    if (ic->small)
-        return;
-    const float sx = (float)ic->x + W * 0.7f, sw = W * 0.27f, base = (float)ic->y + H * 0.85f;
-    ic_line(sx, base, sx + sw, base, C_LINE);
-    float px = sx, py = base - H * 0.7f;
-    for (int32_t i = 1; i <= (int32_t)sw; i++) {
-        const float u = (float)i / sw, y = base - H * 0.7f * fm_expf(-u * (2.0f + K2 * 10.0f));
-        ic_line(px, py, sx + (float)i, y, C_HI);
-        px = sx + (float)i;
-        py = y;
+    const float R = fm_minf(W * 0.3f, H * 0.62f), base = CY + H * 0.18f;
+    if (!SMALL)
+        for (int32_t i = 0; i < 4; i++) {   /* the ripples, travelling out */
+            float s = T * (0.25f + 0.25f * K1) + (float)i * 0.25f + HIT * 0.2f;
+            s -= fm_floorf(s);
+            ic_glow(ic_hue, 0);
+            ic_ellipse(CX, base, R * (0.9f + 0.9f * s), R * (0.9f + 0.9f * s) * 0.24f, 0.0f,
+                       ic_dim(ic_hue, (int32_t)(220.0f * (1.0f - s))), 0);
+        }
+    const float d = R * (0.7f + 0.08f * HIT * fm_sinf(T * 30.0f));   /* the dome, its latitudes */
+    ic_glow(ic_hue, 60);
+    for (int32_t k = 0; k <= (SMALL ? 1 : 3); k++) {
+        const float lat = (float)k / 4.0f, rr = d * fm_sqrtf(1.0f - lat * lat), yy = base - d * 1.1f * lat;
+        ic_move(CX - rr, yy);
+        for (int32_t i = 1; i <= 16; i++) {
+            const float t = IC_PI * (float)i / 16.0f;
+            ic_to(CX - rr * fm_cosf(t), yy - rr * 0.22f * fm_sinf(t) * (k == 0 ? 0.0f : 1.0f), k == 0 ? ic_hue : ic_dim(ic_hue, 170));
+        }
+    }
+    ic_move(CX - d, base);                   /* its outline */
+    for (int32_t i = 1; i <= 20; i++) {
+        const float t = IC_PI * (float)i / 20.0f;
+        ic_to(CX - d * fm_cosf(t), base - d * 1.1f * fm_sinf(t), HIT > 0.7f ? ic_mix(ic_hue, C_WHITE, 0.5f) : ic_hue);
     }
 }
 
-static void i_syn_kick(void)
+static void i_kick(void)                 /* rings round a glowing core, jumping out at each hit: the punch (K2)
+                                          * spreads them, the decay (K1) keeps them lit */
 {
-    ic_line(ic->x, CY, ic->x + W, CY, C_LINE);
-    ic_wave(f_chirp, CY, H * 0.44f, C_HI);
+    const float R = fm_minf(W * 0.48f, H * 0.48f);
+    const int32_t n = SMALL ? 2 : 4;
+    for (int32_t i = n - 1; i >= 0; i--) {
+        const float r = R * (0.3f + (0.7f / (float)n) * (float)(i + 1) * (0.85f + 0.3f * K2)) *
+                        (1.0f + 0.25f * HIT * (1.0f - (float)i * 0.15f));
+        ic_glow(ic_hue, 60);
+        ic_ellipse(CX, CY, r, r, 0.0f, ic_dim(ic_hue, (int32_t)(256.0f - (float)i * (70.0f - 40.0f * K1))), 0);
+    }
+    ic_disc(CX, CY, R * 0.22f * (1.0f + 0.5f * HIT) + 1.0f, ic_dim(ic_hue, 120));
+    ic_disc(CX, CY, R * 0.16f * (1.0f + 0.5f * HIT), ic_mix(ic_hue, C_WHITE, 0.2f + 0.5f * HIT));
 }
 
-static void i_snare(void)                /* a drum side on: its head jumps, its wires buzz (SNAPPY) */
+static void i_syn_kick(void)             /* SYN KICK: its sweep, a sine falling in pitch, and its core */
 {
-    const float x0 = (float)ic->x + W * 0.15f, x1 = (float)ic->x + W * 0.85f, top = (float)ic->y + H * 0.3f;
-    const float bot = (float)ic->y + H * 0.62f, bulge = H * 0.08f * HIT;
-    for (int32_t i = 0; i < 8; i++) {    /* the head, bowed by the hit */
-        const float u0 = (float)i / 8.0f, u1 = (float)(i + 1) / 8.0f;
-        ic_line(x0 + (x1 - x0) * u0, top + bulge * fm_sinf(IC_PI * u0),
-                x0 + (x1 - x0) * u1, top + bulge * fm_sinf(IC_PI * u1), HIT > 0.7f ? C_WHITE : C_HI);
-    }
-    ic_line(x0, top, x0, bot, C_AMB);
-    ic_line(x1, top, x1, bot, C_AMB);
-    ic_line(x0, bot, x1, bot, C_AMB);
-    const float buzz = H * 0.08f * (0.15f + K2) * HIT;
-    for (int32_t i = 0; i < (ic->small ? 4 : 12); i++) {   /* the wires */
-        const float x = x0 + (x1 - x0) * ((float)i + 0.5f) / (ic->small ? 4.0f : 12.0f);
-        const float b = buzz * fm_sinf(T * 50.0f + (float)i);
-        ic_line(x - 2.0f, bot + 3.0f + b, x + 2.0f, bot + 3.0f - b, C_HI);
-    }
+    ic_glow(ic_hue, 60);
+    ic_wave(f_chirp, CY, H * 0.44f, ic_hue);
+    if (!SMALL)
+        ic_disc(X0 + 4.0f, CY, 2.0f + 2.0f * HIT, ic_mix(ic_hue, C_WHITE, 0.4f));
 }
 
-static void i_syn_snare(void)            /* an FM drum, its noise bursting (SNAPPY) */
+static void i_snare(void)                /* a starburst at each hit: its rays (SNAPPY: more, sparks at their ends) */
 {
-    ic_circle(CX, CY, H * 0.24f * (1.0f + 0.25f * HIT), C_HI, 0);
-    ic_circle(CX, CY, H * 0.12f, C_AMB, 0);
-    const int32_t n = (int32_t)((ic->small ? 10.0f : 50.0f) * (0.2f + K2) * HIT);
+    const float R = fm_minf(W * 0.48f, H * 0.5f);
+    const int32_t n = SMALL ? 8 : 28 + (int32_t)(K2 * 20.0f);
+    const uint32_t frame = (uint32_t)(T * 12.0f);
+    for (int32_t i = 0; i < n; i++) {
+        const float a = IC_TAU * ((float)i + 0.3f * ic_rnd(frame * 7u + (uint32_t)i)) / (float)n;
+        const float len = R * (0.25f + 0.75f * ic_rnd((uint32_t)i * 11u + frame)) * (SMALL ? 0.7f + 0.3f * HIT : 0.35f + 0.65f * HIT);
+        ic_glow(ic_hue, 0);
+        ic_line(CX, CY, CX + fm_cosf(a) * len * (W > H ? 1.25f : 1.0f), CY + fm_sinf(a) * len,
+                ic_dim(ic_hue, 140 + (int32_t)(116.0f * ic_rnd((uint32_t)i))));
+        if (!SMALL && K2 > 0.3f && (i & 3) == 0)
+            ic_add(ic_round(CX + fm_cosf(a) * len * 1.35f), ic_round(CY + fm_sinf(a) * len * 1.1f), C_WHITE);
+    }
+    ic_disc(CX, CY, SMALL ? 1.0f : 2.0f + 2.0f * HIT, ic_mix(ic_hue, C_WHITE, 0.6f));
+}
+
+static void i_syn_snare(void)            /* SYN SNARE: an FM drum's ring, its noise bursting round it (SNAPPY) */
+{
+    const float R = fm_minf(W * 0.3f, H * 0.32f) * (1.0f + 0.25f * HIT);
+    ic_glow(ic_hue, 60);
+    ic_ellipse(CX, CY, R, R, 0.0f, ic_hue, 0);
+    ic_ellipse(CX, CY, R * 0.5f, R * 0.5f, 0.0f, ic_dim(ic_hue, 160), 0);
+    const int32_t n = (int32_t)((SMALL ? 10.0f : 60.0f) * (0.2f + K2) * (0.2f + HIT));
     const uint32_t frame = (uint32_t)(T * 25.0f);
     for (int32_t i = 0; i < n; i++) {
-        const float a = ic_rnd(frame * 31u + (uint32_t)i) * IC_TAU;
-        const float r = H * (0.28f + 0.2f * ic_rnd(frame * 57u + (uint32_t)i));
-        ic_pset((int32_t)(CX + fm_cosf(a) * r * 1.3f), (int32_t)(CY + fm_sinf(a) * r), C_GRAY);
+        const float a = ic_rnd(frame * 31u + (uint32_t)i) * IC_TAU, r = R * (1.2f + 0.9f * ic_rnd(frame * 57u + (uint32_t)i));
+        ic_add(ic_round(CX + fm_cosf(a) * r * 1.3f), ic_round(CY + fm_sinf(a) * r), ic_dim(RGB(220, 230, 255), 200));
     }
 }
 
-static void i_hat(void)                  /* six square waves' metal: spokes shimmering at each hit */
+static void i_hat(void)                  /* metal's spikes, up and down from the middle, at each hit: the decay (K1)
+                                          * how far they spread */
 {
-    const float cx = CX, cy = CY;
-    for (int32_t i = 0; i < 8; i++) {
-        const float a = (float)i / 8.0f * IC_TAU + T * 0.6f, r1 = H * 0.12f;
-        const float r2 = H * (0.2f + 0.25f * HIT * (0.6f + 0.4f * fm_sinf(T * 23.0f + (float)i * 5.0f)));
-        ic_line(cx + fm_cosf(a) * r1, cy + fm_sinf(a) * r1, cx + fm_cosf(a) * r2, cy + fm_sinf(a) * r2,
-                i & 1 ? C_AMB : C_HI);
+    const uint32_t frame = (uint32_t)(T * 18.0f);
+    const float spread = 0.12f + 0.3f * K1;
+    ic_glow(ic_hue, 0);
+    for (int32_t i = 0; i < ic->w; i += SMALL ? 2 : 1) {
+        const float u = (float)i / W - 0.5f, env = fm_expf(-u * u / (spread * spread));
+        const float a = H * 0.46f * env * (0.25f + 0.75f * ic_rnd(frame * 61u + (uint32_t)i)) * (SMALL ? 0.7f + 0.3f * HIT : 0.3f + 0.7f * HIT);
+        ic_line(X0 + (float)i, CY - a, X0 + (float)i, CY + a, ic_dim(ic_hue, 110 + (int32_t)(146.0f * env)));
     }
-    ic_disc(cx, cy, H * 0.08f, HIT > 0.7f ? C_WHITE : C_HI);
-    const int32_t m = ic->small ? 0 : (int32_t)(K2 * 30.0f * HIT);
-    for (int32_t i = 0; i < m; i++)
-        ic_pset((int32_t)(cx + fm_sinf((float)i * 12.9f + T * 40.0f) * H * 0.45f),
-                (int32_t)(cy + fm_cosf((float)i * 7.3f + T * 31.0f) * H * 0.4f), C_GRAY);
+    ic_line(X0, CY, X0 + W - 1.0f, CY, ic_dim(ic_hue, 70));
 }
 
-static void i_ring_hat(void)             /* two rings beating against each other */
+static void i_ring_hat(void)             /* RING HAT: two rings beating against each other, sparks between */
 {
-    const float d = W * (0.08f + 0.06f * fm_sinf(T * 9.0f) * (0.3f + HIT)), r = H * 0.26f * (1.0f + 0.15f * HIT);
-    ic_circle(CX - d, CY, r, C_HI, 0);
-    ic_circle(CX + d, CY, r, C_AMB, 0);
-    if (!ic->small)
-        for (int32_t i = 0; i < (int32_t)(20.0f * HIT * (0.3f + K2)); i++)
-            ic_pset((int32_t)(CX + (ic_rnd((uint32_t)i + (uint32_t)(T * 30.0f) * 13u) - 0.5f) * W * 0.6f),
-                    (int32_t)(CY + (ic_rnd((uint32_t)i * 7u + (uint32_t)(T * 30.0f)) - 0.5f) * H * 0.6f), C_WHITE);
+    const float d = W * (0.08f + 0.06f * fm_sinf(T * 9.0f) * (0.3f + HIT)), r = fm_minf(W, H) * 0.3f * (1.0f + 0.15f * HIT);
+    ic_glow(ic_hue, 60);
+    ic_ellipse(CX - d, CY, r, r, 0.0f, ic_hue, 0);
+    ic_ellipse(CX + d, CY, r, r, 0.0f, ic_dim(ic_hue, 190), 0);
+    if (!SMALL)
+        for (int32_t i = 0; i < (int32_t)(24.0f * HIT * (0.3f + K2)); i++)
+            ic_add(ic_round(CX + (ic_rnd((uint32_t)i + (uint32_t)(T * 30.0f) * 13u) - 0.5f) * W * 0.6f),
+                   ic_round(CY + (ic_rnd((uint32_t)i * 7u + (uint32_t)(T * 30.0f)) - 0.5f) * H * 0.6f), C_WHITE);
 }
 
-static void i_vcf(void)                  /* a saw under a low-pass's curve: cutoff (K0), resonance (K2) */
+static void i_vcf(void)                  /* a low-pass's curve, its resonant peak (K2) at the cutoff (K0), the light
+                                          * under it falling away */
 {
     float px = 0.0f, py = 0.0f;
     for (int32_t i = 0; i <= ic->w; i++) {
-        const float u = (float)i / W, v = u * 3.0f + T * 0.5f, p = v - fm_floorf(v);
-        if (!ic->small)
-            ic_pset(ic->x + i, ic->y + (int32_t)(H * (0.55f - 0.25f * (p * 2.0f - 1.0f))), C_LINE);
-        const float fc = 0.15f + 0.7f * K0 + 0.04f * fm_sinf(T * 1.5f) * LIVE, d = (u - fc) * 10.0f;
-        const float g = 1.0f / (1.0f + fm_expf(d)) + K2 * 0.9f * fm_expf(-d * d * 1.5f);
-        const float x = (float)(ic->x + i), y = (float)ic->y + H * (0.9f - 0.62f * g);
-        if (i)
-            ic_line(px, py, x, y, C_HI);
+        const float u = (float)i / W, fc = 0.18f + 0.62f * K0 + 0.05f * fm_sinf(T * 1.5f) * LIVE, d = (u - fc) * 10.0f;
+        const float g = 1.0f / (1.0f + fm_expf(d)) + (0.25f + K2 * 0.8f) * fm_expf(-d * d * 1.5f);
+        const float x = X0 + (float)i, y = Y0 + H * (0.92f - 0.62f * g);
+        if (!SMALL && (i % 3) == 0)          /* the light under it */
+            ic_line(x, y + 2.0f, x, Y0 + H - 1.0f, ic_dim(ic_hue, (int32_t)(30.0f + 50.0f * g)));
+        if (i) {
+            ic_glow(ic_hue, 60);
+            ic_move(px, py);
+            ic_to(x, y, ic_hue);
+        }
         px = x;
         py = y;
     }
 }
 
-static void i_phase_dist(void)
+static void i_phase_dist(void)           /* a spiral turning in, wound tighter by the amount (K0), bent by the
+                                          * asymmetry (K1) */
 {
-    if (!ic->small)
-        ic_wave(f_sine, CY, H * 0.38f, C_LINE);
-    ic_wave(f_bent, CY, H * 0.38f * LIVE, C_HI);
-}
-
-static void i_six_op(uint32_t bank)      /* six operators in an algorithm: the patch (K2) picks its layout */
-{
-    static const uint8_t ALGS[3][6][2] = {{{0, 0}, {1, 0}, {2, 0}, {0, 1}, {1, 1}, {2, 1}},
-                                          {{1, 0}, {0, 1}, {2, 1}, {0, 2}, {1, 2}, {2, 2}},
-                                          {{0, 0}, {0, 1}, {0, 2}, {2, 0}, {2, 1}, {2, 2}}};
-    const uint8_t (*l)[2] = ALGS[((int32_t)(K2 * 31.99f) + (int32_t)bank) % 3];
-    const float bw = ic->small ? 4.0f : W * 0.2f, bh = ic->small ? 3.0f : H * 0.17f;
-    const float gx = (W - 3.0f * bw) / 4.0f, gy = (H - 3.0f * bh) / 4.0f;
-    float px[6], py[6];
-    for (int32_t i = 0; i < 6; i++) {
-        px[i] = (float)ic->x + gx + (float)l[i][0] * (bw + gx);
-        py[i] = (float)ic->y + gy + (float)l[i][1] * (bh + gy);
-    }
-    for (int32_t i = 0; i < 5; i++)
-        ic_line(px[i] + bw * 0.5f, py[i] + bh, px[i + 1] + bw * 0.5f, py[i + 1], C_DIM);
-    for (int32_t i = 0; i < 6; i++) {
-        const float lit = K0 * 0.6f + 0.4f * HIT * (0.5f + 0.5f * fm_sinf(T * 4.0f - (float)i * 0.7f));
-        ic_rect(px[i], py[i], bw, bh, lit > 0.55f ? C_HI : lit > 0.3f ? C_AMB : C_DIM);
-    }
-}
-
-static void i_terrain(void)              /* a terrain's contours, a path across it (radius K0, offset K1) */
-{
-    for (int32_t j = 0; j < (ic->small ? 2 : 4); j++) {
-        float px = 0.0f, py = 0.0f;
-        for (int32_t i = 0; i <= ic->w; i += 2) {
-            const float u = (float)i / W;
-            const float y = (float)ic->y + H * (0.2f + 0.2f * (float)j) +
-                            H * 0.06f * fm_sinf(u * 9.0f + (float)j * 1.3f + K2 * 4.0f);
-            if (i)
-                ic_line(px, py, (float)(ic->x + i), y, C_DIM);
-            px = (float)(ic->x + i);
-            py = y;
-        }
-    }
-    const float ox = CX + W * 0.2f * (K1 - 0.5f), rx = W * (0.12f + 0.25f * K0), ry = H * (0.12f + 0.25f * K0);
-    float px = ox + rx, py = CY;
-    for (int32_t i = 1; i <= 24; i++) {
-        const float a = IC_TAU * (float)i / 24.0f, x = ox + rx * fm_cosf(a), y = CY + ry * fm_sinf(a);
-        ic_line(px, py, x, y, C_AMB);
-        px = x;
-        py = y;
-    }
-    ic_disc(ox + rx * fm_cosf(T * 2.0f), CY + ry * fm_sinf(T * 2.0f), 2.0f, HIT > 0.7f ? C_WHITE : C_HI);
-}
-
-static void i_string_machine(void)       /* four strings, detuned, shimmering (chorus K0) */
-{
-    for (int32_t j = 0; j < 4; j++) {
-        const float y0 = (float)ic->y + H * (0.2f + 0.2f * (float)j);
-        float px = (float)ic->x, py = y0;
-        for (int32_t i = 1; i <= ic->w; i++) {
-            const float u = (float)i / W;
-            const float ph = u * IC_TAU * (2.0f + (float)j * 0.3f) + T * (2.0f + K0 * 3.0f * (float)j);
-            const float y = y0 - H * 0.06f * LIVE * fm_sinf(ph);
-            ic_line(px, py, (float)(ic->x + i), y, j & 1 ? C_AMB : C_HI);
-            px = (float)(ic->x + i);
-            py = y;
+    const float R = fm_minf(W * 0.46f, H * 0.5f), turns = 1.5f + 2.5f * K0 * LIVE;
+    const int32_t lines = SMALL ? 1 : 3;
+    for (int32_t j = 0; j < lines; j++) {
+        const int32_t n = (int32_t)(turns * 40.0f);
+        ic_glow(ic_hue, j == 0 ? 55 : 0);
+        for (int32_t i = 0; i <= n; i++) {
+            const float f = (float)i / (float)n, a = f * turns * IC_TAU + T * 1.2f + (float)j * 0.12f;
+            const float r = R * (1.0f - f) * (1.0f + 0.25f * (K1 - 0.5f) * fm_cosf(a));
+            const float x = CX + fm_cosf(a) * r * (W > H ? 1.35f : 1.0f), y = CY + fm_sinf(a) * r;
+            if (i == 0)
+                ic_move(x, y);
+            else
+                ic_to(x, y, ic_dim(ic_hue, j == 0 ? 256 : 110));
         }
     }
 }
 
-static void i_chiptune(void) { ic_wave(f_chip, CY, H * 0.38f * (0.6f + 0.4f * LIVE), C_HI); }
+static void i_six_op(uint32_t bank)      /* a sphere of wire loops turning: as many as the brightness (K0) lights,
+                                          * the patch (K2) their tilts */
+{
+    const int32_t n = SMALL ? 2 : 4 + (int32_t)(K0 * 2.0f);
+    const float R = fm_minf(W * 0.42f, H * 0.46f) * (1.0f + 0.08f * HIT);
+    for (int32_t k = 0; k < n; k++) {
+        const float psi = IC_PI * (float)k / (float)n + (float)bank * 0.4f + K2 * 1.3f;
+        const float ry = R * fm_fabsf(fm_cosf(T * 0.6f + (float)k * 1.1f + K2 * 2.0f));
+        ic_glow(ic_hue, k == 0 ? 55 : 30);
+        ic_ellipse(CX, CY, R * (W > H ? 1.25f : 1.0f), ry + 1.0f, psi, ic_dim(ic_hue, k == 0 ? 256 : 180), 0);
+    }
+}
+
+static void i_terrain(void)              /* wire mountains in perspective, a light travelling the path (radius K0,
+                                          * offset K1) across them */
+{
+    const int32_t rows = SMALL ? 2 : 5, cols = SMALL ? 6 : 12;
+    float yy[5][13], xx[5][13];
+    for (int32_t j = 0; j < rows; j++)
+        for (int32_t i = 0; i <= cols; i++) {
+            const float depth = (float)j / (float)(rows > 1 ? rows - 1 : 1), shrink = 1.0f - 0.35f * depth;
+            const float u = (float)i / (float)cols;
+            const float hgt = fm_fabsf(fm_sinf(u * 7.0f + (float)j * 1.7f + K2 * 4.0f + T * 0.15f)) *
+                              fm_fabsf(fm_sinf(u * 3.0f + (float)j * 0.9f)) * (0.7f + 0.3f * LIVE);
+            xx[j][i] = CX + (u - 0.5f) * W * shrink;
+            yy[j][i] = Y0 + H * (0.95f - 0.13f * (float)j) - hgt * H * 0.5f * shrink;
+        }
+    ic_glow(ic_hue, 0);
+    for (int32_t j = rows - 1; j >= 0; j--) {
+        ic_move(xx[j][0], yy[j][0]);
+        for (int32_t i = 1; i <= cols; i++)
+            ic_to(xx[j][i], yy[j][i], ic_dim(ic_hue, 256 - 30 * j));
+        if (j > 0 && !SMALL)
+            for (int32_t i = 0; i <= cols; i += 2)
+                ic_line(xx[j][i], yy[j][i], xx[j - 1][i], yy[j - 1][i], ic_dim(ic_hue, 70));
+    }
+    const float a = T * 1.2f, ox = CX + W * 0.25f * (K1 - 0.5f), r = W * (0.1f + 0.2f * K0);
+    ic_disc(ox + fm_cosf(a) * r, Y0 + H * 0.45f + fm_sinf(a) * r * 0.3f, SMALL ? 1.0f : 1.5f + HIT,
+            ic_mix(ic_hue, C_WHITE, 0.5f));
+}
+
+static void i_string_machine(void)       /* a bundle of detuned waves, chorused (K0) */
+{
+    const int32_t n = SMALL ? 2 : 6;
+    for (int32_t j = 0; j < n; j++) {
+        const float det = 1.0f + ((float)j - 2.5f) * 0.03f * (0.3f + K0);
+        const float a = H * 0.36f * (0.8f + 0.2f * fm_sinf(T * 0.7f + (float)j)) * LIVE;
+        ic_glow(ic_hue, j == 0 ? 50 : 0);
+        for (int32_t i = 0; i <= ic->w; i++) {
+            const float u = (float)i / W, y = CY - a * fm_sinf(u * IC_TAU * 1.6f * det + T * (1.2f + 0.3f * (float)j));
+            if (i == 0)
+                ic_move(X0, y);
+            else
+                ic_to(X0 + (float)i, y, ic_dim(ic_hue, j == 0 ? 256 : 140 - 10 * j));
+        }
+    }
+}
+
+static void i_chiptune(void)             /* pixels stepping up an arpeggio, 8-bit: its pulse width (K1) their size */
+{
+    static const int8_t ARP[8] = {0, 2, 4, 2, 5, 3, 1, 3};
+    const float s = SMALL ? 2.0f : fm_maxf(3.0f, H / 6.0f), step = s + 2.0f;
+    const int32_t n = (int32_t)(W / step), shift = (int32_t)(T * (4.0f + K0 * 4.0f));
+    for (int32_t i = 0; i < n; i++) {
+        const int32_t v = ARP[(i + shift) & 7];
+        const float x = X0 + (float)i * step, y = CY - s * 0.5f + ((float)v - 2.5f) * (H * 0.15f) * LIVE;
+        const float sz = s * (0.7f + 0.3f * K1);
+        ic_halo = 0;
+        for (int32_t j = 0; j < (int32_t)sz; j++)
+            for (int32_t k = 0; k < (int32_t)sz; k++)
+                ic_add(ic_round(x) + k, ic_round(y) + j, (j == 0 || k == 0) ? ic_dim(ic_hue, 160) : ic_hue);
+        if (!SMALL && i + 1 < n) {       /* the step to the next, faint */
+            const float ny = CY - s * 0.5f + ((float)ARP[(i + 1 + shift) & 7] - 2.5f) * (H * 0.15f) * LIVE;
+            ic_line(x + sz, y + sz * 0.5f, x + step, y + sz * 0.5f, ic_dim(ic_hue, 70));
+            ic_line(x + step, y + sz * 0.5f, x + step, ny + sz * 0.5f, ic_dim(ic_hue, 70));
+        }
+        if (!SMALL && ic_rnd((uint32_t)(i * 31 + shift)) > 0.7f)   /* a stray pixel near */
+            ic_add(ic_round(x), ic_round(y - step * 1.5f), ic_dim(ic_hue, 110));
+    }
+}
 
 /* an engine's icon (GRAV_ENGINE_*), drawn into i's box */
 static void icon_draw(uint32_t engine, const icon_t *i)
 {
     ic = i;
+    ic_hue = ENGINE_HUE[engine < GRAV_ENGINE_ALL ? engine : 0];
+    ic_halo = 0;
     switch (engine) {
     case GRAV_ENGINE_WAVESHAPING: i_waveshape(); break;
     case GRAV_ENGINE_FM: i_fm(); break;
@@ -556,6 +771,7 @@ static void icon_draw(uint32_t engine, const icon_t *i)
     case GRAV_ENGINE_RING_HAT: i_ring_hat(); break;
     default: break;
     }
+    ic_halo = 0;
 }
 
 /* an engine in a line: on its splash, beside its icon on its sound page, and for a screen reader */
@@ -597,9 +813,12 @@ static const char *engine_desc(uint32_t engine)
 #undef CY
 #undef W
 #undef H
+#undef X0
+#undef Y0
 #undef K0
 #undef K1
 #undef K2
 #undef T
 #undef HIT
 #undef LIVE
+#undef SMALL

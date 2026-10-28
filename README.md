@@ -15,11 +15,13 @@ FM-1's own panel and screen.
 
 Current version: **0.28.0**, HOME's terricons: the song at a glance as a ridge of eight terricons, a track each, S1
 at the left to D4 at the right, their slopes bending with each track's own sound, in its engine's way (a kick's peak
-jumps as it hits, a hi-hat's slopes get small teeth, a pad's slow waves; grey when muted, none when empty). Before
-it: 0.27, the presets' browser on PRESET (every sound the track can play, each played at once; OCT+ its engine's
-alone, OCT- back) and the mixer's VOL its own fader (0.27.1: VOICES no longer silences other tracks; 0.27.2: the
-code tidied); 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25, recording finished and the colours chosen
-on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn SELECT to jump.
+jumps as it hits, a hi-hat's slopes get small teeth, a pad's slow waves; grey when muted, none when empty); step
+mode's rows in the same colours, track by track; every engine's icon redrawn as a neon picture in its own colour,
+alive with its knobs and notes. Before it: 0.27, the presets' browser on PRESET (every sound the track can play,
+each played at once; OCT+ its engine's alone, OCT- back) and the mixer's VOL its own fader (0.27.1: VOICES no longer
+silences other tracks; 0.27.2: the code tidied); 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25,
+recording finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn
+SELECT to jump.
 [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
@@ -51,7 +53,7 @@ on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn SELECT to 
 
 <p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), FX GRAIN (DENSITY, TIME, SIZE, frozen), FX MIX (DRY/WET, REVERB, QUALITY), GLO (VOICES, VELOCITY, the version) and DEBUG"></p>
 
-<p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="All 27 engines' icons, each on its sound page with its line"></p>
+<p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="The engines' poster: each engine's neon icon in its own colour, with its name"></p>
 
 | Button | Page | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |

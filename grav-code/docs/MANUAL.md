@@ -119,10 +119,11 @@ does depends on the engine: section 6. They start at 65, 50 and 75.
 K1 to K3 are drawn as small knobs, in the Octatrack's manner: a thin ring, nine ticks over its travel (lighter up to the
 value; a centred control's middle tick longer), a pointer that eases to the value; the name above, the value under,
 and a mode under that when it matters (AUX, WORDS, DX). They are grey and white; the knob being turned lights in the
-theme's colour for a moment. The page title and number and a compact live engine icon sit above them. Each engine's icon is drawn by GRAV CODE and moves
-with its knobs and its notes: WAVESHAPE's wave folds further as TIMBRE goes up, FM 2-OP's modulator orbits wider,
-CHORDS stacks its chord's notes, a kick's rings jump at each hit (all of them in section 6). A drum's DRUM and SHAPE
-pages show it the same way.
+theme's colour for a moment. The page title and number and a compact live engine icon sit above them. Each engine's icon is drawn by GRAV CODE as a neon picture
+in the engine's own colour (since 0.28; the engines' poster in section 6), and moves with its knobs and its notes:
+WAVESHAPE's ribbons fold further as TIMBRE goes up, FM 2-OP's loops bend with INDEX and multiply with RATIO, CHORDS
+stacks a plane for each note of its chord, a kick's rings jump out at each hit, a snare bursts into rays. Lines that
+cross grow brighter, as neon does. A drum's DRUM and SHAPE pages show it the same way.
 
 ![ALGO turned: SPEECH's splash, its icon alive, its name and its line](img/screen-splash.png "The engine's splash")
 
@@ -268,7 +269,7 @@ The effect's three pages: section 7.
 
 ![HOME playing: four terricons on the ridge, S1 (rose, at the left, selected: white at its core, a marker and its name over its peak), S2 (orange), D1 (green) and D3 (blue), each bending with its sound; S1's level at the top right; TRK 01, CHORDS below](img/screen-seq.png "HOME: the terricons")
 
-![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, S1 on a teal ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
+![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, each in its track's colour, S1's row on a rose ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
 
 ![One bar playing, in the simulator: HOME's terricons at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
 
@@ -321,10 +322,10 @@ the page shown, and the keys no longer play. SEQ again turns it off and goes bac
 HOME turns it off and shows SEQ's own view, the selected track alone; another page's button (LFO, ENV, FX, GLO)
 turns it off and opens that page.
 
-The screen shows every track then, as the keys do: eight rows, S1 to S4 then D1 to D4, named at the left, the
-selected one on a teal ground; the 16 steps of the page shown across (the white keys), in beats of four. A step on
-is lit, brighter the harder it plays (the selected track's in the theme's teal, the others' grey); a notch at its corner marks a
-chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
+The screen shows every track then, as the keys do: eight rows, S1 to S4 then D1 to D4, named at the left, each
+in its track's colour, its terricon's on HOME (since 0.28), the selected one on a ground of its colour; the 16 steps
+of the page shown across (the white keys), in beats of four. A step on is lit in its track's colour, brighter the
+harder it plays (the selected track's brightest); a notch at its corner marks a chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
 note flashing white as it begins. A held step is framed in white. The pages are under the rows, as on HOME.
 
 | Do | What happens |
@@ -420,7 +421,7 @@ tempo (0.15's, of one track, as S1's; 0.16's with the drum tracks empty).
 
 ## 6. The engines
 
-![Every engine's icon on its sound page: the 24 engines in Plaits' order, then the drums' second models](img/readme-icons.png "The engines' icons")
+![The engines' poster: every engine's icon at its biggest (its splash), a moment after a note, each in its own colour: the 24 synth engines in ALGO's order, then a drum track's six drums](img/readme-icons.png "The engines' icons")
 
 ALGO steps the selected track's engine through all 24 engines of Plaits, in Plaits' own order: its first sixteen,
 then the eight its firmware 1.2 added. K1 is TIMBRE, K2 MORPH, K3 HARMONICS; their screen labels describe the engine (FM 2-OP: INDEX, FEEDBACK, RATIO;
