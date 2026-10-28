@@ -9,7 +9,7 @@ FM-1's own panel and screen.
 
 <p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE on the FM-1's screen: a chord on CHORDS, its sound page with its knobs, CHORD just turned"></p>
 
-[Русская версия](README.ru.md) · [The manual](grav-code/docs/MANUAL.md)
+[Українська версія](README.uk.md) · [The manual](grav-code/docs/MANUAL.md)
 
 ---
 
