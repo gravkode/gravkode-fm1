@@ -3483,6 +3483,37 @@ static void sky_light(int32_t cx, int32_t cy, float r, float g, uint16_t c, uint
     }
 }
 
+/* (0.29.1) the moon, at the top right: a crescent, its light shimmering, its glow breathing, a ripple of light going
+ * out from it now and again */
+static void draw_moon(int32_t cx, int32_t cy, int32_t base, float time)
+{
+    const float r = 12.0f, g = 16.0f + 3.0f * fm_sinf(time * 0.6f);
+    const float a = 0.22f + 0.08f * fm_sinf(time * 0.9f) + 0.05f * fm_sinf(time * 2.3f);
+    float ring = time * 5.0f;
+    ring -= fm_floorf(ring / 19.0f) * 19.0f;
+    const uint16_t lit = mix565(RGB(225, 222, 190), RGB(255, 251, 230), (int32_t)(128.0f + 127.0f * fm_sinf(time * 1.3f)));
+    const int32_t e = (int32_t)(r + g) + 2;
+    for (int32_t y = cy - e; y <= cy + e; y++) {
+        if (y < 0 || y >= base)
+            continue;
+        const uint16_t sky = sky_at(y, base);
+        for (int32_t x = cx - e; x <= cx + e; x++) {
+            const float fx = (float)(x - cx), fy = (float)(y - cy), d = fm_sqrtf(fx * fx + fy * fy);
+            if (d <= r) {                    /* the crescent: the disc but for its dark part */
+                const float ox = fx - 6.0f, oy = fy + 4.0f, dd = fm_sqrtf(ox * ox + oy * oy);
+                if (dd > 11.0f)              /* (softer towards the dark) */
+                    cv_rect(x, y, 1, 1, mix565(sky, lit, (int32_t)(256.0f * fm_minf(1.0f, (dd - 11.0f) * 0.7f + 0.35f))));
+                continue;
+            }
+            if (d > r + g)
+                continue;
+            const float k = 1.0f - (d - r) / g, w = d - r - ring;
+            const float glow = a * k * k + 0.12f * fm_expf(-w * w / 3.0f) * (1.0f - ring / 19.0f);
+            cv_rect(x, y, 1, 1, mix565(sky, RGB(230, 230, 205), (int32_t)(256.0f * fm_minf(1.0f, glow))));
+        }
+    }
+}
+
 static void draw_sky(int32_t base, uint32_t now)
 {
     if (set.sky == SKY_OFF)
@@ -3519,17 +3550,49 @@ static void draw_sky(int32_t base, uint32_t now)
             }
         }
     } else {
-        const float hat = sky_flare(LOOK_HAT, now, 90.0f);   /* the stars, twinkling at each hi-hat */
-        for (uint32_t i = 0; i < 46u; i++) {
-            const int32_t x = (int32_t)(ic_hash(i * 2u + 1u) % 240u), y = 4 + (int32_t)(ic_hash(i * 2u + 2u) % 92u);
-            const int bright = i % 3u == 0u;
-            if (y >= base)
+        const float hat = sky_flare(LOOK_HAT, now, 90.0f);
+        for (uint32_t i = 0; i < 56u; i++) { /* the stars (0.29.1): each comes out, shines a few seconds, fades and
+                                              * comes out again elsewhere; twinkling, the brighter flashing at each
+                                              * hi-hat; white, some bluish, some warm */
+            const float period = 5.0f + 5.0f * ic_rnd(i * 3u + 1u);
+            float ph = time / period + ic_rnd(i * 3u + 2u);
+            const uint32_t cycle = (uint32_t)ph;
+            ph -= (float)cycle;
+            const float life = ph < 0.2f ? ph * 5.0f : ph < 0.7f ? 1.0f : ph < 0.9f ? (0.9f - ph) * 5.0f : 0.0f;
+            if (life <= 0.0f)
                 continue;
-            const float tw = 0.5f + 0.5f * fm_sinf(time * 2.0f + (float)i * 1.7f) + (bright ? hat * 0.8f : 0.0f);
-            const uint16_t c = mix565(sky_at(y, base), RGB(255, 255, 240), (int32_t)(256.0f * fm_minf(1.0f, 0.25f + 0.6f * tw)));
-            cv_rect(x, y, bright ? 2 : 1, bright ? 2 : 1, c);
+            const uint32_t h = ic_hash(i * 977u + cycle * 131u);
+            const int32_t x = (int32_t)(h % 240u), y = 2 + (int32_t)((h >> 8) % 100u);
+            if (y >= base - 4)
+                continue;
+            const int bright = i % 5u == 0u;
+            const float tw = fm_minf(1.0f, ((0.7f + 0.3f * fm_sinf(time * 3.0f + (float)i * 1.7f)) +
+                                            (bright ? hat * 0.8f : 0.0f)) * life);
+            const uint16_t star = i % 7u == 3u ? RGB(200, 220, 255) : i % 7u == 5u ? RGB(255, 235, 200) : RGB(255, 255, 240);
+            if (bright) {                    /* (a cross of light) */
+                const uint16_t d = mix565(sky_at(y, base), star, (int32_t)(110.0f * tw));
+                cv_rect(x - 1, y, 3, 1, d);
+                cv_rect(x, y - 1, 1, 3, d);
+            }
+            cv_rect(x, y, 1, 1, mix565(sky_at(y, base), star, (int32_t)(256.0f * tw)));
         }
-        sky_light(70, 24, 12.0f, 15.0f, RGB(240, 236, 200), RGB(230, 230, 200), 0.25f, base, 6, -4, 11.0f);   /* the moon */
+        {                                    /* now and then a shooting star, down to the left */
+            const uint32_t n = (uint32_t)(time / 11.0f);
+            const float f0 = (time - (float)n * 11.0f) / 0.7f;
+            if (f0 < 1.0f) {
+                const uint32_t h = ic_hash(n * 7919u + 17u);
+                const float x0 = 60.0f + (float)(h % 150u), y0 = 4.0f + (float)((h >> 8) % 24u);
+                for (int32_t k = 0; k < 12; k++) {
+                    const float f = f0 - (float)k * 0.03f;
+                    const int32_t x = (int32_t)(x0 - f * 70.0f), y = (int32_t)(y0 + f * 30.0f);
+                    if (f < 0.0f)
+                        break;
+                    if (y >= 0 && y < base)
+                        cv_rect(x, y, 1, 1, mix565(sky_at(y, base), C_WHITE, 230 - k * 18));
+                }
+            }
+        }
+        draw_moon(196, 26, base, time);
     }
 }
 
@@ -3542,7 +3605,8 @@ static void draw_terricons(int32_t dy, uint32_t now)
 {
     const float time = (float)(now % 600000u) * 0.001f;
     const int32_t base = TC_BASE + dy;
-    const uint16_t earth = set.sky == SKY_DAY ? RGB(18, 16, 22) : C_BLACK;   /* (the heaps' black, by day dark earth) */
+    const int day = set.sky == SKY_DAY;
+    const uint16_t earth = day ? RGB(18, 16, 22) : C_BLACK;   /* (the heaps' black, by day dark earth) */
     int16_t px[2 * TC_N + 1], py[2 * TC_N + 1];
     draw_sky(base, now);
     for (uint32_t o = 0; o < SEQ_TRACKS; o++) {
@@ -3582,20 +3646,24 @@ static void draw_terricons(int32_t dy, uint32_t now)
             if (k) {
                 const uint32_t at = (uint32_t)((float)TC_N * (1.0f + 0.12f * (float)k) + 0.5f);
                 cv_line(px[at], py[at] + 3, TC_X[t] + (int32_t)(0.42f * (float)k * (float)TC_HALF), base - 1,
-                        mix565(earth, muted ? C_DIM : TRACK_HUE[t], 70));
+                        mix565(earth, day ? RGB(120, 114, 108) : muted ? C_DIM : TRACK_HUE[t], 70));
             }
         if (muted)                           /* silent: grey, still */
             thick_line(px, py, 2u * TC_N + 1u, C_DIM, sel ? 2 : 1);
-        else if (amp < 0.02f)                /* quiet: its colour, dim */
-            thick_line(px, py, 2u * TC_N + 1u, mix565(C_BLACK, TRACK_HUE[t], sel ? 200 : 120), sel ? 2 : 1);
+        else if (amp < 0.02f)                /* quiet: its colour, dim (by day, dark: 0.29.1) */
+            thick_line(px, py, 2u * TC_N + 1u, mix565(earth, TRACK_HUE[t], day ? (sel ? 120 : 70) : sel ? 200 : 120),
+                       sel ? 2 : 1);
         else {                               /* sounding: a glow under, brighter the louder; its colour on it */
-            thick_line(px, py, 2u * TC_N + 1u, mix565(C_BLACK, TRACK_HUE[t], 40 + (int32_t)(amp * 90.0f)), sel ? 5 : 4);
-            thick_line(px, py, 2u * TC_N + 1u, TRACK_HUE[t], 2);
+            thick_line(px, py, 2u * TC_N + 1u,
+                       mix565(earth, TRACK_HUE[t], day ? 20 + (int32_t)(amp * 45.0f) : 40 + (int32_t)(amp * 90.0f)),
+                       sel ? 5 : 4);
+            thick_line(px, py, 2u * TC_N + 1u, day ? mix565(earth, TRACK_HUE[t], 100 + (int32_t)(fm_minf(amp, 1.0f) * 70.0f))
+                                                   : TRACK_HUE[t], 2);
         }
         if (sel) {                           /* the selected track's: a white core; over its peak a marker, its name */
             const int32_t tx = px[TC_N], ty = py[TC_N];
             if (!muted)
-                thick_line(px, py, 2u * TC_N + 1u, C_WHITE, 1);
+                thick_line(px, py, 2u * TC_N + 1u, day ? mix565(earth, C_WHITE, 170) : C_WHITE, 1);
             for (int32_t k = 0; k < 6; k++)
                 cv_rect(tx - k, ty - 5 - k, 2 * k + 1, 1, C_WHITE);
             cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2, ty - 24, &FONT_T, TRACK_NAME[t], C_WHITE);
@@ -3604,11 +3672,16 @@ static void draw_terricons(int32_t dy, uint32_t now)
     cv_rect(0, base + 1, 240, 144, set.sky == SKY_DAY ? RGB(26, 24, 28) : C_BLACK);   /* the ground (the feet's glow
                                                                                      * cut) */
     cv_rect(0, base, 240, 1, C_LINE);
-    {                                        /* the selected track's level, top left */
-        const int32_t lv = (int32_t)(ui.level[track_sel] * 6.0f + 0.5f);
-        for (int32_t k = 0; k < 6; k++)
-            cv_rect(8 + k * 6, 4 + dy, 4, 8, k < lv ? TRACK_HUE[track_sel] : C_LINE);
-    }
+}
+
+/* the selected track's level, six segments in its colour: in HOME's bottom band, at its right (0.29.1) */
+#define LEVEL_X 198
+#define LEVEL_Y 38
+static void draw_level(int32_t x, int32_t y)
+{
+    const int32_t lv = (int32_t)(ui.level[track_sel] * 6.0f + 0.5f);
+    for (int32_t k = 0; k < 6; k++)
+        cv_rect(x + k * 6, y, 4, 10, k < lv ? TRACK_HUE[track_sel] : C_LINE);
 }
 
 /* SEQ (step mode): every track's steps of the page shown, a row each, in the track's colour (its terricon's, 0.28):
@@ -3856,10 +3929,13 @@ static void draw_splash(void)
 /* only the strip under the track's line (the steps moved, a flash, the cursor): not the whole screen */
 static void draw_seq_grid(void)
 {
-    if (active_page == PAGE_SEQ && !ui.step_mode) {   /* HOME's terricons: the whole page */
+    if (active_page == PAGE_SEQ && !ui.step_mode) {   /* HOME's terricons: the whole page; the level, in the band */
         cv_begin(240, 144, C_BLACK);
         draw_terricons(0, plat_ms());
         cv_blit(0, 36);
+        cv_begin(36, 10, C_BLACK);
+        draw_level(0, 0);
+        cv_blit(LEVEL_X, 180 + LEVEL_Y);
         return;
     }
     if (active_page == PAGE_MIXER) {
@@ -4072,6 +4148,7 @@ static void draw_home_band(void)
     cv_text(172 - text_w(&FONT_XS, state), 6, &FONT_XS, state,   /* (ending clear of CPU) */
             silent || seq.mute >> tr & 1u ? C_RED : C_HI);
     draw_cpu(178, 6);
+    draw_level(LEVEL_X, LEVEL_Y);
     if (ui.shown_count) {                    /* counting in: the beats to come */
         t[0] = 'I'; t[1] = 'N'; t[2] = ' ';
         int_text(ui.shown_count, t + 3);

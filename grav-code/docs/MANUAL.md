@@ -236,7 +236,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002900, version 0.29.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002901, version 0.29.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -297,12 +297,15 @@ one ground line, each in a colour of its own (rose, orange, amber, yellow, green
 right). They are spoil heaps as the Donbas has them (since 0.29): their tops flat, a terrace on each slope, gullies
 running down them. Each has its own height and place; where they overlap, the lower one stands in front.
 
-![HOME at night: the moon, the stars, the terricons in their colours](img/screen-night.png "HOME at night")
+![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
 
 - **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a blue sky, darker up, its sun at the top right
-  flaring at each kick, three clouds drifting across at the tempo's pace, the heaps dark earth against it; by
-  NIGHT a moon at the top left and stars twinkling, the brighter ones at each hi-hat; OFF, black as before. With a
-  sky the page moves on its own, about 20 times a second while all is quiet.
+  flaring at each kick, three clouds drifting across at the tempo's pace, the heaps dark against it (their tracks'
+  colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a crescent moon at the top right,
+  its light shimmering, its glow breathing, a ripple of light going out from it now and again, and stars that come
+  out, shine a few seconds, fade and come out again elsewhere, twinkling, the brighter ones flashing at each hi-hat;
+  now and then a shooting star (0.29.1); OFF, black as before. With a sky the page moves on its own, about 20 times
+  a second while all is quiet.
 
 - **A track with no step on** in the pattern has no terricon; its place stays empty, so every one keeps its place.
 - **A quiet track's terricon** is its colour, dim and still. **A sounding one** lives: its slopes bend with the
@@ -311,7 +314,7 @@ running down them. Each has its own height and place; where they overlap, the lo
   hits, a snare a sharper one, a hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
 - **A muted track's terricon** (or one silenced by another's solo, the mixer) is grey and still.
 - **The selected track's terricon** is thicker, white at its core, with a marker and its name over its top; its
-  level is at the top left. SELECT picks another.
+  level, six segments in its colour, is at the right of the bottom band (0.29.1). SELECT picks another.
 - **The bottom band:** TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name large (a * once changed
   after its preset). A moment's message (TEMPO 120, PATTERN ...) takes its place, and while counting in IN 4 .. 1.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's), **K2 SWING** (the selected track's, 50 % straight to
