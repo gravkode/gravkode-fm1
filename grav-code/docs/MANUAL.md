@@ -236,7 +236,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002901, version 0.29.1](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002902, version 0.29.2](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -299,7 +299,7 @@ running down them. Each has its own height and place; where they overlap, the lo
 
 ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
 
-- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a blue sky, darker up, its sun at the top right
+- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a deep blue sky (one colour since 0.29.2), its sun at the top right
   flaring at each kick, three clouds drifting across at the tempo's pace, the heaps dark against it (their tracks'
   colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a crescent moon at the top right,
   its light shimmering, its glow breathing, a ripple of light going out from it now and again, and stars that come
@@ -314,8 +314,10 @@ running down them. Each has its own height and place; where they overlap, the lo
   hits, a snare a sharper one, a hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
 - **A muted track's terricon** (or one silenced by another's solo, the mixer) is grey and still.
 - **The selected track's terricon** is thicker, white at its core, with a marker and its name over its top; its
-  level, six segments in its colour, is at the right of the bottom band (0.29.1). SELECT picks another.
-- **The bottom band:** TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name large (a * once changed
+  level, six segments in its colour, is at the right of the bottom band (0.29.1).
+- **The scene is taller** (0.29.2): it goes on under the page, 28 rows more, so the heaps stand bigger, and HOME's
+  bottom band is half as high, its sound's name smaller. SELECT picks another.
+- **The bottom band** (32 pixels high since 0.29.2): TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name (a * once changed
   after its preset). A moment's message (TEMPO 120, PATTERN ...) takes its place, and while counting in IN 4 .. 1.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's), **K2 SWING** (the selected track's, 50 % straight to
   75 %; with SEQ held, the pattern's, every track's), **K3 LENGTH** (the selected track's, 1 to 64 steps), K4 the

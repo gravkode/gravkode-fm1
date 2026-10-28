@@ -13,16 +13,16 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.29.1** (the night alive: the moon at the right, shimmering, stars coming and going; the heaps
-dark by day; the level in the bottom band), on 0.29.0's HOME under a sky: by day a blue one, its sun flaring at each
-kick, clouds drifting at the tempo's pace; by night a moon and stars twinkling at the hi-hats (GLO's SCREEN, K2 SKY:
-OFF, DAY, NIGHT); the terricons as the Donbas has them, flat-topped, terraced, gullied. Step mode's knobs at the top
-of its page. Before it: 0.28, HOME's ridge of eight terricons, a track each, bending with each track's own sound in
-its engine's way, step mode's rows in the same colours, and every engine's icon redrawn as a neon picture in its own
-colour; 0.27, the presets' browser on PRESET and the mixer's VOL its own fader (0.27.1: VOICES no longer silences
-other tracks; 0.27.2: the code tidied); 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25, recording
-finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn SELECT to
-jump.
+Current version: **0.29.2** (a flat sky, HOME's scene taller and its bottom band smaller; 0.29.1: the night alive:
+the moon at the right, shimmering, stars coming and going; the heaps dark by day; the level in the bottom band), on
+0.29.0's HOME under a sky: by day a blue one, its sun flaring at each kick, clouds drifting at the tempo's pace; by
+night a moon and stars twinkling at the hi-hats (GLO's SCREEN, K2 SKY: OFF, DAY, NIGHT); the terricons as the Donbas
+has them, flat-topped, terraced, gullied. Step mode's knobs at the top of its page. Before it: 0.28, HOME's ridge of
+eight terricons, a track each, bending with each track's own sound in its engine's way, step mode's rows in the same
+colours, and every engine's icon redrawn as a neon picture in its own colour; 0.27, the presets' browser on PRESET
+and the mixer's VOL its own fader (0.27.1: VOICES no longer silences other tracks; 0.27.2: the code tidied); 0.26,
+the mixer on SEL (levels, sends, mutes, solos); 0.25, recording finished and the colours chosen on GLO; 0.24, live
+recording. HOME advances pages; hold HOME and turn SELECT to jump.
 [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
@@ -127,7 +127,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.29.1.fwsc 0.29.1 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.29.2.fwsc 0.29.2 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -142,7 +142,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.29.1      # grav-code/build/grav_code-0.29.1.fwsc
+python3 tools/build.py grav-code --release 0.29.2      # grav-code/build/grav_code-0.29.2.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
