@@ -1,6 +1,6 @@
 # GRAV CODE 0.23.0 — the sequencer's screen
 
-Package: `grav_code-0.23.0.fwsc`, identity `FM-1_73002300`. After 0.22 (`a9ffe6e`: the sound editor, the knobs).
+Package: `grav_code-0.23.0.fwsc`, identity `FM-1_73002300`. After 0.22 (`7bcbd3d`: the sound editor, the knobs).
 
 0.22 took the keyboard off the screen. This version gives that room to the sequencer, in two views: HOME shows the
 selected track alone, SEQ (step mode) every track.

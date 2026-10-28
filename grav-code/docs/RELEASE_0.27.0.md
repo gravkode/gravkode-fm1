@@ -1,6 +1,6 @@
 # GRAV CODE 0.27.0 — HOME's rings, the presets' browser
 
-Package: `grav_code-0.27.0.fwsc`, identity `FM-1_73002700`. After 0.26.2 (`92e380d`: the mixer, solos).
+Package: `grav_code-0.27.0.fwsc`, identity `FM-1_73002700`. After 0.26.2 (`2c1d443`: the mixer, solos).
 
 From the brief "HOME UI redesign & preset architecture": HOME shows the whole song instead of one track, presets are
 browsed on their own (the engine follows the preset), and the mixer's level is its own.

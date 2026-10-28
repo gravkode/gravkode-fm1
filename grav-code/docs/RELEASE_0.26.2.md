@@ -1,6 +1,6 @@
 # GRAV CODE 0.26.2 — SEL from every page, FX on DRY/WET first
 
-Package: `grav_code-0.26.2.fwsc`, identity `FM-1_73002602`. After 0.26.1 (`74f1166`: solo).
+Package: `grav_code-0.26.2.fwsc`, identity `FM-1_73002602`. After 0.26.1 (`614d502`: solo).
 
 Found on the FM-1: after FX, SEL did not open the mixer (on the FX pages SEL was SEED).
 

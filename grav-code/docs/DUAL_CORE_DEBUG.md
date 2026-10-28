@@ -2,7 +2,7 @@
 
 Included in `main` since **0.14.0**. Developed in `codex/dual-core-debug`, based on
 `feature/grav-code-v0.13.0` (the version with Beads).
-At creation, local `main` and `origin/main` were still at `7b5fbd3`, without the effect.
+At creation, local `main` and `origin/main` were still at `1a64076`, without the effect.
 See [the measured hardware results](DUAL_CORE_RESULTS.md) for the installed build's first A/B test.
 
 CPU0 handles input, MIDI, the UI, its share of the active Plaits voices, MASTER and the limiter.

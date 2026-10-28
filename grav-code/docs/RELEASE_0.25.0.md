@@ -1,6 +1,6 @@
 # GRAV CODE 0.25.0 — recording, finished
 
-Package: `grav_code-0.25.0.fwsc`, identity `FM-1_73002500`. After 0.24 (`e574b3f`: live recording, the metronome).
+Package: `grav_code-0.25.0.fwsc`, identity `FM-1_73002500`. After 0.24 (`a388440`: live recording, the metronome).
 
 What live recording still lacked: a swing for each track, a count-in, notes from a MIDI keyboard, and a way to erase
 while recording.

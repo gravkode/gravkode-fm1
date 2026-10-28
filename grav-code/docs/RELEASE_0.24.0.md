@@ -1,6 +1,6 @@
 # GRAV CODE 0.24.0 — live recording
 
-Package: `grav_code-0.24.0.fwsc`, identity `FM-1_73002400`. After 0.23 (`a8d7be5`: the sequencer's screen).
+Package: `grav_code-0.24.0.fwsc`, identity `FM-1_73002400`. After 0.23 (`ced71c7`: the sequencer's screen).
 
 REC now records while the sequencer plays, with a metronome to play against.
 

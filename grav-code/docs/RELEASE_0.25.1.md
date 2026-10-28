@@ -1,6 +1,6 @@
 # GRAV CODE 0.25.1 — teal
 
-Package: `grav_code-0.25.1.fwsc`, identity `FM-1_73002501`. After 0.25.0 (`7e77214`: recording finished).
+Package: `grav_code-0.25.1.fwsc`, identity `FM-1_73002501`. After 0.25.0 (`53779a1`: recording finished).
 
 The screen's colour is teal now, not amber. The screen keeps its three neutral greys (rules, empty cells, labels);
 only its two brightest steps carry the theme's colour: values, the knob being turned, the selected track, the step

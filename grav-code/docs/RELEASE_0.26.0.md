@@ -1,6 +1,6 @@
 # GRAV CODE 0.26.0 — the mixer
 
-Package: `grav_code-0.26.0.fwsc`, identity `FM-1_73002600`. After 0.25.1 (`0484140`: the colours).
+Package: `grav_code-0.26.0.fwsc`, identity `FM-1_73002600`. After 0.25.1 (`a761a19`: the colours).
 
 SEL opens a mixer for the eight tracks: their levels, mutes, and how much of each goes through the effect.
 

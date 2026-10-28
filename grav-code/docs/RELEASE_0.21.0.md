@@ -27,7 +27,7 @@ calibration, legacy sequence objects and the 97000..D7000 pattern bank keep thei
 
 Validation on 26 October 2026:
 
-- Reviewed main `4f2db52` from the previous ENV fix through 0.20: sequencer, track/voice allocation, dedicated
+- Reviewed main `58c2370` from the previous ENV fix through 0.20: sequencer, track/voice allocation, dedicated
   drums, patterns, pipelined Beads on CPU1 and icon rendering. Its eleven simulator scripts, sequencer timing,
   pattern-bank fault/wear tests and 960 concurrent DSP comparisons passed in an independent clean snapshot.
 - 0.21: all twelve simulator scripts pass, including `presets.txt` (filtering, six drum knobs, slot 1/64,

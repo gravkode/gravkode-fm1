@@ -1,6 +1,6 @@
 # GRAV CODE 0.26.1 — solo
 
-Package: `grav_code-0.26.1.fwsc`, identity `FM-1_73002601`. After 0.26.0 (`3bd5cae`: the mixer).
+Package: `grav_code-0.26.1.fwsc`, identity `FM-1_73002601`. After 0.26.0 (`e63090d`: the mixer).
 
 The mixer's black keys 1–8 solo the tracks now (the white ones still mute them).
 

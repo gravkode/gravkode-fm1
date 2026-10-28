@@ -1,6 +1,6 @@
 # GRAV CODE 0.22.0 — the sound editor
 
-Package: `grav_code-0.22.0.fwsc`, identity `FM-1_73002200`. After 0.21 (`05fb85f`: ALGO, presets).
+Package: `grav_code-0.22.0.fwsc`, identity `FM-1_73002200`. After 0.21 (`764ba9d`: ALGO, presets).
 
 Plaits' three macro knobs combine several musical settings. This version adds independent controls on sound
 pages while retaining AUTO for the original macro behavior, plus a full editor for all three six-op FM banks.
@@ -31,7 +31,7 @@ pages while retaining AUTO for the original macro behavior, plus a full editor f
   its first note. A few silent blocks now bring it to where it runs, as on Plaits, where the engine runs from
   power-on. No other engine changes; a new check builds each of the 30 engines anew and finds no start click.
 - **Plaits' changed files are each marked "GRAV CODE"** (vendor/README.md). With every advanced control at AUTO,
-  all 30 engines render sample for sample as in 0.20.0 (checked against a build of `4f2db52`).
+  all 30 engines render sample for sample as in 0.20.0 (checked against a build of `58c2370`).
 
 Expanded sounds use a 184-byte record in an indexed 32 KiB flash log at E5000..ED000. CRC headers commit last;
 compaction copies live records before erasing. The final page of each sector stays erased for update-loader

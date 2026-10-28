@@ -1,6 +1,6 @@
 # GRAV CODE 0.27.1 — VOICES no longer silences other tracks
 
-Package: `grav_code-0.27.1.fwsc`, identity `FM-1_73002701`. After 0.27.0 (`9cad9cb`: HOME's rings, the presets'
+Package: `grav_code-0.27.1.fwsc`, identity `FM-1_73002701`. After 0.27.0 (`425ad0d`: HOME's rings, the presets'
 browser).
 
 Found on the FM-1: after turning VOICES up on GLO, only one track played and the others fell silent. Every synth

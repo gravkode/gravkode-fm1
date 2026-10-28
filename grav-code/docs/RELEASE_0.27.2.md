@@ -1,6 +1,6 @@
 # GRAV CODE 0.27.2 — the code tidied, the rings drawn faster
 
-Package: `grav_code-0.27.2.fwsc`, identity `FM-1_73002702`. After 0.27.1 (`0fa0e36`: VOICES never takes another
+Package: `grav_code-0.27.2.fwsc`, identity `FM-1_73002702`. After 0.27.1 (`c64bc73`: VOICES never takes another
 track's last voice).
 
 A refactoring release. The FM-1 does what 0.27.1 did; the code is easier to read and change, and HOME's rings cost
