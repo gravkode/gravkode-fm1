@@ -70,7 +70,8 @@ From the top:
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
-  STOP, REC or STEP, the pattern, UNSAVED or FREEZE, and CPU (the engine is in the header). The keys are not drawn: the FM-1's own are under the screen.
+  STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED or FREEZE, and CPU
+  (the engine is in the header). The keys are not drawn: the FM-1's own are under the screen.
 
 ---
 
@@ -92,11 +93,11 @@ From the top:
 | FX | The effect's pages, again for the next: FX MIX (DRY/WET first, since 0.26.2), FX GRAIN, FX SHAPE. Lit while the effect runs |
 | EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
 | SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on. Held on an FX page: SEED, grains by hand; held 2 s more, the grains on their own again (lit while they come on their own) |
-| SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again: back to the page it was pressed on |
+| SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again (0.31): the selected track alone, a synth track's notes as a piano roll, a drum track's 64 steps; a third time: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording; playing: live recording (section 5). Held SEQ, then REC: the selected track cleared |
 | MASTER | The volume, glided: no step in the sound |
-| SAVE | Tap: stores settings and pattern. Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
+| SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: GRAIN, SHAPE,
 MIX; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP is reserved for a later version.
@@ -237,7 +238,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003002, version 0.30.2](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003100, version 0.31.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -336,9 +337,9 @@ goes.
 ### Step mode (SEQ)
 
 SEQ turns step mode on (SEQ lit), from any page: the screen shows every track, the 16 white keys are the steps of
-the page shown, and the keys no longer play. SEQ again turns it off and goes back to the page it was pressed on;
-HOME turns it off and shows SEQ's own view, the selected track alone; another page's button (LFO, ENV, FX, GLO)
-turns it off and opens that page.
+the page shown, and the keys no longer play. SEQ again shows the selected track alone (0.31, below), and a third
+time turns step mode off and goes back to the page it was pressed on; HOME turns it off and shows HOME's
+terricons; another page's button (LFO, ENV, FX, GLO) turns it off and opens that page.
 
 The screen shows every track then, as the keys do, under TEMPO, SWING and LENGTH (small knobs at the page's top
 since 0.29; the engine in the header, the bottom band one line of state since 0.30.1): eight rows, 15 pixels apart
@@ -360,6 +361,30 @@ note flashing white as it begins. A held step is framed in white. The pages are 
 The keys' lights show the selected track's steps: a step on lit, an empty one mid, one past the LENGTH dim, the
 step playing the other way round (an empty one lights, one on goes out); the black keys show the tracks: the
 selected one lit, one with voices mid (a drum track always), one without dim, each flashing as it plays a note.
+
+### The track alone (SEQ again, 0.31)
+
+![SEQ again on S1: its notes as a piano roll, the page's 16 steps across, the keyboard at the left with C4 and C5 named; a chord on step 3, E4 and D4 two steps long, G major on step 9; the step playing lighter; S1 NOTES in the bottom band](img/screen-seq-notes.png "The notes of a synth track") ![SEQ again on D1: its 32 steps, a page a row, page 2 (on the white keys) on a green ground, each step's velocity a bar, pages 3 and 4 past its length; D1 STEPS in the bottom band](img/screen-seq-drum.png "The steps of a drum track")
+
+![One bar playing, in the simulator: S1's piano roll at the left, D1's pages at the right](img/seq-notes.gif "The track alone, playing")
+
+SEQ pressed again in step mode shows the selected track alone, all of the screen its own, under the same knobs
+(TEMPO, SWING, LENGTH); the bottom band names it, with NOTES or STEPS. The keys work as in step mode: a white key
+puts its step on or off, held with K1 to K3 its notes, velocity and length; OCT- / OCT+ the pages; the black keys 1
+to 8 another track (the view following it, notes or steps); SEQ held and a white key the LENGTH. SEQ a third time
+goes back to the page step mode was entered from; HOME to the terricons.
+
+- **A synth track (S1 to S4): its notes as a piano roll.** The page's 16 steps across, in beats of four, as the
+  white keys; 20 semitones up, the black keys' rows darker, a keyboard at the left with each C named and a line
+  under it. A note is a bar in the track's colour on its row, as long as its length in steps (a note held from the
+  page before goes on into this one), brighter the harder it plays, its start lit; a chord, its notes one over the
+  other. The roll follows the track's notes: it stays while they fit, and centres them when one goes out of it
+  (more than 20 semitones apart: the page's notes); a note still out of it is a mark at the roll's top or foot.
+  The step playing has its column lighter, its notes flashing as they begin; the step held is framed in white; past
+  the LENGTH the columns are darker. The pages are under it, as in step mode.
+- **A drum track (D1 to D4): all its steps.** Its 64 steps a page a row, 1 to 4 at the left, the page on the white
+  keys on a ground of the track's colour. A step on is its colour, with its velocity as a bar up from its foot (the
+  harder, the higher); the step playing lights, a note flashing white, a mark under it; past the LENGTH, a dot.
 
 ### Step recording (REC)
 
@@ -669,7 +694,9 @@ TUNE at the note and SHAPE as Plaits made the drum sound from its HARMONICS). Wr
 settings stops the sound for a moment, so SAVE writes them only when they changed: save them while the sequencer is
 stopped. A pattern is written without a gap (section 5), and saved by itself when you leave it; edits to the one
 you are on that neither SAVE nor leaving it saved are lost at power-off. FREEZE and SEED's way are not kept: the effect starts
-unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A firmware update
+unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A tap on SAVE
+lights the white keys one after another, first to last, then all of them for a moment (0.31), whatever page is
+shown; SAVE FAILED lights none. A firmware update
 keeps them (settings saved by 0.12 load with the effect at rest).
 
 ---
@@ -735,7 +762,7 @@ or hold it 2 s for AUTO. Or the recording holds nothing yet: play.
 **The installer doesn't find the FM-1:** a data cable, other MIDI apps and browser tabs closed, Chrome or Edge.
 Started but out of reach over USB: hold REC while switching on (update mode), then install.
 
-**The keys play no notes:** step mode is on (SEQ lit): press SEQ (or HOME).
+**The keys play no notes:** step mode is on (SEQ lit): press SEQ until it goes out (or HOME).
 
 **The sequencer plays nothing:** the steps past the LENGTH don't play (they show as dots); a MIDI clock coming in
 leads it (MIDI CLOCK on SEQ): start it from there.

@@ -25,6 +25,8 @@ expect pattern_dirty 1
 expect dirty 1
 tap SEQ
 wait 30
+tap SEQ
+wait 30
 # HOME held: the grid of 16; with the second white key, pattern 2 (stopped: at once), pattern 1 saved on the way;
 # HOME's page stays as it was
 listen
@@ -60,6 +62,8 @@ key 4 up
 key 11 down 100 0
 wait 30
 key 11 up
+wait 30
+tap SEQ
 wait 30
 tap SEQ
 wait 30
@@ -123,6 +127,8 @@ wait 30
 key 14 up
 wait 30
 tap SEQ
+wait 30
+tap SEQ
 expect pattern_dirty 1
 expect bank_stale 0
 turn K4 1
@@ -153,6 +159,8 @@ wait 30
 key 16 down 100 0
 wait 30
 key 16 up
+wait 30
+tap SEQ
 wait 30
 tap SEQ
 wait 30

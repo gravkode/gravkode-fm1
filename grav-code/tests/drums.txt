@@ -176,6 +176,8 @@ wait 1600
 shot drum-steps.png
 tap SEQ
 wait 30
+tap SEQ
+wait 30
 # PLAY: D1 and D2 play their steps, on channels 5 and 6
 out
 tap PLAY

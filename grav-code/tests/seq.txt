@@ -74,6 +74,37 @@ expect stepnote2 65
 expect stepvel2 80
 expect steplen2 2
 leds
+# (0.31) SEQ again: S1 alone, its notes as a piano roll (said S1 NOTES); the white keys still its steps (step 4 on and
+# off again), the roll around its notes (from 56 up); SEQ again: back (step mode off)
+tap SEQ
+wait 30
+expect step_mode 2
+expect page 8
+said S1 NOTES
+expect roll_lo 56
+key 6 down 100 0
+wait 30
+key 6 up
+wait 30
+expect step3 1
+key 6 down 100 0
+wait 30
+key 6 up
+wait 30
+expect step3 0
+# a black key there: D1 alone, its 64 steps (the tracks' list a moment, as ever); S1 again
+key b4 down 100 0
+wait 30
+key b4 up
+wait 30
+expect track 4
+expect step_mode 2
+said D1 KICK
+key b0 down 100 0
+wait 30
+key b0 up
+wait 1600
+expect track 0
 # PLAY: MIDI start and clock, step 3's F4 (41) at 80 (50) over USB; the steps go round
 tap SEQ
 wait 30
@@ -226,6 +257,10 @@ expect page 8
 expect step_mode 1
 tap SEQ
 wait 30
+expect page 8
+expect step_mode 2
+tap SEQ
+wait 30
 expect page 0
 expect step_mode 0
 tap SEQ
@@ -241,10 +276,17 @@ tap HOME
 wait 30
 expect page 8
 expect step_mode 0
-# SAVE, a restart: the pattern as it was
+# SAVE, a restart: the pattern as it was. (0.31) The white keys light one after another, first to last, then all a
+# moment, then as they were
 tap SAVE
 wait 60
+expect save_sweep >0
+expect save_sweep <16
 expect dirty 0
+wait 500
+expect save_sweep 16
+wait 400
+expect save_sweep 0
 reboot
 wait 600
 expect page 8

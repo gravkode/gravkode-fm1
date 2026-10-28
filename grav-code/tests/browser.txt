@@ -21,6 +21,8 @@ key 0 up
 wait 30
 tap SEQ
 wait 30
+tap SEQ
+wait 30
 expect terricons 1
 # PRESET: the browser, all engines; WAVESHAPE's next
 turn PRESET 1

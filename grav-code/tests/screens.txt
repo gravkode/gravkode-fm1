@@ -92,6 +92,8 @@ key 14 up
 wait 30
 tap SEQ
 wait 30
+tap SEQ
+wait 30
 tap REC
 wait 30
 turn SELECT 2
@@ -103,6 +105,29 @@ wait 50
 key 4 up
 key 8 up
 key 11 up
+wait 30
+tap REC
+wait 30
+# (0.31) and three single notes: E4 on step 7, A4 on step 11, D4 on step 15
+tap REC
+wait 30
+turn SELECT 6
+wait 30
+key 11 down 90 0
+wait 50
+key 11 up
+wait 30
+turn SELECT 3
+wait 30
+key 16 down 110 0
+wait 50
+key 16 up
+wait 30
+turn SELECT 3
+wait 30
+key 9 down 80 0
+wait 50
+key 9 up
 wait 30
 tap REC
 wait 30
@@ -169,6 +194,8 @@ wait 30
 key 1 up
 wait 30
 tap SEQ
+wait 30
+tap SEQ
 wait 1600
 turn K2 8
 tap PLAY
@@ -178,6 +205,58 @@ shot screen-seq.png
 tap SEQ
 wait 2000
 shot screen-seq-steps.png
+# (0.31) SEQ again: S1 alone, its notes as a piano roll; steps 7 and 15 two steps long (held, K3)
+tap SEQ
+wait 30
+key 11 down 100 0
+wait 30
+turn K3 1
+wait 30
+key 11 up
+wait 30
+key 24 down 100 0
+wait 30
+turn K3 1
+wait 30
+key 24 up
+wait 1400
+shot screen-seq-notes.png
+# D1 alone (black key 5): its steps, a page a row; 32 long, its second page some softer kicks
+key 10 down 100 0
+wait 30
+key 10 up
+wait 30
+turn K3 16
+wait 30
+tap OCT+
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+key 11 down 100 0
+wait 30
+turn K2 -50
+wait 30
+key 11 up
+key 14 down 100 0
+wait 30
+key 14 up
+key 18 down 100 0
+wait 30
+turn K2 -75
+wait 30
+key 18 up
+key 21 down 100 0
+wait 30
+key 21 up
+wait 1600
+shot screen-seq-drum.png
+tap OCT-
+wait 30
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
 tap SEQ
 wait 30
 # (0.28) HOME at night (as it comes, 0.30.2), still playing: the moon, the stars; by day (GLO's SCREEN, K2 SKY: the
@@ -217,6 +296,8 @@ wait 30
 key 0 down 100 0
 wait 30
 key 0 up
+wait 30
+tap SEQ
 wait 30
 tap SEQ
 wait 30

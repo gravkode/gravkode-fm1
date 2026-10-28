@@ -13,18 +13,22 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.30.2**: HOME's sky NIGHT as it comes; by day a light blue sky again, its soft clouds drifting
-slowly. 0.30: the header names the selected track's engine; step mode's grid bigger, its bottom band one line. HOME
-is the song at a glance: a ridge of eight terricons, a track each, flat-topped, terraced and gullied as the Donbas
-has them, bending with each track's own sound in its engine's way, under a sky (GLO's SCREEN, K2 SKY): by day the
-sun flaring at each kick and clouds drifting at the tempo's pace, by night a shimmering crescent moon and stars
-coming and going, flashing at the hi-hats. Step mode's rows in the tracks' colours, its knobs at the top; every
-engine's icon a neon picture in its own colour, inside its box. Before it: 0.27, the presets' browser on PRESET and
-the mixer's VOL its own fader; 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25, recording finished and
-the colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn SELECT to jump.
+Current version: **0.31.0**: SEQ pressed again shows the selected track alone: a synth track's notes as a piano
+roll, a drum track's 64 steps a page a row; a tap on SAVE lights the white keys first to last. 0.30.2: HOME's sky
+NIGHT as it comes, by day a light blue one. 0.30: the header names the selected track's engine; step mode's grid
+bigger, its bottom band one line. HOME is the song at a glance: a ridge of eight terricons, a track each,
+flat-topped, terraced and gullied as the Donbas has them, bending with each track's own sound in its engine's way,
+under a sky (GLO's SCREEN, K2 SKY): by day the sun flaring at each kick and clouds drifting at the tempo's pace, by
+night a shimmering crescent moon and stars coming and going, flashing at the hi-hats. Step mode's rows in the
+tracks' colours, its knobs at the top; every engine's icon a neon picture in its own colour, inside its box. Before
+it: 0.27, the presets' browser on PRESET and the mixer's VOL its own fader; 0.26, the mixer on SEL (levels, sends,
+mutes, solos); 0.25, recording finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages;
+hold HOME and turn SELECT to jump.
 [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
+
+<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ again, one bar playing, in the simulator: S1's notes as a piano roll, and D1's steps a page a row"></p>
 
 ## What it does
 
@@ -75,7 +79,8 @@ stores the settings and pattern. Sound pages include the engine's extra controls
 PRESET browses four factory sounds and the user presets for this engine.
 Hold SAVE for the 64 user slots (four pages, OCT-/+); a white key saves or replaces that slot. A queued preset
 is written after stopping and releasing the notes; wait for PRESET SAVED before powering off. SEQ turns step mode on (the white keys are the steps; hold one and turn K1..K3 for its note,
-velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length), PLAY
+velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ held and a step: the length; SEQ again:
+the selected track alone, a synth track's notes as a piano roll, a drum's 64 steps; a third time: out), PLAY
 starts and stops, REC (stopped) records notes and chords step by step. HOME held and a white key, or K4, picks the
 pattern (playing: at the pattern's end). The open page's button blinks, faster on its next page; PLAY flashes green on the beat. EDIT freezes
 the effect's recording (FREEZE); SEL opens the mixer from every page; held on an FX page it seeds grains by hand
@@ -126,7 +131,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.30.2.fwsc 0.30.2 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.31.0.fwsc 0.31.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -141,7 +146,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.30.2      # grav-code/build/grav_code-0.30.2.fwsc
+python3 tools/build.py grav-code --release 0.31.0      # grav-code/build/grav_code-0.31.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
