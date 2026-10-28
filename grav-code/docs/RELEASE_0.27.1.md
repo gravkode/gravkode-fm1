@@ -21,7 +21,7 @@ than one. On the FM-1 as found: S1..S3 up to MONO each, S4 then back to MONO.
 
 Validation on 28 October 2026:
 
-- All **19 simulator scenarios** pass. The new `playback.txt` turns on four steps on each of the eight tracks and
+- All **18 simulator scenarios** pass, and the screenshot script. The new `playback.txt` turns on four steps on each of the eight tracks and
   plays them: each track's notes go out on its MIDI channel and every ring sounds. With every voice taken, S4's
   VOICES up is refused and nothing falls silent. S1..S3 are turned OFF (they fall silent, the rest play on) and S4
   goes up to 4. S1..S3 then come back one by one, each taking one of S4's voices, until all eight sound again. Run

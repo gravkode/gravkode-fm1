@@ -147,21 +147,6 @@ uint32_t preset_category(uint32_t e, int id, const char *name)
     }
 }
 
-int preset_next(const preset_bank_t *b, uint32_t e, int drum, int id, int32_t delta)
-{
-    int ids[PRESET_FACTORY + PRESET_USERS], n = 0, pos = -1;
-    preset_t p;
-    for (int i = 0; i < (int)(PRESET_FACTORY + PRESET_USERS); i++)
-        if (preset_get(b, e, drum, i, &p)) {
-            if (i == id) pos = n;
-            ids[n++] = i;
-        }
-    if (!n || !delta) return id;
-    if (pos < 0) pos = delta > 0 ? -1 : 0;
-    pos = (pos + delta % n) % n;
-    if (pos < 0) pos += n;
-    return ids[pos];
-}
 int preset_match(const preset_bank_t *b, const preset_t *p)
 {
     preset_t q;

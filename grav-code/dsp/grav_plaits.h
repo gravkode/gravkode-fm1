@@ -59,9 +59,8 @@ typedef struct {
 
 void grav_plaits_init(void);
 /* the engine a voice plays (GRAV_ENGINE_*): a change builds it anew in that voice, as Plaits starts an engine it
- * switches to afresh. Each voice its own (a track's engine in its voices); grav_plaits_engine: every voice the same */
+ * switches to afresh. Each voice its own (a track's engine in its voices) */
 void grav_plaits_voice_engine(uint32_t voice, uint32_t engine);
-void grav_plaits_engine(uint32_t engine);
 uint32_t grav_plaits_voice_engine_id(uint32_t voice);   /* the engine built in it (GRAV_ENGINE_ALL: none) */
 /* At zero outer amplitude, discard a six-op voice's held gate/FIFO before it sleeps. Joined worker only. */
 void grav_plaits_reset_voice(uint32_t voice);

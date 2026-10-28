@@ -309,12 +309,6 @@ extern "C" void grav_plaits_voice_engine(uint32_t voice, uint32_t engine) {
   }
 }
 
-extern "C" void grav_plaits_engine(uint32_t engine) {
-  for (uint32_t i = 0; i < GRAV_VOICES; ++i) {
-    grav_plaits_voice_engine(i, engine);
-  }
-}
-
 extern "C" uint32_t grav_plaits_voice_engine_id(uint32_t voice) {
   return voice < GRAV_VOICES ? voices[voice].id : GRAV_ENGINE_ALL;
 }

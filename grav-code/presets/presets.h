@@ -39,7 +39,6 @@ int preset_used(const preset_bank_t *b, uint32_t slot);
 int preset_put(preset_bank_t *b, uint32_t slot, const preset_t *p);
 /* IDs: 0..3 factory, 4..67 user slots, -1 custom. Only matching engine AND track kind are browsed. */
 int preset_get(const preset_bank_t *b, uint32_t engine, int drum, int id, preset_t *p);
-int preset_next(const preset_bank_t *b, uint32_t engine, int drum, int id, int32_t delta);
 /* (0.27) a sound's whole name (a factory one's up to 16), 0 if there is none; its kind, for the browser (a user's:
  * USER), and the kinds' names */
 const char *preset_title(const preset_bank_t *b, uint32_t engine, int drum, int id);
