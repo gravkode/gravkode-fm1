@@ -13,14 +13,14 @@
 
 ---
 
-Текущая версия: **0.26.2**, микшер (SEL — с любой страницы; FX открывается на DRY/WET): SEL открывает полосы восьми
-дорожек — у каждой фейдер LEVEL, индикатор уровня в такт игре, SEND (сколько идёт в эффект) мьют на белых клавишах
-1–8 и соло на чёрных 1–8; K3 — RETURN эффекта. До этого: 0.25.1 — экран в бирюзовом, цвета выбираются на второй
-странице GLO; 0.25 — доводка записи (свинг дорожек, отсчёт, запись с MIDI-клавиатуры, стирание); 0.24 — живая запись
-с метрономом; 0.23 — экран секвенсора. HOME листает страницы; HOME зажат + SELECT переключает их быстро. [Все
-параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
+Текущая версия: **0.27.0**, новый HOME: вся песня одним взглядом — восемь вложенных колец, по кольцу на дорожку;
+каждое изгибается и пульсирует от звука своей дорожки (серое при мьюте, нет кольца — пустая дорожка); PRESET
+открывает браузер всех звуков дорожки по движкам, каждый звучит сразу (OCT+ — только этого движка, OCT− — вернуть
+как было); VOL в микшере — свой фейдер, пресет его не меняет. До этого: 0.26 — микшер на SEL (громкость, посылы,
+мьют, соло); 0.25 — доводка записи и выбор цветов на GLO; 0.24 — живая запись. HOME листает страницы; HOME зажат +
+SELECT переключает их быстро. [Все параметры и управление](grav-code/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: piano roll одной дорожки на HOME и сетка всех восьми в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
+<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт в симуляторе: кольца HOME и сетка всех восьми дорожек в шаговом режиме"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки страницы звука плавно доходят до значения, в симуляторе"></p>
 
 ## Возможности
 
@@ -52,7 +52,7 @@
 
 | Кнопка | Страница | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
-| HOME | SEQ | TEMPO (30–300 BPM) | SWING (50–75 %) | LENGTH (1–64 шага) |
+| HOME | HOME (кольца) | TEMPO (30–300 BPM) | SWING (50–75 %) | LENGTH (1–64 шага) |
 | HOME ещё раз | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0,05–20 Гц) | LFO DEPTH (глубина) | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
@@ -62,7 +62,7 @@
 | FX ещё раз | FX GRAIN | DENSITY (в середине гранул нет: левее — ровно по такту, правее — случайно) | TIME (насколько далеко назад) | SIZE (назад, вперёд, в конце — задержка) |
 | FX ещё раз | FX SHAPE | SHAPE (огибающая гранулы) | PITCH (от -24 до +24 полутонов) | FEEDBACK (обратная связь) |
 | GLO ещё раз | DEBUG | одно/два ядра | сброс пиков и счётчиков | — |
-| SEL | MIXER | LEVEL (выбранной дорожки) | SEND (доля в эффект) | RETURN (DRY/WET эффекта); белые клавиши 1–8 — мьют дорожек, чёрные 1–8 — соло |
+| SEL | MIXER | VOL (фейдер выбранной дорожки) | SEND (доля в эффект) | RETURN (DRY/WET эффекта); белые клавиши 1–8 — мьют дорожек, чёрные 1–8 — соло |
 
 SELECT выбирает дорожку (S1–S4, D1–D4), для неё работают клавиши, ALGO, PRESET, OSC, VOICES и шаги. Ручка ALGO
 выбирает её движок (на барабанной дорожке: бочка, малый барабан, хай-хэт), OCT- и OCT+ — октаву (от -2 до +2),
@@ -124,7 +124,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на экране — свои н
 2. Соберите сайт и запустите его (или используйте опубликованный):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.2.fwsc 0.26.2 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.0.fwsc 0.27.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -139,7 +139,7 @@ GRAV CODE собирается инструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.26.2      # grav-code/build/grav_code-0.26.2.fwsc
+python3 tools/build.py grav-code --release 0.27.0      # grav-code/build/grav_code-0.27.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестов:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # эмулятор в браузере (Emscripten)
@@ -147,7 +147,7 @@ python3 tools/build.py grav-code --web                 # эмулятор в б�
 
 Тесты (`grav-code/tests/`): `basic.txt` (клавиши, октава, сохранение, MIDI), `engines.txt` (все движки звучат),
 `voices.txt` (полифония, MONO, velocity), `fx.txt` (эффект: страницы, FREEZE, SEED, QUALITY, сохранение),
-`seq.txt` (секвенсор), `rec.txt` (живая запись, метроном), `theme.txt` (цвета экрана), `mixer.txt` (микшер), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
+`seq.txt` (секвенсор), `rec.txt` (живая запись, метроном), `theme.txt` (цвета экрана), `mixer.txt` (микшер), `browser.txt` (кольца HOME, браузер пресетов), `tracks.txt` (синтовые дорожки), `drums.txt` (барабанные дорожки), `patterns.txt` (паттерны), `icons.txt` (иконки), `seq_test.c` (его тайминг до сэмпла) и `bank_test.c`
 (паттерны во флеше): `run_seq_test.py`, `screens.txt` (скриншоты). Подробнее — в
 [grav-code/README.md](grav-code/README.md).
 

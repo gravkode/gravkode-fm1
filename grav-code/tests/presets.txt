@@ -15,16 +15,18 @@ expect osc1 35
 expect osc2 35
 said PRESET SOFT FOLD
 shot preset-factory.png
-# A knob makes a custom sound; changing global ENV leaves the preset alone.
+# A knob changes the sound: its preset kept, marked * (0.27; before, a custom sound); global ENV leaves it alone.
 turn K1 7
 wait 30
-expect preset -1
+expect preset 1
+expect preset_edited 1
 expect osc0 27
 tap ENV
 turn K1 10
 wait 30
 expect env0 20
-expect preset -1
+expect preset 1
+expect preset_edited 1
 # Save to slot 1 while step mode is active: no step is edited, no note is sent.
 tap SEQ
 wait 30
@@ -75,9 +77,25 @@ turn PRESET 4
 wait 30
 expect wave 1
 expect preset 3
+# (0.27) the browser shows every engine's: on, the next engine's first; OCT+ its engine's alone, round: FM's first
 turn PRESET 1
 wait 30
+expect wave 4
 expect preset 0
+turn PRESET -1
+wait 30
+expect wave 1
+expect preset 3
+tap OCT+
+wait 30
+expect browser_all 0
+expect octave 0
+turn PRESET 1
+wait 30
+expect wave 1
+expect preset 0
+wait 3100
+expect browser 0
 # Ordinary SAVE persists settings and pattern; a restart keeps the user bank as a separate object.
 tap SAVE
 wait 100
@@ -128,7 +146,8 @@ turn K1 3
 turn K2 4
 turn K3 5
 wait 30
-expect preset -1
+expect preset 1
+expect preset_edited 1
 expect tune 43
 expect osc0 46
 expect osc1 29

@@ -1,4 +1,5 @@
-# The mixer (0.26, SEL): the eight tracks a strip each: LEVEL (K1, the selected track's, its sound's OUTPUT level),
+# The mixer (0.26, SEL): the eight tracks a strip each: VOL (K1, the selected track's fader; 0.27: its own, not its
+# sound's OUTPUT LEVEL),
 # SEND (K2: its share through the effect; the rest goes past it), the effect's RETURN (K3: FX MIX's DRY/WET), the
 # mutes on white keys 1..8 (a muted track's steps start no notes), the tracks on black keys 1..8. SEL again: back.
 # On the effect's pages SEL is SEED, as before. Saved with the settings.
@@ -26,8 +27,9 @@ expect page 13
 said PAGE MIXER
 turn K1 -20
 wait 30
-expect level 80
-said LEVEL S1
+expect vol 80
+expect level 100
+said VOL S1
 turn K2 -50
 wait 30
 expect send 50
@@ -108,7 +110,7 @@ wait 60
 turn SELECT 4
 wait 1600
 expect send 100
-expect level 100
+expect vol 100
 wait 900
 expect meter 0
 # SEL again: back to SEQ's page; from an FX page too (0.26.2), SEL held there: SEED
@@ -148,11 +150,18 @@ reboot
 wait 600
 expect mute 514
 expect send 50
-expect level 80
-# the settings as 0.21..0.25 saved them (no mixer): every track sent whole, none muted; the sound's LEVEL kept
+expect vol 80
+# the settings as 0.26 saved them (no faders): each fader at 100, the rest kept; as 0.21..0.25 (no mixer): every
+# track sent whole, none muted
+save026
+reboot
+wait 600
+expect vol 100
+expect mute 514
+expect send 50
 save025
 reboot
 wait 600
 expect mute 0
 expect send 100
-expect level 80
+expect vol 100

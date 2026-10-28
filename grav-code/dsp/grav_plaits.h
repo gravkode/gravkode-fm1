@@ -80,6 +80,9 @@ uint32_t grav_drum_step(uint32_t engine, int32_t steps); /* ALGO on a drum track
  * snare's SNAPPY, the hi-hat's NOISE it, DRIVE none, LEVEL full */
 void grav_drum_shape(uint32_t engine, float harmonics, float shape[3]);
 uint32_t grav_engine_step(uint32_t engine, int32_t steps);   /* ALGO: steps away in Plaits' order, round */
+/* (0.27) the i-th engine in ALGO's order (a drum track's: of its six), and an engine's place in it */
+uint32_t grav_engine_at(int drum, uint32_t i);
+uint32_t grav_engine_rank(int drum, uint32_t engine);
 uint32_t grav_plaits_ram_used(uint32_t voice);   /* bytes of a voice's RAM its engine's Init took */
 void grav_fm_patch(uint32_t engine, uint32_t harmonics, uint8_t raw[GRAV_CONTROL_BYTES]);
 

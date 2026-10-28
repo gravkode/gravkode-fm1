@@ -34,6 +34,7 @@ typedef struct {
     const grav_controls_t *controls;
     float send;                          /* (0.26) its share through the effect, 0..1; the rest goes past it, dry. 1
                                           * (every track): the whole mix through it, as before */
+    float gain;                          /* (0.27) the mixer's fader on it, 0..1 (1: as before, sample for sample) */
 } grav_sound_t;
 
 void grav_engine_init(grav_engine_t *e);

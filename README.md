@@ -13,14 +13,14 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.26.2**, the mixer (SEL, from every page; FX opens on DRY/WET now): SEL opens the eight tracks'
-strips, each with its LEVEL fader, a meter moving as it plays, its SEND (how much goes through the effect), its mute
-on white keys 1–8 and its solo on black keys 1–8; K3 is the effect's RETURN. Before it: 0.25.1, the screen in teal,
-its colours chosen on GLO's second page; 0.25, recording finished (each track its swing, a count-in, a MIDI keyboard
-recorded, erasing); 0.24, live recording with a metronome; 0.23, the sequencer's screen. HOME advances pages; hold
-HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.27.0**, a new HOME: the song at a glance, eight concentric rings, a track each, bending and
+swelling with each track's own sound (grey when muted, none when empty); PRESET opens a browser of every sound the
+track can play, engine after engine, each played at once (OCT+ its engine's alone, OCT- back); the mixer's VOL is
+its own fader, which a preset never changes. Before it: 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25,
+recording finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn
+SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's piano roll of one track, and step mode's grid of all eight"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
+<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's rings, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
 ## What it does
 
@@ -53,7 +53,7 @@ HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS
 
 | Button | Page | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
-| HOME | SEQ | TEMPO (30 to 300 BPM) | SWING (50 to 75 %) | LENGTH (1 to 64 steps) |
+| HOME | HOME (the rings) | TEMPO (30 to 300 BPM) | SWING (50 to 75 %) | LENGTH (1 to 64 steps) |
 | HOME again | OSC | TIMBRE | MORPH | HARMONICS |
 | LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
@@ -63,7 +63,7 @@ HOME and turn SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS
 | FX again | FX GRAIN | DENSITY (none at the middle: clocked left, random right) | TIME (how far back) | SIZE (backwards, forwards, at the end the delay) |
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
 | GLO again | DEBUG | one/two cores | reset peaks/counters | — |
-| SEL | MIXER | LEVEL (the selected track's) | SEND (its share through the effect) | RETURN (the effect's DRY/WET); white keys 1–8 mute the tracks, black keys 1–8 solo them |
+| SEL | MIXER | VOL (the selected track's fader) | SEND (its share through the effect) | RETURN (the effect's DRY/WET); white keys 1–8 mute the tracks, black keys 1–8 solo them |
 
 SELECT picks the track (S1–S4, D1–D4) the keys, ALGO, PRESET, OSC, VOICES and the steps are for; ALGO picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
@@ -122,7 +122,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.26.2.fwsc 0.26.2 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.0.fwsc 0.27.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -137,7 +137,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.26.2      # grav-code/build/grav_code-0.26.2.fwsc
+python3 tools/build.py grav-code --release 0.27.0      # grav-code/build/grav_code-0.27.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -145,7 +145,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's rings, the presets' browser), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

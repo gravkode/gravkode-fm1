@@ -4,7 +4,7 @@
 
 _Static_assert(sizeof(preset_t) == 184, "expanded preset record layout");
 
-typedef struct { char name[11]; uint8_t osc[3]; } factory_t;
+typedef struct { char name[PRESET_TITLE]; uint8_t osc[3]; } factory_t;   /* (0.27: names up to 16, the browser's) */
 #define F(n,a,b,c) {n,{a,b,c}}
 #define INIT F("INIT",65,50,75)
 /* Starting points, rather than imitations of named instruments. Engine IDs are the saved IDs, not ALGO order.
@@ -93,7 +93,8 @@ int preset_get(const preset_bank_t *b, uint32_t e, int drum, int id, preset_t *p
         p->drum = !!drum;
         p->tune = 50;
         memcpy(p->osc, factory[e][id].osc, 3);
-        memcpy(p->name, factory[e][id].name, sizeof p->name);
+        memcpy(p->name, factory[e][id].name, sizeof p->name - 1u);   /* (a long one cut: preset_title has it whole) */
+        p->name[sizeof p->name - 1u] = 0;
         if (drum) {
             /* Dedicated drums expose these controls independently (synth-track drums retain Plaits' fold). */
             static const uint8_t shape[3][4][3] = {
@@ -113,6 +114,39 @@ int preset_get(const preset_bank_t *b, uint32_t e, int drum, int id, preset_t *p
     *p = *saved;
     return 1;
 }
+const char *preset_title(const preset_bank_t *b, uint32_t e, int drum, int id)
+{
+    preset_t p;
+    if (!preset_get(b, e, drum, id, &p)) return 0;
+    if (id < (int)PRESET_FACTORY) return factory[e][id].name;
+    return preset_user(b, (uint32_t)id - PRESET_FACTORY)->name;
+}
+
+const char *const PRESET_CATEGORY[PRESET_CATEGORIES] = {"SYNTH", "BASS", "LEAD", "PAD", "PLUCK", "KEYS", "DRUM", "FX",
+                                                        "USER"};
+
+uint32_t preset_category(uint32_t e, int id, const char *name)
+{
+    if (id >= (int)PRESET_FACTORY) return PRESET_CAT_USER;
+    for (const char *c = name; c && *c; c++)   /* by its name first: a BASS, a SUB */
+        if ((c[0] == 'B' && c[1] == 'A' && c[2] == 'S' && c[3] == 'S') || (c[0] == 'S' && c[1] == 'U' && c[2] == 'B'))
+            return PRESET_CAT_BASS;
+    switch (e) {                             /* then by its engine */
+    case GRAV_ENGINE_VA_VCF: return PRESET_CAT_BASS;
+    case GRAV_ENGINE_WAVESHAPING: case GRAV_ENGINE_PHASE_DISTORTION: case GRAV_ENGINE_CHIPTUNE: return PRESET_CAT_LEAD;
+    case GRAV_ENGINE_CHORDS: case GRAV_ENGINE_SWARM: case GRAV_ENGINE_STRING_MACHINE: case GRAV_ENGINE_WAVE_TERRAIN:
+        return PRESET_CAT_PAD;
+    case GRAV_ENGINE_STRING: case GRAV_ENGINE_MODAL: return PRESET_CAT_PLUCK;
+    case GRAV_ENGINE_FM: case GRAV_ENGINE_ADDITIVE: case GRAV_ENGINE_SIX_OP_1: case GRAV_ENGINE_SIX_OP_2:
+    case GRAV_ENGINE_SIX_OP_3: return PRESET_CAT_KEYS;
+    case GRAV_ENGINE_GRAIN: case GRAV_ENGINE_SPEECH: case GRAV_ENGINE_NOISE: case GRAV_ENGINE_PARTICLE:
+        return PRESET_CAT_FX;
+    case GRAV_ENGINE_BASS_DRUM: case GRAV_ENGINE_SNARE_DRUM: case GRAV_ENGINE_HI_HAT: case GRAV_ENGINE_SYN_KICK:
+    case GRAV_ENGINE_SYN_SNARE: case GRAV_ENGINE_RING_HAT: return PRESET_CAT_DRUM;
+    default: return PRESET_CAT_SYNTH;
+    }
+}
+
 int preset_next(const preset_bank_t *b, uint32_t e, int drum, int id, int32_t delta)
 {
     int ids[PRESET_FACTORY + PRESET_USERS], n = 0, pos = -1;

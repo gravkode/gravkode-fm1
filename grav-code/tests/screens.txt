@@ -186,6 +186,12 @@ wait 600
 shot screen-mixer.png
 tap SEL
 wait 30
+# (0.27) the presets' browser over HOME, still playing: PRESET, then OCT- (the sound back as it was)
+turn PRESET 1
+wait 600
+shot screen-browser.png
+tap OCT-
+wait 30
 tap PLAY
 wait 30
 # SELECT: the tracks' list, all eight

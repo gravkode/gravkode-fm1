@@ -414,9 +414,22 @@ extern "C" int grav_drum_kind(uint32_t engine) {
   return drum_kind(engine);
 }
 
+static const uint8_t drums[6] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SYN_KICK, GRAV_ENGINE_SNARE_DRUM,
+                                 GRAV_ENGINE_SYN_SNARE, GRAV_ENGINE_HI_HAT, GRAV_ENGINE_RING_HAT};
+
+// (0.27) the engines by their place in ALGO's order (a synth track's 24, a drum track's 6), and an engine's place
+extern "C" uint32_t grav_engine_at(int drum, uint32_t i) {
+  return drum ? drums[i % 6u] : order[i % GRAV_ENGINE_COUNT];
+}
+
+extern "C" uint32_t grav_engine_rank(int drum, uint32_t engine) {
+  const uint32_t n = drum ? 6u : GRAV_ENGINE_COUNT;
+  for (uint32_t i = 0; i < n; ++i)
+    if (grav_engine_at(drum, i) == engine) return i;
+  return 0;
+}
+
 extern "C" uint32_t grav_drum_step(uint32_t engine, int32_t steps) {
-  static const uint8_t drums[6] = {GRAV_ENGINE_BASS_DRUM, GRAV_ENGINE_SYN_KICK, GRAV_ENGINE_SNARE_DRUM,
-                                   GRAV_ENGINE_SYN_SNARE, GRAV_ENGINE_HI_HAT, GRAV_ENGINE_RING_HAT};
   int32_t at = 0;
   while (at < 6 && drums[at] != engine) {
     ++at;

@@ -13,7 +13,7 @@ controls, all six FM operators, small animated knobs and extended preset storage
 HOME with SELECT jumps between them. The sequencer's screen (0.23) shows the selected track as a piano roll on
 HOME, and all eight tracks as a grid in step mode, both moving as they play. Live recording (0.24): REC while
 playing records the keys (and a MIDI keyboard) into the selected track, quantized, with a metronome and a count-in;
-each track has its own swing (0.25). SEL opens a mixer: each track's level, mute, solo and send to the effect (0.26).
+each track has its own swing (0.25). SEL opens a mixer: each track's level, mute, solo and send to the effect (0.26). HOME shows every track as a ring moving with its sound, and PRESET browses every sound, engine after engine (0.27).
 
 ![GRAV CODE on the FM-1's screen: a chord on CHORDS, its sound page with its knobs](manual/img/screen-playing.png "A chord on CHORDS")
 

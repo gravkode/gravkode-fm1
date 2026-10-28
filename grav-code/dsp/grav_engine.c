@@ -46,6 +46,7 @@ static struct {
     float out[SYNTH_VOICES_MAX][GRAV_RENDER_FRAMES];
     float mix[GRAV_RENDER_FRAMES], fx_l[GRAV_RENDER_FRAMES], fx_r[GRAV_RENDER_FRAMES];
     float send[SYNTH_VOICES_MAX];        /* (0.26) each voice's track's share through the effect */
+    float gain[SYNTH_VOICES_MAX];        /* (0.27) and its fader */
     uint32_t split;                      /* some voice's share below 1: the rest of its sound goes past the effect */
     uint32_t ticks[2], fx_ticks, voice_ticks[SYNTH_VOICES_MAX];
 } work __attribute__((aligned(32)));
@@ -77,7 +78,7 @@ static void render_chunk(uint32_t core, uint32_t c)
             for (uint32_t j = 0; j < count; ++j) {
                 const float level = envelope_process(&voice->env);
                 float sample = out[j] * ((work.own_envelope[v] ? 1.0f : level) *
-                                         (GRAV_VOICE_GAIN * voice->velocity));
+                                         (GRAV_VOICE_GAIN * voice->velocity)) * work.gain[v];   /* (x 1: exact) */
                 if (fade) {
                     const uint32_t i = base + j;
                     sample *= i < fade ? (float)(fade - i) * (1.0f / (float)GRAV_SHED_FADE) : 0.0f;
@@ -221,7 +222,8 @@ void grav_engine_render(
         sound[t].harmonics = harmonics;
         sound[t].pitch = 0.0f;
         sound[t].controls = 0;
-        sound[t].send = 1.0f;                /* (every voice through the effect) */
+        sound[t].send = 1.0f;                /* (every voice through the effect, at its full level) */
+        sound[t].gain = 1.0f;
         grav_drum_shape(engine, harmonics, sound[t].shape);   /* (a drum's, as Plaits folds them on HARMONICS) */
     }
     grav_engine_render_tracks(e, lr, n, synth, master_q12, sound, pitch_offset, fx);
@@ -296,6 +298,7 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         work.p[v].accent = voice->velocity;
         work.p[v].controls = snd->controls;
         work.send[v] = track < SYNTH_TRACKS ? snd->send : 1.0f;
+        work.gain[v] = track < SYNTH_TRACKS ? snd->gain : 1.0f;
         if (snd->controls && track < SYNTH_S_TRACKS)
             work.p[v].note += ((int32_t)snd->controls->tune - 50) * 0.5f;
         /* Let the outer ENV own the six-op note's release. Releasing the DX gate here would

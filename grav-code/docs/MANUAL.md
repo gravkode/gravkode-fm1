@@ -54,7 +54,8 @@ your own risk.
 From the top:
 
 - **The header:** GRAV CODE; in the middle the tempo, the whole song's, in BPM (in the theme's teal while a MIDI clock coming in
-  leads, section 5); the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1
+  leads, section 5); the pattern playing (P01) and a triangle while it plays, a square stopped, a red dot recording
+  (0.27); the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1
   runs on USB power. The page you are on is the one whose button blinks (faster on its second and third pages).
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
 - **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
@@ -79,11 +80,11 @@ From the top:
 | Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0 |
 | OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go. In step mode: the pages |
 | ALGO (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: its drum, one of six (section 6). Each turn shows the engine's splash for a moment |
-| PRESET (knob) | Four factory presets and saved user presets for the current engine and track kind; the sound changes immediately. A sound edited with its knobs reads CUSTOM |
+| PRESET (knob) | The presets' browser (0.27, section 9): every sound the track can play, engine after engine; each chosen plays at once, the engine changing with it. OCT+ its engine's alone, OCT- back as it was; it closes 3 s after the last turn. A sound changed after its preset reads its name with a * |
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
-| HOME | SEQ (the selected track alone) → OSC → extra sound pages → OUTPUT → SEQ. A drum track: DRUM → SHAPE → OUTPUT. From step mode: SEQ, the track alone. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
+| HOME | HOME's rings (every track, 0.27) → OSC → extra sound pages → OUTPUT → the rings. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the rings. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
@@ -212,7 +213,8 @@ SEL opens the mixer, from every page (SEL held on an FX page is SEED); SEL again
 opened on. Each track is a strip, S1 to S4 then D1 to D4:
 
 - **its name**, the selected track's in the theme's colour;
-- **its LEVEL** as a fader (its sound's OUTPUT level, the same as on its last sound page, and kept with its preset);
+- **its VOL** as a fader: the mixer's own (0.27), which a preset never changes (its sound's OUTPUT LEVEL is
+  another, kept with the preset);
 - **a meter** of its sound beside it, moving as it plays and falling back over 0.6 s;
 - **its SEND** as a bar under them: how much of it goes through the effect; the rest goes past it, dry;
 - **M**, lit red while it is muted; **S**, lit in the theme's colour while it is soloed. A track silent (muted, or
@@ -220,7 +222,7 @@ opened on. Each track is a strip, S1 to S4 then D1 to D4:
 
 | Control | What it does |
 | --- | --- |
-| K1 LEVEL | the selected track's level, 0 to 100 |
+| K1 VOL | the selected track's fader, 0 to 100 (100: as before 0.27) |
 | K2 SEND | its share through the effect, 0 to 100 % (100 %: all of it, as before 0.26; 0: none, it stays dry) |
 | K3 RETURN | how much of the effect comes back: FX MIX's DRY/WET, the same knob |
 | White keys 1–8 | mute a track (S1 to D4): its steps start no notes and its notes sounding end; again: on. The keys are lit while their track plays, dim while it is muted |
@@ -233,7 +235,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002602, version 0.26.2](img/screen-glo.png "The GLO page")
+![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002700, version 0.27.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -263,11 +265,11 @@ The effect's three pages: section 7.
 
 ## 5. The sequencer
 
-![The SEQ page (HOME) playing S1 (CHORDS) as a piano roll: its notes as teal bars at their pitch, A3 to D5 named at the left with a line at C4, a chord stacked on step 3, the line playing on step 13 and its notes flashing white; steps 1, 5, 9, 13 numbered; the four pages, the first shown; TEMPO 120, SWING 58 %, LENGTH 16 as small knobs; PLAY, P1, CPU](img/screen-seq.png "The SEQ page: one track")
+![HOME playing: four rings, S1 (rose, outermost, selected: white at its core, a marker at its right), S2 (orange), D1 (green) and D3 (blue), each bending with its sound; S1 in the middle, its level at the bottom right; TRK 01, CHORDS below](img/screen-seq.png "HOME: the rings")
 
 ![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, S1 on a teal ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
 
-![One bar playing, in the simulator: HOME's piano roll at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
+![One bar playing, in the simulator: HOME's rings at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
 
 ![SELECT turned: the eight tracks, S2 (VA VCF) selected, each with its engine and voices (DRUM: a drum track's own)](img/screen-tracks.png "The tracks' list")
 
@@ -284,34 +286,31 @@ four, its velocity and its length.
 A fresh FM-1's tracks are a lead (WAVESHAPE), a bass (VA VCF), chords (CHORDS) and a pluck (STRING), one voice each,
 and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 
-### The SEQ page (HOME)
+### HOME: the rings (0.27)
 
-The page shows the selected track alone, as a piano roll:
+HOME opens on the song at a glance: eight concentric rings, a track each, S1 the outermost and D4 the innermost,
+each in a colour of its own (rose, orange, amber, yellow, green, teal, blue, violet, outside in).
 
-- **Across:** its 16 steps of a page, in four beats of four (each beat's first column a little lighter), the first
-  step of each beat numbered under them (1, 5, 9, 13; on page 2: 17, 21 ...); past the LENGTH, a dot.
-- **Up and down:** the track's notes, from its lowest to its highest (at least an octave), the two named at the left,
-  a line at each C (named too where there is room).
-- **A note** is a bar at its pitch, as long as its length in steps, with a bright start; the harder it plays (its
-  velocity), the brighter. A chord is a bar for each of its notes, stacked. A drum track's hits are a block each,
-  bigger the harder.
-- **It shows the page playing** (stopped, or recording: the page shown). As it plays, the step's column lights, a
-  white line sweeps across in time, and the notes flash white as they begin. Recording, the step the next chord goes
-  to is marked red under the roll.
-- **The pages:** four bars under it, the one shown in colour, with a white mark travelling through all four where the
-  track plays.
-- **In the bottom band**, small: **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's, every pattern's),
-  **K2 SWING** (the selected track's, 50 % straight to 75 %: grey while it follows the pattern's; with SEQ held, the
-  pattern's, every track's), **K3 LENGTH** (the selected track's, 1 to 64 steps). A step
-  held in step mode shows its **NOTE**, **VELOCITY** and **LENGTH** instead. Under them: PLAY or STOP; REC and the
-  step while step recording, REC LIVE while recording live, STEP in step mode, or CLOCK while following a MIDI clock; the pattern (P1 to P16) and,
-  blinking, the next one (>3); UNSAVED while the sound's preset has changes not saved (PENDING while it waits to
-  be written); CPU. A message (OCTAVE, PATTERN, the volume as it moves) takes the line's left part for a moment.
-- **SELECT** picks the track (recording: moves the step).
+- **A track with no step on** in the pattern has no ring; its place stays empty, so every ring keeps its place.
+- **A quiet track's ring** is its colour, dim and round. **A sounding one** lives: it bends and swells with the
+  track's own sound (measured before the mix, followed with an attack and a release), a glow under it brighter the
+  louder. How it moves comes from its engine: a kick a strong quick bulge as it hits, a snare a sharper one, a
+  hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
+- **A muted track's ring** (or one silenced by another's solo, the mixer) is grey and still.
+- **The selected track's ring** is thicker, white at its core, with a marker at its right; its name is in the middle
+  and its level at the bottom right. SELECT picks another.
+- **The bottom band:** TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name large (a * once changed
+  after its preset). A moment's message (TEMPO 120, PATTERN ...) takes its place, and while counting in IN 4 .. 1.
+- **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's), **K2 SWING** (the selected track's, 50 % straight to
+  75 %; with SEQ held, the pattern's, every track's), **K3 LENGTH** (the selected track's, 1 to 64 steps), K4 the
+  pattern, as before; their values show in the bottom band as they turn.
 
-While it plays, only the part under the track's line redraws, about 30 times a second (10 while the sound takes
-75 % or more); stopped, nothing moves. A list over it (the tracks, the patterns, a preset's slots) stops it until
-the list goes.
+The rings redraw on their own while anything sounds, about 30 times a second (10 while the sound takes 75 % or
+more); still, nothing moves. Until 0.27 HOME showed the selected track as a piano roll; step mode (SEQ) shows every
+track's steps.
+
+A list over the page (the tracks, the patterns, a preset's slots, the presets' browser) stops it until the list
+goes.
 
 ### Step mode (SEQ)
 
@@ -349,8 +348,7 @@ recording, live.
 ### Live recording (REC while playing)
 
 While the sequencer plays, REC records what you play into the selected track as it goes round (PLAY red, REC
-lighting on each beat, REC LIVE in the bottom band; the page shows the track's piano roll, following the page
-playing). REC again stops recording and the sequencer plays on; stopping (PLAY) ends it too. REC while stopped and
+lighting on each beat, a red dot in the header; HOME's rings show it sounding). REC again stops recording and the sequencer plays on; stopping (PLAY) ends it too. REC while stopped and
 then PLAY records from the first step (with METRONOME at COUNT, after a bar of clicks: IN 4 .. IN 1 in the bottom
 band; nothing plays or records meanwhile but a note in the last half step, which goes to the first).
 
@@ -593,6 +591,27 @@ The keys' pressure goes out over MIDI as polyphonic aftertouch; it doesn't chang
 ---
 
 ## 9. Saving
+
+### The presets' browser (PRESET)
+
+![The presets' browser over HOME: PRESETS, ALL ENGINES; five rows, each its engine's icon, its name and its kind (SYNTH, LEAD ...), SOFT FOLD framed; OCT+ ALL / ENGINE, OCT- CANCEL at its foot](img/screen-browser.png "The presets' browser")
+
+Turning PRESET opens the browser over the page, on the sound playing. It lists every sound the selected track can
+play, engine after engine in ALGO's order: each engine's four factory sounds, then the user's saved on it (a drum
+track: its six drums' only). Each row shows the engine's icon, the sound's name (a factory one's up to 16
+characters) and its kind: SYNTH, BASS, LEAD, PAD, PLUCK, KEYS, DRUM, FX, or USER.
+
+- **Turning PRESET** moves to the next sound (round the list) and plays it at once: past an engine's last, the next
+  engine's first, the engine changing with it. Only the track's sound changes: its steps, its length, the mixer
+  (VOL, SEND, mute, solo), the tempo and the other tracks stay, and the sequencer goes on. Nothing is written to the
+  flash.
+- **OCT+** shows the current engine's sounds alone, and again all.
+- **OCT-** puts the sound back as it was when the browser opened, and closes it.
+- It closes 3 s after the last turn, or as a page's button is pressed or another track is chosen, keeping the
+  sound chosen. ALGO (an engine by hand) closes it too.
+- **A sound changed after its preset** (a knob turned) keeps the preset's name with a * (until 0.27 it read
+  CUSTOM). Loading a preset again, or saving the sound, clears it.
+
 
 **Sound presets (0.21).** ALGO chooses the engine; PRESET scrolls through its four factory starting points and
 user presets saved for the same engine and track kind. A sound preset stores its main engine knobs, all additional controls (the full edited FM patch when applicable),

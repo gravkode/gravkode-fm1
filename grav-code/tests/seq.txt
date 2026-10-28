@@ -88,7 +88,7 @@ expect clocks_out >20
 expect seq_count >3
 wait 1500
 expect seq_count >15
-# (0.23: as it plays the steps' strip redraws alone, ~30 times a second: the flash, the cursor gliding)
+# (0.23: as it plays the page's strip redraws alone, ~30 times a second; 0.27: HOME's rings, moving with the sound)
 expect grid_frames >50
 expect grid_since <40
 # stop: its note ends, MIDI stop
@@ -99,8 +99,8 @@ expect seq_step -1
 expect voices_held 0
 expect_out USB FC 00 00
 expect_out USB 80 41 00
-# (stopped: the strip still)
-wait 500
+# (stopped: the page still, once every sound has faded: 0.27, HOME's rings follow the tracks' sound)
+wait 2500
 expect grid_since >500
 # step recording: a chord (keys 0 4 7: F3 A3 C4) to step 1, a note (key 9: D4) to step 2; SELECT skips one
 tap REC

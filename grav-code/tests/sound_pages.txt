@@ -225,9 +225,15 @@ soundpage 0
 turn K3 -1
 wait 30
 expect fm_custom 0
+expect preset 5
+expect preset_edited 1
+# (0.27) changed, its preset kept and marked *: the browser back and forth loads it again
 turn PRESET -1
 wait 30
+turn PRESET 1
+wait 30
 expect preset 5
+expect preset_edited 0
 expect fm_custom 1
 # Settings from 0.21 retain all old knobs and reset advanced controls to AUTO; extended user sounds survive.
 save021
