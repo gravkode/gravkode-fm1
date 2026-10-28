@@ -3287,10 +3287,12 @@ static int animate_dials(uint32_t now)
  * while the sound is busy); still, nothing does. */
 #define STRIP_Y 22                           /* the mixer's strip, redrawn as it plays: from here to the page's end */
 #define SEQ_STRIP_Y 40                       /* (0.28) SEQ's: under its knobs (at the page's top, CHIP_H high) */
-#define GRID_Y 42                            /* SEQ: the tracks' rows, 11 apart (the drums' 3 lower), to 132 */
-#define GRID_DY 11
-#define CELL_H 9
-#define POS_Y 136                            /* the pages */
+#define GRID_Y 42                            /* SEQ: the tracks' rows, 15 apart (the drums' 4 lower), to 164: on into
+                                              * the page's foot (0.30.1: two canvases, as HOME; the band one line) */
+#define GRID_DY 15
+#define CELL_H 13
+#define GRID_DRUMS 4
+#define POS_Y 167                            /* the pages */
 
 static int32_t step_x(uint32_t i) { return 24 + (int32_t)i * 13 + (int32_t)(i / 4u) * 2; }   /* 12 wide (16: to 237) */
 
@@ -3450,7 +3452,7 @@ static uint16_t sky_at(int32_t y, int32_t base)   /* the sky's colour on row y: 
 {
     (void)y;
     (void)base;
-    return set.sky == SKY_DAY ? RGB(66, 124, 204) : RGB(2, 3, 10);
+    return set.sky == SKY_DAY ? C_BLACK : RGB(2, 3, 10);   /* (0.30.1: by day no sky, its sun and clouds on black) */
 }
 
 static float sky_flare(uint32_t look, uint32_t now, float ms)   /* the last hit of a track of this look, fading */
@@ -3523,6 +3525,15 @@ static void draw_moon(int32_t cx, int32_t cy, int32_t base, float time)
     }
 }
 
+/* the canvas's pixel at (x, y), or black off it (what a see-through thing is drawn over) */
+static uint16_t cv_get(int32_t x, int32_t y)
+{
+    y += cv_oy;
+    if ((uint32_t)x >= cv_w || y < cv_y0 || y >= cv_y1)
+        return C_BLACK;
+    return swap16(cv_px[(uint32_t)y * cv_w + (uint32_t)x]);
+}
+
 /* (0.30) a cloud, soft and see-through: eleven puffs of different sizes, each densest in its middle, thinning to its
  * edge; the sky shows through it (three quarters of it white at most), its top bright, its underside a little greyer
  * and bluer, as a lit cloud's. (x0, y0): its first puff's middle; sc its size; n its shape (each cloud its own) */
@@ -3542,9 +3553,8 @@ static void draw_cloud(float x0, float y0, float sc, int32_t base, uint32_t n)
     for (int32_t y = ya; y <= yb; y++) {
         if (y < 0 || y >= base)
             continue;
-        const uint16_t sky = sky_at(y, base);
         const float v = fm_clampf(((float)y - (y0 - 20.0f * sc)) / (32.0f * sc), 0.0f, 1.0f);   /* (0 its top, 1 its foot) */
-        const uint16_t tint = mix565(RGB(250, 252, 255), RGB(176, 192, 222), (int32_t)(256.0f * v * v));
+        const uint16_t tint = mix565(RGB(255, 255, 255), RGB(196, 206, 228), (int32_t)(256.0f * v * v));
         for (int32_t x = xa; x <= xb; x++) {
             float dens = 0.0f;
             for (uint32_t k = 0; k < 11u; k++) {
@@ -3554,8 +3564,9 @@ static void draw_cloud(float x0, float y0, float sc, int32_t base, uint32_t n)
             }
             if (dens <= 0.0f)
                 continue;
-            const float a = fm_minf(1.0f, dens * 2.2f) * 0.78f;   /* (soft at its edge, the sky through it) */
-            cv_rect(x, y, 1, 1, mix565(sky, tint, (int32_t)(256.0f * a)));
+            const float a = fm_minf(1.0f, dens * 2.2f) * 0.92f;   /* (soft at its edge, the dark through it) */
+            cv_rect(x, y, 1, 1, mix565(cv_get(x, y), tint, (int32_t)(256.0f * a)));   /* (over what is there:
+                                                                              * the sun shows through) */
         }
     }
 }
@@ -3564,8 +3575,9 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
 {
     if (set.sky == SKY_OFF)
         return;
-    for (int32_t y = 0; y < base; y++)       /* darker up */
-        cv_rect(0, y, 240, 1, sky_at(y, base));
+    if (set.sky != SKY_DAY)                  /* (the night's; by day none) */
+        for (int32_t y = 0; y < base; y++)
+            cv_rect(0, y, 240, 1, sky_at(y, base));
     const float time = (float)(now % 600000u) * 0.001f;
     if (set.sky == SKY_DAY) {
         const float kick = sky_flare(LOOK_KICK, now, 120.0f);   /* the sun, flaring at each kick */
@@ -3573,7 +3585,7 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
                   0, 0, 0.0f);
         static const uint8_t AT[3] = {0, 90, 170}, Y[3] = {36, 50, 28}, SCALE[3] = {100, 80, 70};   /* (low in the
                                                                                    * sky, over the heaps' tops) */
-        const float speed = 12.0f * (float)seq_bpm(&seq) / 60.0f;   /* the clouds: at the tempo's pace */
+        const float speed = 3.0f * (float)seq_bpm(&seq) / 60.0f;   /* the clouds: slowly, at the tempo's pace (0.30.1) */
         for (uint32_t c = 0; c < 3u; c++) {
             const float sc = (float)SCALE[c] * 0.01f;
             float pos = (float)AT[c] + time * speed * sc;
@@ -3695,10 +3707,10 @@ static void draw_terricons(int32_t dy, uint32_t now)
             const int32_t tx = px[TC_N], ty = py[TC_N];
             if (!muted)
                 thick_line(px, py, 2u * TC_N + 1u, day ? mix565(earth, C_WHITE, 170) : C_WHITE, 1);
-            for (int32_t k = 0; k < 6; k++) {   /* (a shadow under: readable over a cloud) */
+            for (int32_t k = 0; k < 6; k++)  /* (a shadow under it first: readable over a cloud) */
                 cv_rect(tx - k + 1, ty - 4 - k, 2 * k + 1, 1, C_BLACK);
+            for (int32_t k = 0; k < 6; k++)
                 cv_rect(tx - k, ty - 5 - k, 2 * k + 1, 1, C_WHITE);
-            }
             cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2 + 1, ty - 23, &FONT_T, TRACK_NAME[t], C_BLACK);
             cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2, ty - 24, &FONT_T, TRACK_NAME[t], C_WHITE);
         }
@@ -3725,18 +3737,18 @@ static void draw_grid(int32_t dy, uint32_t now)
     const uint32_t page = ui.view_page;
     for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
         const seq_track_t *tr = &seq.pat.track[t];
-        const int32_t y = GRID_Y + dy + (int32_t)t * GRID_DY + (t >= SEQ_S_TRACKS ? 3 : 0), sel = t == track_sel;
+        const int32_t y = GRID_Y + dy + (int32_t)t * GRID_DY + (t >= SEQ_S_TRACKS ? GRID_DRUMS : 0), sel = t == track_sel;
         const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
         const uint16_t hue = TRACK_HUE[t], sel_lo = mix565(C_BLACK, hue, 90);
         if (sel)                             /* the selected track: its row on a ground of its colour */
             cv_rect(0, y - 1, 240, CELL_H + 2, mix565(C_BLACK, hue, 40));
         const int muted = seq.mute >> t & 1u;   /* (0.26) silent (muted, or another soloed): its name red, steps dim */
-        cv_text(3, y - 2, &FONT_T, TRACK_NAME[t], muted ? C_RED : sel ? C_WHITE : hue);
+        cv_text(3, y - 1, &FONT_XS, TRACK_NAME[t], muted ? C_RED : sel ? C_WHITE : hue);
         for (uint32_t i = 0; i < SEQ_PAGE; i++) {
             const uint32_t s = page * SEQ_PAGE + i;
             const int32_t x = step_x(i);
             if (s >= tr->length) {           /* past its length: a dot */
-                cv_rect(x + 5, y + 4, 2, 1, C_LINE);
+                cv_rect(x + 5, y + CELL_H / 2, 2, 1, C_LINE);
                 continue;
             }
             const seq_step_t *st = &tr->step[s];
@@ -3981,10 +3993,13 @@ static void draw_seq_grid(void)
         cv_begin(240, 144u - STRIP_Y, C_BLACK);
         draw_mixer_body(-STRIP_Y);
         cv_blit(0, 36 + STRIP_Y);
-    } else {                                 /* (step mode: under its knobs) */
+    } else {                                 /* (step mode: under its knobs, and on into the page's foot) */
         cv_begin(240, 144u - SEQ_STRIP_Y, C_BLACK);
         draw_seq_body(-SEQ_STRIP_Y);
         cv_blit(0, 36 + SEQ_STRIP_Y);
+        cv_begin(240, HOME_FOOT, C_BLACK);
+        draw_seq_body(-144);
+        cv_blit(0, 180);
     }
 }
 
@@ -4127,8 +4142,8 @@ static void draw_track_line(int32_t y)
 static void draw_seq_band(void)
 {
     char t[48];
-    const int32_t y = 34;
-    draw_track_line(8);                      /* (0.28: its knobs at the page's top, the track's line here) */
+    const int32_t y = 8;                     /* (0.30.1: one line; the track's engine in the header, its name in the
+                                              * rows) */
     if ((ui.msg_until && plat_ms() < ui.msg_until) || preset_import_failed) {
         band_message(t, 160);
         cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
@@ -4165,6 +4180,8 @@ static void draw_seq_band(void)
         }
         if (preset_dirty)
             cv_text(144, y + 2, &FONT_T, preset_write_req ? "PENDING" : "UNSAVED", C_HI);
+        else if (fx_freeze)
+            cv_text(144, y + 2, &FONT_T, "FREEZE", C_HI);
     }
     draw_cpu(178, y);
 }
@@ -4350,12 +4367,19 @@ static void draw_midi_in(void)
 static void draw_bottom(void)
 {
     char t[48];
-    if (active_page == PAGE_SEQ && !ui.step_mode) {   /* HOME (0.29.2): the scene's foot, then a band 32 high */
+    if (active_page == PAGE_SEQ) {           /* HOME (0.29.2), step mode (0.30.1): the page's foot, then a band 32
+                                              * high */
         cv_begin(240, HOME_FOOT, C_BLACK);
-        draw_terricons(-144, plat_ms());
+        if (ui.step_mode)
+            draw_seq_body(-144);
+        else
+            draw_terricons(-144, plat_ms());
         cv_blit(0, 180);
         cv_begin(240, 240 - HOME_BAND_Y, C_BLACK);
-        draw_home_band();
+        if (ui.step_mode)
+            draw_seq_band();
+        else
+            draw_home_band();
         cv_blit(0, HOME_BAND_Y);
         return;
     }

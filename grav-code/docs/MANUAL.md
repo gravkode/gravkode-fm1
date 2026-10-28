@@ -69,8 +69,8 @@ From the top:
 - **The bottom band:** the page's state (a sound page: how to change pages; FX: SEED and whether the effect is on; the mixer: what its keys do);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
-  sound came late (heard as a crackle), until the next power-on. In step mode: the track and its engine, then PLAY or
-  STOP, the pattern and CPU. The keys are not drawn: the FM-1's own are under the screen.
+  sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
+  STOP, REC or STEP, the pattern, UNSAVED or FREEZE, and CPU (the engine is in the header). The keys are not drawn: the FM-1's own are under the screen.
 
 ---
 
@@ -237,7 +237,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003000, version 0.30.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003001, version 0.30.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -253,7 +253,7 @@ Section 8 has more on VOICES and VELOCITY, section 5 on the metronome.
 GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
 AMBER (GRAV CODE's until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown under the knobs as
 a swatch of its two colours, the one shown framed. K2 SKY (0.29) picks HOME's sky: OFF (black, as before), DAY (as
-it comes: a blue sky, a sun flaring at each kick, clouds drifting at the tempo's pace) or NIGHT (a moon, stars
+it comes: a sun flaring at each kick, soft clouds drifting slowly at the tempo's pace, on black) or NIGHT (a moon, stars
 twinkling at each hi-hat). Only the theme's two brightest colours change (values, the knob
 turned, the selected track, the steps and notes); the greys stay, REC stays red. It is saved with the settings (SAVE).
 The splash at power-on keeps its teal: it is drawn before the settings are read.
@@ -298,11 +298,12 @@ one ground line, each in a colour of its own (rose, orange, amber, yellow, green
 right). They are spoil heaps as the Donbas has them (since 0.29): their tops flat, a terrace on each slope, gullies
 running down them. Each has its own height and place; where they overlap, the lower one stands in front.
 
-![HOME by day, in the simulator: the sun at the top right, soft clouds drifting, the terricons dark against a clear blue sky](img/home-day.gif "HOME by day") ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
+![HOME by day, in the simulator: the sun at the top right, soft clouds drifting slowly, the terricons; no sky behind them](img/home-day.gif "HOME by day") ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
 
-- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a clear blue sky (one colour since 0.29.2, lighter since 0.30), its sun at the top
-  right flaring at each kick, three soft clouds drifting across at the tempo's pace, low over the heaps' tops
-  (since 0.30 see-through, each its own shape, bright on top and greyer below, thinning at their edges), the heaps dark against it (their tracks'
+- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, no sky behind (since 0.30.1; a blue one before), its sun at the top
+  right flaring at each kick, three soft white clouds drifting slowly across at the tempo's pace, low over the heaps'
+  tops (each its own shape, bright on top and greyer below, thinning at their edges, the sun showing through), the
+  heaps dark (their tracks'
   colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a clean crescent moon at the top right (its dark part the sky's, its glow by its lit edge),
   its light shimmering, its glow breathing, a ripple of light going out from it now and again, and stars that come
   out, shine a few seconds, fade and come out again elsewhere, twinkling, the brighter ones flashing at each hi-hat;
@@ -340,7 +341,8 @@ HOME turns it off and shows SEQ's own view, the selected track alone; another pa
 turns it off and opens that page.
 
 The screen shows every track then, as the keys do, under TEMPO, SWING and LENGTH (small knobs at the page's top
-since 0.29; the bottom band names the track and its engine): eight rows, S1 to S4 then D1 to D4, named at the left, each
+since 0.29; the engine in the header, the bottom band one line of state since 0.30.1): eight rows, 15 pixels apart
+(0.30.1: bigger, on down to the screen's foot), S1 to S4 then D1 to D4, named at the left, each
 in its track's colour, its terricon's on HOME (since 0.28), the selected one on a ground of its colour; the 16 steps
 of the page shown across (the white keys), in beats of four. A step on is lit in its track's colour, brighter the
 harder it plays (the selected track's brightest); a notch at its corner marks a chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
