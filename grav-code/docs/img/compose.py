@@ -8,7 +8,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 SHOTS = ["screen-osc", "screen-playing", "screen-mod", "screen-env", "screen-glo", "screen-fx-grain",
          "screen-fx-mix", "screen-debug", "screen-seq", "screen-tracks", "screen-patterns",
-         "screen-drum", "screen-shape", "screen-splash"]
+         "screen-drum", "screen-shape", "screen-splash", "screen-night"]
 GAP, BACK = 8, (24, 24, 24)
 
 for name in SHOTS:                       # the simulator writes them uncompressed

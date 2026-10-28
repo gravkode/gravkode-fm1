@@ -1,5 +1,6 @@
 # GLO's SCREEN page (0.25.1, GLO again): K1 THEME, the screen's colours: device/gfx.c's palettes in the knob's order,
 # the app's own (TEAL) first; shown at once, saved with the settings, as it was after a restart. GLO again: DEBUG.
+# (0.28) K2 SKY, HOME's sky: OFF, DAY (as it comes), NIGHT; saved too.
 #   tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/theme.txt grav-code/build/host
 wait 600
@@ -23,15 +24,15 @@ turn K1 -5
 wait 30
 expect palette 6
 said THEME TEAL
-# three on: ICE; K2 and K3 do nothing here
+# three on: ICE; K3 does nothing here (K2, SKY since 0.28, leaves the palette as it is)
 turn K1 3
 wait 30
 expect palette 7
 said THEME ICE
-turn K2 2
 turn K3 -2
 wait 30
 expect palette 7
+expect sky 0
 shot theme-ice.png
 # saved; a restart: ICE again
 tap SAVE
@@ -58,3 +59,30 @@ turn K1 -9
 wait 30
 expect palette 6
 expect theme 7
+# (0.28) K2 SKY: DAY at first; left OFF, right DAY then NIGHT, no further; saved, a restart: NIGHT
+expect sky 0
+listen
+turn K2 -1
+wait 30
+expect sky 2
+said SKY OFF
+turn K2 -1
+wait 30
+expect sky 2
+turn K2 1
+wait 30
+expect sky 0
+said SKY DAY
+turn K2 1
+wait 30
+expect sky 1
+said SKY NIGHT
+turn K2 1
+wait 30
+expect sky 1
+expect dirty 1
+tap SAVE
+wait 100
+reboot
+wait 600
+expect sky 1

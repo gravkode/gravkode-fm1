@@ -64,11 +64,11 @@ From the top:
 - **The page's three parameters** as knobs, K1 to K3, on every page: a thin ring, ticks over its travel lit up to
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
-  settles back. On SEQ the page is the sequencer's, and its knobs are small, in the bottom band (section 5).
+  settles back. In step mode (SEQ) its knobs are small, at the page's top, above the tracks' steps (section 5).
 - **The bottom band:** the page's state (a sound page: how to change pages; FX: SEED and whether the effect is on; the mixer: what its keys do);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
-  sound came late (heard as a crackle), until the next power-on. On SEQ: TEMPO, SWING and LENGTH, then PLAY or
+  sound came late (heard as a crackle), until the next power-on. In step mode: the track and its engine, then PLAY or
   STOP, the pattern and CPU. The keys are not drawn: the FM-1's own are under the screen.
 
 ---
@@ -236,7 +236,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002800, version 0.28.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002900, version 0.29.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -250,12 +250,14 @@ Above the knobs, how the four voices are shared out: S1..S4 each its number (OFF
 lit) and FREE, those no track has. Under them, the package's identity (the installer's) and the firmware's version.
 Section 8 has more on VOICES and VELOCITY, section 5 on the metronome.
 GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
-AMBER (GRAV CODE's until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown beside the knob as
-a swatch of its two colours, the one shown framed. Only the theme's two brightest colours change (values, the knob
+AMBER (GRAV CODE's until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown under the knobs as
+a swatch of its two colours, the one shown framed. K2 SKY (0.29) picks HOME's sky: OFF (black, as before), DAY (as
+it comes: a blue sky, a sun flaring at each kick, clouds drifting at the tempo's pace) or NIGHT (a moon, stars
+twinkling at each hi-hat). Only the theme's two brightest colours change (values, the knob
 turned, the selected track, the steps and notes); the greys stay, REC stays red. It is saved with the settings (SAVE).
 The splash at power-on keeps its teal: it is drawn before the settings are read.
 
-![GLO's SCREEN page: THEME at TEAL, the ten palettes' swatches beside it, TEAL framed](img/screen-theme.png "The SCREEN page")
+![GLO's SCREEN page: THEME at TEAL, SKY at DAY, the ten palettes' swatches under them, TEAL framed](img/screen-theme.png "The SCREEN page")
 
 GLO once more opens DEBUG, the two cores' timings (section 11).
 
@@ -288,11 +290,19 @@ four, its velocity and its length.
 A fresh FM-1's tracks are a lead (WAVESHAPE), a bass (VA VCF), chords (CHORDS) and a pluck (STRING), one voice each,
 and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 
-### HOME: the terricons (0.28)
+### HOME: the terricons (0.28) under the sky (0.29)
 
 HOME opens on the song at a glance: a ridge of eight terricons, a track each, S1 at the left to D4 at the right on
 one ground line, each in a colour of its own (rose, orange, amber, yellow, green, teal, blue, violet, left to
-right). Each has its own height and place; where they overlap, the lower one stands in front.
+right). They are spoil heaps as the Donbas has them (since 0.29): their tops flat, a terrace on each slope, gullies
+running down them. Each has its own height and place; where they overlap, the lower one stands in front.
+
+![HOME at night: the moon, the stars, the terricons in their colours](img/screen-night.png "HOME at night")
+
+- **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a blue sky, darker up, its sun at the top right
+  flaring at each kick, three clouds drifting across at the tempo's pace, the heaps dark earth against it; by
+  NIGHT a moon at the top left and stars twinkling, the brighter ones at each hi-hat; OFF, black as before. With a
+  sky the page moves on its own, about 20 times a second while all is quiet.
 
 - **A track with no step on** in the pattern has no terricon; its place stays empty, so every one keeps its place.
 - **A quiet track's terricon** is its colour, dim and still. **A sounding one** lives: its slopes bend with the
@@ -300,8 +310,8 @@ right). Each has its own height and place; where they overlap, the lower one sta
   brighter the louder. How it moves comes from its engine: a kick a strong quick bulge, its peak jumping up as it
   hits, a snare a sharper one, a hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
 - **A muted track's terricon** (or one silenced by another's solo, the mixer) is grey and still.
-- **The selected track's terricon** is thicker, white at its core, with a marker and its name over its peak; its
-  level is at the top right. SELECT picks another.
+- **The selected track's terricon** is thicker, white at its core, with a marker and its name over its top; its
+  level is at the top left. SELECT picks another.
 - **The bottom band:** TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name large (a * once changed
   after its preset). A moment's message (TEMPO 120, PATTERN ...) takes its place, and while counting in IN 4 .. 1.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's), **K2 SWING** (the selected track's, 50 % straight to
@@ -322,7 +332,8 @@ the page shown, and the keys no longer play. SEQ again turns it off and goes bac
 HOME turns it off and shows SEQ's own view, the selected track alone; another page's button (LFO, ENV, FX, GLO)
 turns it off and opens that page.
 
-The screen shows every track then, as the keys do: eight rows, S1 to S4 then D1 to D4, named at the left, each
+The screen shows every track then, as the keys do, under TEMPO, SWING and LENGTH (small knobs at the page's top
+since 0.29; the bottom band names the track and its engine): eight rows, S1 to S4 then D1 to D4, named at the left, each
 in its track's colour, its terricon's on HOME (since 0.28), the selected one on a ground of its colour; the 16 steps
 of the page shown across (the white keys), in beats of four. A step on is lit in its track's colour, brighter the
 harder it plays (the selected track's brightest); a notch at its corner marks a chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a

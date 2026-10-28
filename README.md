@@ -13,15 +13,14 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.28.0**, HOME's terricons: the song at a glance as a ridge of eight terricons, a track each, S1
-at the left to D4 at the right, their slopes bending with each track's own sound, in its engine's way (a kick's peak
-jumps as it hits, a hi-hat's slopes get small teeth, a pad's slow waves; grey when muted, none when empty); step
-mode's rows in the same colours, track by track; every engine's icon redrawn as a neon picture in its own colour,
-alive with its knobs and notes. Before it: 0.27, the presets' browser on PRESET (every sound the track can play,
-each played at once; OCT+ its engine's alone, OCT- back) and the mixer's VOL its own fader (0.27.1: VOICES no longer
-silences other tracks; 0.27.2: the code tidied); 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25,
-recording finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn
-SELECT to jump.
+Current version: **0.29.0**, HOME under a sky: by day a blue one, its sun flaring at each kick, clouds drifting at
+the tempo's pace; by night a moon and stars twinkling at the hi-hats (GLO's SCREEN, K2 SKY: OFF, DAY, NIGHT); the
+terricons as the Donbas has them, flat-topped, terraced, gullied. Step mode's knobs at the top of its page. Before
+it: 0.28, HOME's ridge of eight terricons, a track each, bending with each track's own sound in its engine's way,
+step mode's rows in the same colours, and every engine's icon redrawn as a neon picture in its own colour; 0.27, the
+presets' browser on PRESET and the mixer's VOL its own fader (0.27.1: VOICES no longer silences other tracks;
+0.27.2: the code tidied); 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25, recording finished and the
+colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn SELECT to jump.
 [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
@@ -62,7 +61,7 @@ SELECT to jump.
 | LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
 | GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
-| GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | — | — |
+| GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: HOME's sky (OFF, DAY, NIGHT) | — |
 | FX | FX MIX | DRY/WET | REVERB | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) |
 | FX again | FX GRAIN | DENSITY (none at the middle: clocked left, random right) | TIME (how far back) | SIZE (backwards, forwards, at the end the delay) |
 | FX again | FX SHAPE | SHAPE (the grains' envelope) | PITCH (-24 to +24 semitones) | FEEDBACK |
@@ -126,7 +125,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.28.0.fwsc 0.28.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.29.0.fwsc 0.29.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -141,7 +140,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.28.0      # grav-code/build/grav_code-0.28.0.fwsc
+python3 tools/build.py grav-code --release 0.29.0      # grav-code/build/grav_code-0.29.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)

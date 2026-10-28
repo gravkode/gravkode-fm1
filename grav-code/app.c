@@ -25,6 +25,10 @@ static const uint8_t FX_DEFAULT[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};   /* (DR
 #define SET_MAGIC 0x47525639u
 /* GLO's METRONOME: clicks while recording live; OFF; COUNT: and a bar's count-in when recording starts from a stop */
 enum { METRO_REC, METRO_OFF, METRO_COUNT };
+/* (0.28) GLO's SCREEN, K2 SKY: HOME's sky. DAY (as it comes) a blue one, its sun flaring at each kick, clouds drifting
+ * at the tempo; NIGHT a moon, stars twinkling at each hi-hat; OFF black, as before */
+enum { SKY_DAY, SKY_NIGHT, SKY_OFF };
+static const char *const SKY_NAME[3] = {"DAY", "NIGHT", "OFF"};
 #define PREV_SET_MAGIC 0x54504C32u
 #define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -40,7 +44,7 @@ typedef struct {
     uint8_t env[3];
     uint8_t voices;                      /* 1 MONO, 2..4 POLY (GLO); 0, in a record saved before 0.12: the default */
     uint8_t velocity_off;                /* the FM-1's keys play at a fixed velocity (GLO); MIDI in keeps its own */
-    uint8_t reserved[1];
+    uint8_t sky;                         /* (0.28) GLO's SCREEN, K2: HOME's sky, SKY_*: DAY (0, as saved before), NIGHT, OFF */
     uint8_t fx[FX_N];                    /* 0.13: the effect's knobs; in a record saved before (20 bytes): defaults */
     uint8_t fx_quality;                  /* GRAV_FX_* (dsp/grav_beads.h) */
     uint8_t fx_reserved[3];
@@ -69,7 +73,7 @@ typedef struct {
     /* 0.27: the mixer's fader on each track (VOL, 0..100; its sound's own LEVEL, OUTPUT's, goes with its preset) */
     uint8_t vol[SYNTH_TRACKS];
 } settings_t;
-#define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to reserved[] */
+#define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to sky (a byte reserved then) */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
 #define SET_SIZE_016 56                  /* as 0.16 saved it: up to trk_reserved[] (no drums) */
 #define SET_SIZE_017 72                  /* as 0.17 saved it: up to drum_osc[] (the tempo the pattern's) */
@@ -223,7 +227,7 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"", "", ""},
     {"TEMPO", "SWING", "LENGTH"},
     {"PUNCH", "SWEEP", "DRIVE"},
-    [PAGE_SCREEN] = {"THEME", "", ""},
+    [PAGE_SCREEN] = {"THEME", "SKY", ""},
     [PAGE_MIXER] = {"VOL", "SEND", "RETURN"}
 };
 
@@ -561,7 +565,7 @@ static void settings_defaults(void)
     set.env[0] = 10; set.env[1] = 50; set.env[2] = 30;
     set.voices = VOICES_DEFAULT;
     set.velocity_off = 0;
-    set.reserved[0] = 0;
+    set.sky = SKY_DAY;
     fx_defaults(&set);
     track_defaults(&set);
     drum_defaults(&set);
@@ -634,6 +638,8 @@ static void settings_upgrade(settings_t *s, int loaded)
             s->vol[t] = 100;
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
+    if (s->sky > SKY_OFF)                    /* (a byte reserved before 0.28) */
+        s->sky = SKY_DAY;
     if (s->metro > METRO_COUNT)              /* (a byte reserved before 0.24) */
         s->metro = METRO_REC;
 }
@@ -1376,6 +1382,18 @@ static uint32_t theme_at(void)               /* its place on the knob */
         if (THEME_ORDER[i] == theme_palette())
             return i;
     return 0;
+}
+
+static void sky_turn(int32_t e)              /* (0.28) SCREEN's K2: OFF, DAY, NIGHT, left to right */
+{
+    static const uint8_t ORDER[3] = {SKY_OFF, SKY_DAY, SKY_NIGHT};
+    const int32_t at = set.sky == SKY_OFF ? 0 : set.sky == SKY_DAY ? 1 : 2;
+    const uint8_t sky = ORDER[clamp(at + (e > 0 ? 1 : -1), 0, 2)];
+    if (sky != set.sky) {
+        set.sky = sky;
+        set_dirty = 1;
+    }
+    app_say("SKY", SKY_NAME[set.sky]);
 }
 
 static void theme_turn(int32_t e)
@@ -2778,8 +2796,10 @@ static void encoder_turn(uint32_t k, int32_t e)
     else if (knob && active_page == PAGE_MIXER)
         mixer_turn(index, e);
     else if (knob && active_page == PAGE_SCREEN) {
-        if (index == 0u)                     /* (K2, K3: none) */
+        if (index == 0u)                     /* (K3: none) */
             theme_turn(e);
+        else if (index == 1u)
+            sky_turn(e);
     } else if (knob && active_page == PAGE_GLO)
         glo_turn(index, e);
     else if (k == EN_K3 && active_page == PAGE_FX_MIX)
@@ -3008,8 +3028,13 @@ static void knob_get(uint32_t i, knob_t *k)
         k->frac = v * 256;
         return;
     }
-    if (active_page == PAGE_SCREEN) {        /* THEME alone */
+    if (active_page == PAGE_SCREEN) {        /* THEME, SKY (0.28) */
         k->name = PARAM_NAME[PAGE_SCREEN][i];
+        if (i == 1u) {
+            text_cat(k->value, SKY_NAME[set.sky]);
+            k->frac = set.sky == SKY_OFF ? 0 : set.sky == SKY_DAY ? 12800 : 25600;
+            return;
+        }
         if (i) {
             k->frac = KNOB_NONE;
             return;
@@ -3224,8 +3249,8 @@ static int animate_dials(uint32_t now)
         } else ui.dial_q8[i] = target;
     }
     ui.dial_at = now;
-    if (active_page == PAGE_SCREEN)          /* (THEME alone: K2's and K3's tiles are the palettes' swatches) */
-        ui.dial_dirty &= 1u;
+    if (active_page == PAGE_SCREEN)          /* (THEME and SKY: K3 none) */
+        ui.dial_dirty &= 3u;
     if (!ui.dial_dirty) return 0;
     /* One 80-wide tile of the row per frame (~2.5 ms SPI), even when a preset changes all three values at once. */
     uint32_t dial = ui.dial_next;
@@ -3234,10 +3259,11 @@ static int animate_dials(uint32_t now)
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
     if (active_page == PAGE_SEQ && !ui.step_mode)   /* (HOME's terricons: no knobs drawn) */
         return 0;
-    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER) {   /* (SEQ's and the mixer's: small, below) */
+    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER) {   /* (small: SEQ's at the page's top, 0.28; the
+                                                                   * mixer's in the bottom band) */
         cv_begin(80, CHIP_H, C_BLACK);
         draw_chips(0, 1u << dial, (int32_t)dial * 80);
-        cv_blit(dial * 80, 180u + CHIP_Y);
+        cv_blit(dial * 80, active_page == PAGE_SEQ ? 36u : 180u + CHIP_Y);
     } else {
         int32_t h, r;
         const int32_t top = knob_row(&h, &r);
@@ -3259,9 +3285,12 @@ static int animate_dials(uint32_t now)
  *   the pattern's four pages, the one shown lit, the place playing travelling across them.
  * TEMPO, SWING and LENGTH are K1..K3 on both. While anything moves, the page redraws alone, ~30 times a second (10
  * while the sound is busy); still, nothing does. */
-#define STRIP_Y 22                           /* the strip redrawn as it plays: from here to the page's end */
-#define GRID_Y 23                            /* SEQ: the tracks' rows, 13 apart (the drums' 3 lower), to 127 */
-#define POS_Y 132                            /* the pages */
+#define STRIP_Y 22                           /* the mixer's strip, redrawn as it plays: from here to the page's end */
+#define SEQ_STRIP_Y 40                       /* (0.28) SEQ's: under its knobs (at the page's top, CHIP_H high) */
+#define GRID_Y 42                            /* SEQ: the tracks' rows, 11 apart (the drums' 3 lower), to 132 */
+#define GRID_DY 11
+#define CELL_H 9
+#define POS_Y 136                            /* the pages */
 
 static int32_t step_x(uint32_t i) { return 24 + (int32_t)i * 13 + (int32_t)(i / 4u) * 2; }   /* 12 wide (16: to 237) */
 
@@ -3296,12 +3325,13 @@ static void draw_pages(int32_t dy, uint32_t page, int32_t playing, int32_t frac)
 }
 
 /* HOME: the terricons (0.28; 0.27's rings before). A ridge of eight, S1 at the left to D4 at the right, on one
- * ground line; each its height and place, the overlapping ones drawn from the tallest (furthest) to the lowest */
+ * ground line; each its height and place, the overlapping ones drawn from the tallest (furthest) to the lowest. Spoil
+ * heaps as the Donbas has them: their tops flat, a terrace on each slope, gullies down them */
 #define TC_BASE 136                          /* the ground line */
-#define TC_HALF 36                           /* half a terricon's foot */
+#define TC_HALF 38                           /* half a terricon's foot */
 #define TC_N 22                              /* points up each slope (2 TC_N + 1 along it) */
-static const uint8_t TC_X[SEQ_TRACKS] = {26, 56, 86, 116, 146, 176, 204, 228};   /* its peak's x */
-static const uint8_t TC_H[SEQ_TRACKS] = {96, 78, 88, 70, 58, 64, 48, 52};        /* its height */
+static const uint8_t TC_X[SEQ_TRACKS] = {26, 58, 92, 124, 152, 180, 206, 230};   /* its middle's x */
+static const uint8_t TC_H[SEQ_TRACKS] = {80, 66, 74, 58, 52, 58, 42, 46};        /* its height (to its point, cut) */
 static const uint8_t TC_ORDER[SEQ_TRACKS] = {0, 2, 1, 3, 5, 4, 7, 6};            /* tallest first */
 static const uint16_t TRACK_HUE[SEQ_TRACKS] = {   /* each track's colour, left to right: rose to violet */
     RGB(255, 61, 127), RGB(255, 106, 61), RGB(255, 166, 43), RGB(255, 225, 74),
@@ -3402,14 +3432,105 @@ static void thick_line(const int16_t *x, const int16_t *y, uint32_t n, uint16_t 
     }
 }
 
-/* the ground under a line through n points left to right, down to the base: black (what is behind it hidden) */
-static void ground_under(const int16_t *x, const int16_t *y, uint32_t n, int32_t base)
+/* the ground under a line through n points left to right, down to the base, in colour c (what is behind it hidden) */
+static void ground_under(const int16_t *x, const int16_t *y, uint32_t n, int32_t base, uint16_t c)
 {
     for (uint32_t i = 0; i + 1u < n; i++)
-        for (int32_t c = x[i]; c < x[i + 1u]; c++) {
-            const int32_t yy = y[i] + (y[i + 1u] - y[i]) * (c - x[i]) / (x[i + 1u] - x[i]);
-            cv_rect(c, yy, 1, base - yy, C_BLACK);
+        for (int32_t col = x[i]; col < x[i + 1u]; col++) {
+            const int32_t yy = y[i] + (y[i + 1u] - y[i]) * (col - x[i]) / (x[i + 1u] - x[i]);
+            cv_rect(col, yy, 1, base - yy, c);
         }
+}
+
+static uint16_t sky_at(int32_t y, int32_t base)   /* the sky's colour on row y: darker up */
+{
+    const int32_t t = clamp(y * 256 / (base > 0 ? base : 1), 0, 256);
+    return set.sky == SKY_DAY ? mix565(RGB(18, 52, 110), RGB(95, 140, 190), t) : mix565(RGB(2, 3, 10), RGB(14, 20, 48), t);
+}
+
+static float sky_flare(uint32_t look, uint32_t now, float ms)   /* the last hit of a track of this look, fading */
+{
+    float f = 0.0f;
+    for (uint32_t t = 0; t < SEQ_TRACKS; t++)
+        if (track_look(*track_engine(t)) == look && !(seq.mute >> t & 1u) && now - ui.hit_at[t] < 600u)
+            f = fm_maxf(f, fm_expf(-(float)(now - ui.hit_at[t]) / ms));
+    return f;
+}
+
+/* a disc of light at (cx, cy): r its core in colour c, then its glow over the sky, fading out over g pixels (a: its
+ * strength, 0..1); a moon's dark part: none of it where it is inside the disc (dx, dy) of radius rd */
+static void sky_light(int32_t cx, int32_t cy, float r, float g, uint16_t c, uint16_t glow, float a, int32_t base,
+                      int32_t dx, int32_t dy, float rd)
+{
+    const int32_t e = (int32_t)(r + g) + 1;
+    for (int32_t y = cy - e; y <= cy + e; y++) {
+        if (y < 0 || y >= base)
+            continue;
+        const uint16_t sky = sky_at(y, base);
+        for (int32_t x = cx - e; x <= cx + e; x++) {
+            const float fx = (float)(x - cx), fy = (float)(y - cy), d = fm_sqrtf(fx * fx + fy * fy);
+            if (d > r + g)
+                continue;
+            if (d <= r) {
+                const float ox = fx - (float)dx, oy = fy - (float)dy;
+                if (rd <= 0.0f || ox * ox + oy * oy > rd * rd)
+                    cv_rect(x, y, 1, 1, c);
+                continue;
+            }
+            const float k = 1.0f - (d - r) / g;
+            cv_rect(x, y, 1, 1, mix565(sky, glow, (int32_t)(256.0f * a * k * k)));
+        }
+    }
+}
+
+static void draw_sky(int32_t base, uint32_t now)
+{
+    if (set.sky == SKY_OFF)
+        return;
+    for (int32_t y = 0; y < base; y++)       /* darker up */
+        cv_rect(0, y, 240, 1, sky_at(y, base));
+    const float time = (float)(now % 600000u) * 0.001f;
+    if (set.sky == SKY_DAY) {
+        const float kick = sky_flare(LOOK_KICK, now, 120.0f);   /* the sun, flaring at each kick */
+        sky_light(196, 26, 11.0f + 2.0f * kick, 15.0f, RGB(255, 226, 110), RGB(255, 220, 90), 0.45f + 0.4f * kick, base,
+                  0, 0, 0.0f);
+        static const int8_t PUFF[4][3] = {{0, 0, 9}, {10, -5, 11}, {22, 0, 9}, {12, 3, 9}};
+        static const uint8_t AT[3] = {0, 90, 170}, Y[3] = {12, 30, 6}, SCALE[3] = {100, 80, 70};   /* (over the
+                                                                                   * heaps' names) */
+        const float speed = 12.0f * (float)seq_bpm(&seq) / 60.0f;   /* the clouds: at the tempo's pace */
+        for (uint32_t c = 0; c < 3u; c++) {
+            const float sc = (float)SCALE[c] * 0.01f;
+            float pos = (float)AT[c] + time * speed * sc;
+            pos -= fm_floorf(pos / 300.0f) * 300.0f;
+            const int32_t x0 = (int32_t)pos - 40, y0 = Y[c];
+            for (int32_t y = y0 - (int32_t)(16.0f * sc); y <= y0 + (int32_t)(12.0f * sc); y++) {
+                if (y < 0 || y >= base)
+                    continue;
+                const uint16_t cloud = mix565(sky_at(y, base), RGB(235, 240, 250), 218);
+                for (int32_t x = x0 - (int32_t)(10.0f * sc); x <= x0 + (int32_t)(32.0f * sc); x++)
+                    for (uint32_t k = 0; k < 4u; k++) {
+                        const float fx = (float)(x - x0) - (float)PUFF[k][0] * sc, fy = (float)(y - y0) - (float)PUFF[k][1] * sc;
+                        const float rr = (float)PUFF[k][2] * sc;
+                        if (fx * fx + fy * fy <= rr * rr) {
+                            cv_rect(x, y, 1, 1, cloud);
+                            break;
+                        }
+                    }
+            }
+        }
+    } else {
+        const float hat = sky_flare(LOOK_HAT, now, 90.0f);   /* the stars, twinkling at each hi-hat */
+        for (uint32_t i = 0; i < 46u; i++) {
+            const int32_t x = (int32_t)(ic_hash(i * 2u + 1u) % 240u), y = 4 + (int32_t)(ic_hash(i * 2u + 2u) % 92u);
+            const int bright = i % 3u == 0u;
+            if (y >= base)
+                continue;
+            const float tw = 0.5f + 0.5f * fm_sinf(time * 2.0f + (float)i * 1.7f) + (bright ? hat * 0.8f : 0.0f);
+            const uint16_t c = mix565(sky_at(y, base), RGB(255, 255, 240), (int32_t)(256.0f * fm_minf(1.0f, 0.25f + 0.6f * tw)));
+            cv_rect(x, y, bright ? 2 : 1, bright ? 2 : 1, c);
+        }
+        sky_light(70, 24, 12.0f, 15.0f, RGB(240, 236, 200), RGB(230, 230, 200), 0.25f, base, 6, -4, 11.0f);   /* the moon */
+    }
 }
 
 /* HOME: the terricons. A track with no step on in its pattern has none; one silent (muted, or another soloed) is
@@ -3421,7 +3542,9 @@ static void draw_terricons(int32_t dy, uint32_t now)
 {
     const float time = (float)(now % 600000u) * 0.001f;
     const int32_t base = TC_BASE + dy;
+    const uint16_t earth = set.sky == SKY_DAY ? RGB(18, 16, 22) : C_BLACK;   /* (the heaps' black, by day dark earth) */
     int16_t px[2 * TC_N + 1], py[2 * TC_N + 1];
+    draw_sky(base, now);
     for (uint32_t o = 0; o < SEQ_TRACKS; o++) {
         const uint32_t t = TC_ORDER[o];
         if (!track_used(t))                  /* empty: no terricon */
@@ -3446,10 +3569,21 @@ static void draw_terricons(int32_t dy, uint32_t now)
                         d += TRACK_LOOK[look].w[k] * fm_sinf((float)TRACK_LOOK[look].k[k] * 3.1415927f * (u + 1.0f) +
                                                              TRACK_LOOK[look].speed[k] * time + 1.3f * (float)t);
             const float bend = depth * d / wsum * 4.0f * au * (1.0f - au);   /* (none at the feet, nor the peak) */
+            float y = (float)base - h * (1.0f - au) * (1.0f - 0.06f * u * u);
+            if (y < (float)base - h * 0.88f)  /* its top, flat */
+                y = (float)base - h * 0.88f;
+            if (au > 0.55f && au < 0.7f && y > (float)base - h * 0.45f + 2.0f)   /* a terrace on each slope */
+                y = (float)base - h * 0.45f + 2.0f;
             px[i] = (int16_t)(TC_X[t] + (int32_t)((float)TC_HALF * u + (u < 0.0f ? -0.5f : 0.5f)));
-            py[i] = (int16_t)((float)base - h * (1.0f - au) * (1.0f - 0.12f * u * u) - bend + 0.5f);
+            py[i] = (int16_t)(y - bend + 0.5f);
         }
-        ground_under(px, py, 2u * TC_N + 1u, base);
+        ground_under(px, py, 2u * TC_N + 1u, base, earth);
+        for (int32_t k = -2; k <= 2; k++)    /* gullies down its slopes */
+            if (k) {
+                const uint32_t at = (uint32_t)((float)TC_N * (1.0f + 0.12f * (float)k) + 0.5f);
+                cv_line(px[at], py[at] + 3, TC_X[t] + (int32_t)(0.42f * (float)k * (float)TC_HALF), base - 1,
+                        mix565(earth, muted ? C_DIM : TRACK_HUE[t], 70));
+            }
         if (muted)                           /* silent: grey, still */
             thick_line(px, py, 2u * TC_N + 1u, C_DIM, sel ? 2 : 1);
         else if (amp < 0.02f)                /* quiet: its colour, dim */
@@ -3467,12 +3601,13 @@ static void draw_terricons(int32_t dy, uint32_t now)
             cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2, ty - 24, &FONT_T, TRACK_NAME[t], C_WHITE);
         }
     }
-    cv_rect(0, base + 1, 240, 144, C_BLACK); /* the ground, and nothing under it (the feet's glow cut) */
+    cv_rect(0, base + 1, 240, 144, set.sky == SKY_DAY ? RGB(26, 24, 28) : C_BLACK);   /* the ground (the feet's glow
+                                                                                     * cut) */
     cv_rect(0, base, 240, 1, C_LINE);
-    {                                        /* the selected track's level, top right */
+    {                                        /* the selected track's level, top left */
         const int32_t lv = (int32_t)(ui.level[track_sel] * 6.0f + 0.5f);
         for (int32_t k = 0; k < 6; k++)
-            cv_rect(198 + k * 6, 4 + dy, 4, 10, k < lv ? TRACK_HUE[track_sel] : C_LINE);
+            cv_rect(8 + k * 6, 4 + dy, 4, 8, k < lv ? TRACK_HUE[track_sel] : C_LINE);
     }
 }
 
@@ -3483,18 +3618,18 @@ static void draw_grid(int32_t dy, uint32_t now)
     const uint32_t page = ui.view_page;
     for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
         const seq_track_t *tr = &seq.pat.track[t];
-        const int32_t y = GRID_Y + dy + (int32_t)t * 13 + (t >= SEQ_S_TRACKS ? 3 : 0), sel = t == track_sel;
+        const int32_t y = GRID_Y + dy + (int32_t)t * GRID_DY + (t >= SEQ_S_TRACKS ? 3 : 0), sel = t == track_sel;
         const int32_t at = seq.playing ? seq.step[t] : -1, hit = flash256(now - ui.hit_at[t], 200u);
         const uint16_t hue = TRACK_HUE[t], sel_lo = mix565(C_BLACK, hue, 90);
         if (sel)                             /* the selected track: its row on a ground of its colour */
-            cv_rect(0, y - 1, 240, 13, mix565(C_BLACK, hue, 40));
+            cv_rect(0, y - 1, 240, CELL_H + 2, mix565(C_BLACK, hue, 40));
         const int muted = seq.mute >> t & 1u;   /* (0.26) silent (muted, or another soloed): its name red, steps dim */
-        cv_text(3, y - 1, &FONT_T, TRACK_NAME[t], muted ? C_RED : sel ? C_WHITE : hue);
+        cv_text(3, y - 2, &FONT_T, TRACK_NAME[t], muted ? C_RED : sel ? C_WHITE : hue);
         for (uint32_t i = 0; i < SEQ_PAGE; i++) {
             const uint32_t s = page * SEQ_PAGE + i;
             const int32_t x = step_x(i);
             if (s >= tr->length) {           /* past its length: a dot */
-                cv_rect(x + 5, y + 5, 2, 1, C_LINE);
+                cv_rect(x + 5, y + 4, 2, 1, C_LINE);
                 continue;
             }
             const seq_step_t *st = &tr->step[s];
@@ -3503,17 +3638,17 @@ static void draw_grid(int32_t dy, uint32_t now)
                 c = muted ? C_DIM : mix565(C_BLACK, hue, (sel ? 150 : 90) + (int32_t)st->vel * (sel ? 106 : 120) / 127);
             if (at == (int32_t)s)            /* its step playing: lit; a note, flashing as it begins */
                 c = st->on ? mix565(c, C_WHITE, 64 + hit * 192 / 256) : RGB(70, 70, 82);
-            cv_rect(x, y, 12, 11, c);
+            cv_rect(x, y, 12, CELL_H, c);
             if (st->on && st->n > 1u)        /* a chord: a notch */
                 cv_rect(x + 9, y, 3, 3, sel ? sel_lo : RGB(20, 20, 25));
             if (sel && ui.step_held == (int8_t)s) {   /* the step held: framed */
                 cv_rect(x - 1, y - 1, 14, 1, C_WHITE);
-                cv_rect(x - 1, y + 11, 14, 1, C_WHITE);
-                cv_rect(x - 1, y, 1, 11, C_WHITE);
-                cv_rect(x + 12, y, 1, 11, C_WHITE);
+                cv_rect(x - 1, y + CELL_H, 14, 1, C_WHITE);
+                cv_rect(x - 1, y, 1, CELL_H, C_WHITE);
+                cv_rect(x + 12, y, 1, CELL_H, C_WHITE);
             }
             if (sel && ui.rec && !seq.playing && ui.rec_pos == s)
-                cv_rect(x, y + 9, 12, 2, C_RED);
+                cv_rect(x, y + CELL_H - 2, 12, 2, C_RED);
         }
     }
     draw_pages(dy, page, seq.playing ? seq.step[track_sel] : -1, seq.playing ? step_frac(now) : 0);
@@ -3529,6 +3664,8 @@ static void draw_seq_body(int32_t dy)        /* the strip (rows STRIP_Y on), dra
 
 static void draw_seq(void)
 {
+    if (ui.step_mode)                        /* (0.28) step mode: its knobs at the page's top */
+        draw_chips(0, 7u, 0);
     draw_seq_body(0);
 }
 
@@ -3725,12 +3862,15 @@ static void draw_seq_grid(void)
         cv_blit(0, 36);
         return;
     }
-    cv_begin(240, 144u - STRIP_Y, C_BLACK);
-    if (active_page == PAGE_MIXER)
+    if (active_page == PAGE_MIXER) {
+        cv_begin(240, 144u - STRIP_Y, C_BLACK);
         draw_mixer_body(-STRIP_Y);
-    else
-        draw_seq_body(-STRIP_Y);
-    cv_blit(0, 36 + STRIP_Y);
+        cv_blit(0, 36 + STRIP_Y);
+    } else {                                 /* (step mode: under its knobs) */
+        cv_begin(240, 144u - SEQ_STRIP_Y, C_BLACK);
+        draw_seq_body(-SEQ_STRIP_Y);
+        cv_blit(0, 36 + SEQ_STRIP_Y);
+    }
 }
 
 /* GLO: VOICES, VELOCITY and METRONOME as the other pages' knobs are drawn; the identity and the version below */
@@ -3759,20 +3899,21 @@ static void draw_glo(void)
 
 /* GLO's SCREEN: THEME as a knob; beside it every palette in the knob's order, five a row: a swatch of its two
  * colours and its name, the one shown framed */
+/* GLO's SCREEN: K1 THEME, K2 SKY (0.28); under the knobs every palette's swatch in THEME's order, the one shown
+ * framed (below the knobs' tiles, so a knob turning never redraws them) */
 static void draw_screen_page(void)
 {
     int32_t h, r;
-    draw_dials(knob_row(&h, &r), 1u, 0);
+    const int32_t y = knob_row(&h, &r) + h + 3;
+    draw_dials(knob_row(&h, &r), 3u, 0);
     for (uint32_t i = 0; i < THEMES; i++) {
         const palette_t *pl = &PALETTES[THEME_ORDER[i]];
-        const int32_t x = 96 + (int32_t)(i % 5u) * 28, y = 56 + (int32_t)(i / 5u) * 34;
-        const int shown = THEME_ORDER[i] == theme_palette();
-        if (shown)
-            cv_rect(x - 2, y - 2, 28, 18, C_WHITE);
-        cv_rect(x - 1, y - 1, 26, 16, C_BLACK);
-        cv_rect(x, y, 24, 7, pl->c[3]);
-        cv_rect(x, y + 7, 24, 7, pl->c[4]);
-        cv_text(x + 12 - text_w(&FONT_T, pl->name) / 2, y + 17, &FONT_T, pl->name, shown ? C_WHITE : C_DIM);
+        const int32_t x = 9 + (int32_t)i * 23;
+        if (THEME_ORDER[i] == theme_palette())
+            cv_rect(x - 2, y - 2, 24, 13, C_WHITE);
+        cv_rect(x - 1, y - 1, 22, 11, C_BLACK);
+        cv_rect(x, y, 20, 5, pl->c[3]);
+        cv_rect(x, y + 5, 20, 4, pl->c[4]);
     }
 }
 
@@ -3851,14 +3992,28 @@ static void draw_cpu(int32_t x, int32_t y)   /* the render's load; red once a re
     cv_text(x + 26, y, &FONT_XS, t, ui.xruns ? C_RED : C_HI);
 }
 
-/* SEQ's bottom band: its three knobs, small; under them PLAY or STOP, REC and its step / STEP / a MIDI clock in,
+/* the track's line, its top at y: the track and its engine; FREEZE, and MUTE or SOLO (0.26: muted, or another
+ * soloed; 0.26.1: SOLO) */
+static void draw_track_line(int32_t y)
+{
+    cv_text(8, y, &FONT_S, TRACK_NAME[track_sel], C_WHITE);
+    cv_text(30, y, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
+    if (fx_freeze)
+        cell(172, y - 2, 60, "FREEZE", 1);
+    if (seq.mute >> track_sel & 1u)
+        cv_text(fx_freeze ? 132 : 200, y + 2, &FONT_XS, "MUTE", C_RED);
+    else if (ui.solo >> track_sel & 1u)
+        cv_text(fx_freeze ? 132 : 200, y + 2, &FONT_XS, "SOLO", C_HI);
+}
+
+/* SEQ's bottom band (step mode): the track's line (0.28: its knobs at the page's top); under it PLAY or STOP, REC and its step / STEP / a MIDI clock in,
  * the pattern and the next one (blinking), the preset unsaved, the load. A moment's message (OCTAVE, PATTERN, the
  * volume ...) over the left of that line */
 static void draw_seq_band(void)
 {
     char t[48];
-    const int32_t y = 43;
-    draw_chips(CHIP_Y, 7u, 0);
+    const int32_t y = 34;
+    draw_track_line(8);                      /* (0.28: its knobs at the page's top, the track's line here) */
     if ((ui.msg_until && plat_ms() < ui.msg_until) || preset_import_failed) {
         band_message(t, 160);
         cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
@@ -4025,16 +4180,8 @@ static void draw_page(void)
 {
     cv_begin(240, 144, C_BLACK);
     ui.live_w = 0;                           /* (none, unless a page draws one) */
-    if (!(active_page == PAGE_SEQ && !ui.step_mode)) {
-        cv_text(8, 4, &FONT_S, TRACK_NAME[track_sel], C_WHITE);
-        cv_text(30, 4, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
-        if (fx_freeze)
-            cell(172, 2, 60, "FREEZE", 1);
-        if (seq.mute >> track_sel & 1u)      /* (0.26: muted, or another soloed; 0.26.1: SOLO) */
-            cv_text(fx_freeze ? 132 : 200, 6, &FONT_XS, "MUTE", C_RED);
-        else if (ui.solo >> track_sel & 1u)
-            cv_text(fx_freeze ? 132 : 200, 6, &FONT_XS, "SOLO", C_HI);
-    }
+    if (active_page != PAGE_SEQ)             /* (HOME's terricons: named in the bottom band; step mode too, 0.28) */
+        draw_track_line(4);
     if (active_page == PAGE_GLO)
         draw_glo();
     else if (active_page == PAGE_SCREEN)
@@ -4193,8 +4340,8 @@ static void frame_changes(uint32_t now, uint32_t pct)
  * come (4 .. 1, in the bottom band); the volume's moment over */
 static void seq_frame(uint32_t now)
 {
-    if (!ui.step_mode) {
-        if (now - ui.grid_at >= frame_ms() && levels_update(now))
+    if (!ui.step_mode) {                     /* (0.28: a sky moves on its own, 20 frames a second while all is quiet) */
+        if (now - ui.grid_at >= frame_ms() && (levels_update(now) || (set.sky != SKY_OFF && now - ui.grid_at >= 50u)))
             ui.redraw_grid = 1;
     } else {
         ui.level_at = now;
@@ -4341,6 +4488,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
     (void)a; (void)b; (void)c; (void)d;
     if (!strcmp(cmd, "preset_fail")) { preset_store_test_fail(atoi(a)); return 1; }
     if (!strcmp(cmd, "soundpage")) { sound_activate((uint32_t)atoi(a)); return 1; }
+    if (!strcmp(cmd, "sky")) {               /* (0.28) HOME's sky at once (the pictures): 0 DAY, 1 NIGHT, 2 OFF */
+        set.sky = (uint8_t)clamp(atoi(a), SKY_DAY, SKY_OFF);
+        ui.redraw = 1;
+        return 1;
+    }
     if (!strcmp(cmd, "save_moddest")) {
         settings_capture();
         settings_t legacy = set;
@@ -4528,6 +4680,8 @@ int app_expect(const char *what, int *got)
         *got = fx_params[FX_DRY_WET];
     else if (!strcmp(what, "meter"))         /* the selected track's meter, 0..256 */
         *got = ui.meter[track_sel];
+    else if (!strcmp(what, "sky"))           /* (0.28) GLO's SCREEN: HOME's sky, SKY_* (0 DAY, 1 NIGHT, 2 OFF) */
+        *got = set.sky;
     else if (!strcmp(what, "theme"))         /* (0.25.1) GLO's SCREEN: the palette chosen + 1 (0: the app's); shown */
         *got = set.theme;
     else if (!strcmp(what, "palette"))

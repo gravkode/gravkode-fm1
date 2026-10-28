@@ -180,6 +180,12 @@ wait 2000
 shot screen-seq-steps.png
 tap SEQ
 wait 30
+# (0.28) HOME at night, still playing: the moon, the stars (GLO's SCREEN, K2 SKY); by day again after
+sky 1
+wait 600
+shot screen-night.png
+sky 0
+wait 30
 # the mixer (SEL, 0.26), still playing: the tracks' faders, meters, sends, mutes
 tap SEL
 wait 600
