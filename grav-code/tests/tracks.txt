@@ -52,8 +52,24 @@ key 7 up
 wait 50
 expect_out USB 81 3C 00
 expect voices_held 0
-# GLO VOICES: S2 up to 2 takes S4's voice (the last of those with the most); S4 has none, plays nothing
+# GLO VOICES (0.27.1): S2 up with every voice taken, one each: refused, nobody's last voice taken (it would fall
+# silent); S4 OFF, then S2 up to 2 takes the free one; S4 has none, plays nothing
 tap GLO
+wait 30
+listen
+turn K1 1
+wait 30
+expect voices 1
+expect trk_voices3 1
+said S2 VOICES NO VOICE FREE
+turn SELECT 2
+wait 30
+expect track 3
+turn K1 -1
+wait 30
+expect voices 0
+said S4 VOICES OFF
+turn SELECT -2
 wait 30
 turn K1 1
 wait 30

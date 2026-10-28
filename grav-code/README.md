@@ -45,6 +45,7 @@ From the repository's root:
     grav-code/build/host/grav_code_host grav-code/tests/theme.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/mixer.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/browser.txt grav-code/build/host
+    grav-code/build/host/grav_code_host grav-code/tests/playback.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/tracks.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/drums.txt grav-code/build/host
     grav-code/build/host/grav_code_host grav-code/tests/patterns.txt grav-code/build/host
@@ -62,13 +63,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.27.0    # grav-code/build/grav_code-0.27.0.fwsc, identity FM-1_73002700
+    python3 tools/build.py grav-code --release 0.27.1    # grav-code/build/grav_code-0.27.1.fwsc, identity FM-1_73002701
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.0.fwsc 0.27.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.1.fwsc 0.27.1 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.27.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.27.1   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

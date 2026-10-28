@@ -13,12 +13,13 @@ FM-1's own panel and screen.
 
 ---
 
-Current version: **0.27.0**, a new HOME: the song at a glance, eight concentric rings, a track each, bending and
-swelling with each track's own sound (grey when muted, none when empty); PRESET opens a browser of every sound the
-track can play, engine after engine, each played at once (OCT+ its engine's alone, OCT- back); the mixer's VOL is
-its own fader, which a preset never changes. Before it: 0.26, the mixer on SEL (levels, sends, mutes, solos); 0.25,
-recording finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages; hold HOME and turn
-SELECT to jump. [All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+Current version: **0.27.1** (VOICES no longer silences other tracks), on 0.27.0's new HOME: the song at a glance,
+eight concentric rings, a track each, bending and swelling with each track's own sound (grey when muted, none when
+empty); PRESET opens a browser of every sound the track can play, engine after engine, each played at once (OCT+ its
+engine's alone, OCT- back); the mixer's VOL is its own fader, which a preset never changes. Before it: 0.26, the
+mixer on SEL (levels, sends, mutes, solos); 0.25, recording finished and the colours chosen on GLO; 0.24, live
+recording. HOME advances pages; hold HOME and turn SELECT to jump.
+[All sound controls](grav-code/docs/SOUND_CONTROLS.md).
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's rings, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
@@ -122,7 +123,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.0.fwsc 0.27.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.1.fwsc 0.27.1 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -137,7 +138,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.27.0      # grav-code/build/grav_code-0.27.0.fwsc
+python3 tools/build.py grav-code --release 0.27.1      # grav-code/build/grav_code-0.27.1.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
@@ -145,7 +146,7 @@ python3 tools/build.py grav-code --web                 # the browser emulator (E
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: its pages, FREEZE, SEED, QUALITY, saving),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's rings, the presets' browser), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's rings, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).
 

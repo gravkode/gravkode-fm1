@@ -2,10 +2,31 @@
 # tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/voices.txt grav-code/build/host
 wait 600
-# every track MONO at first; S1 up to 4: the free voices first, then one from the track with the most (S4, S3, S2)
+# every track MONO at first; S1 up: no voice free, none taken (0.27.1: never another track's last, it would fall
+# silent); S2..S4 OFF, then S1 up to 4: the free ones
 expect voices 1
 expect trk_voices3 1
 tap GLO
+wait 30
+listen
+turn K1 3
+wait 30
+expect voices 1
+expect trk_voices3 1
+said NO VOICE FREE
+turn SELECT 1
+wait 30
+turn K1 -1
+wait 30
+turn SELECT 1
+wait 30
+turn K1 -1
+wait 30
+turn SELECT 1
+wait 30
+turn K1 -1
+wait 30
+turn SELECT -3
 wait 30
 turn K1 3
 wait 30

@@ -235,18 +235,19 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002700, version 0.27.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002701, version 0.27.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
 | Knob | Setting | Values |
 | --- | --- | --- |
-| K1 | VOICES | The selected synth track's: OFF, MONO (each track's at first), 2, 3, 4; four in all (section 8). A drum track's: DRUM, its own |
+| K1 | VOICES | The selected synth track's: OFF, MONO (each track's at first), 2, 3, 4; four in all, never another's last (section 8). A drum track's: DRUM, its own |
 | K2 | VELOCITY | ON (right: the keys play as they land), OFF (left: at a fixed 100) |
 | K3 | METRONOME | OFF (left); REC (middle: a click on each quarter note while recording live, the bar's first higher and louder); COUNT (right: REC, and a bar's count-in when recording starts from a stop) |
 
-Under them, the package's identity (the installer's) and the firmware's version. Section 8 has more on VOICES and
-VELOCITY, section 5 on the metronome.
+Above the knobs, how the four voices are shared out: S1..S4 each its number (OFF in red, the selected track's
+lit) and FREE, those no track has. Under them, the package's identity (the installer's) and the firmware's version.
+Section 8 has more on VOICES and VELOCITY, section 5 on the metronome.
 GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
 AMBER (GRAV CODE's until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown beside the knob as
 a swatch of its two colours, the one shown framed. Only the theme's two brightest colours change (values, the knob
@@ -570,10 +571,13 @@ it loops a slice of the recording: TIME picks which, SHAPE its envelope.
 ![A chord on CHORDS, its sound page](img/screen-playing.png "A chord on CHORDS")
 
 **VOICES** (GLO, K1): the FM-1 has four voices for the synth tracks, each its own engine, shared out among them:
-each track none (OFF), one (MONO) or up to four (POLY), four in all. Each track starts with one. Turning a track's
-VOICES up takes a free voice, else one from the track that has the most (the last of them); turning it down leaves
-the voice free. A track without voices plays nothing. Each drum track has a voice of its own besides (VOICES shows
-DRUM): a new hit strikes it afresh.
+each track none (OFF), one (MONO) or up to four (POLY), four in all. Each track starts with one, so at first none
+is free. Turning a track's VOICES up takes a free voice, else one from a track that has more than one (the one with
+the most); never another track's last voice, which would leave it silent. With none to take, VOICES stays as it was
+and says NO VOICE FREE: turn another track down first (to OFF to free its voice). Turning a track down leaves the
+voice free. GLO shows each track's voices and those free above the knobs. A track at OFF plays nothing (its steps
+still go out on MIDI); HOME's bottom band says NO VOICE in red while it is selected. Each drum track has a voice of
+its own besides (VOICES shows DRUM): a new hit strikes it afresh.
 
 - **POLY:** each note takes one of the track's voices: a free one first, else the one let go longest ago, else the
   oldest held. The same note played again takes its own voice back.

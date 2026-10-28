@@ -1,7 +1,21 @@
 # GLO three times opens DEBUG (SCREEN between, 0.25.1); a whole block is handed over only with >= 2 active voices.
 wait 600
-# S1 takes the four voices (every track has one at first)
+# S1 takes the four voices (every track has one at first: S2..S4 OFF first, 0.27.1)
 tap GLO
+wait 30
+turn SELECT 1
+wait 30
+turn K1 -1
+wait 30
+turn SELECT 1
+wait 30
+turn K1 -1
+wait 30
+turn SELECT 1
+wait 30
+turn K1 -1
+wait 30
+turn SELECT -3
 wait 30
 turn K1 3
 wait 30

@@ -855,6 +855,7 @@ static struct {
     uint32_t sel_at;                     /* SEL pressed, when */
     uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
     float ring_env[SYNTH_TRACKS];        /* (0.27) HOME's rings: each track's level, followed */
+    uint8_t ring_heard;                  /* (0.27.1) the rings that sounded since a test last asked (a bit each) */
     uint32_t ring_at;                    /* (its last update) */
     uint8_t preset_edited;               /* (0.27) the tracks whose sound was changed after its preset (a * by it) */
     uint8_t solo;                        /* (0.26.1) the tracks soloed, a bit each (black keys 1..8 on the mixer; not
@@ -1331,16 +1332,20 @@ static void voices_turn(int32_t e)
     for (uint32_t k = 0; k < SYNTH_S_TRACKS; k++)
         total += c[k] = set.trk_voices[k];
     int32_t want = clamp((int32_t)c[t] + e, 0, (int32_t)SYNTH_POLY_VOICES);
-    while ((int32_t)c[t] < want) {
+    int none = 0;
+    while ((int32_t)c[t] < want) {           /* a free voice; else one of a track with more than one (0.27.1: never
+                                              * another's last: it would fall silent, as S1..S3 did) */
         if (total < SYNTH_POLY_VOICES) {
             total++;
         } else {
             uint32_t from = SYNTH_S_TRACKS;
             for (uint32_t k = SYNTH_S_TRACKS; k-- > 0;)
-                if (k != t && c[k] && (from == SYNTH_S_TRACKS || c[k] > c[from]))
+                if (k != t && c[k] > 1u && (from == SYNTH_S_TRACKS || c[k] > c[from]))
                     from = k;
-            if (from == SYNTH_S_TRACKS)
+            if (from == SYNTH_S_TRACKS) {
+                none = 1;
                 break;
+            }
             c[from]--;
         }
         c[t]++;
@@ -1358,7 +1363,7 @@ static void voices_turn(int32_t e)
     a[0] = 0;
     text_cat(a, TRACK_NAME[t]);
     text_cat(a, " VOICES");
-    app_say(a, voices_text(c[t]));
+    app_say(a, none ? "NO VOICE FREE" : voices_text(c[t]));
 }
 
 /* GLO's knobs: K1 VOICES (MONO, 2, 3, 4), K2 VELOCITY (right: on, the keys' own; left: off, fixed), K3 the version */
@@ -3228,6 +3233,7 @@ static int rings_update(uint32_t now)
             e = 0.0f;
         moving |= e != ui.ring_env[t] || e > 0.0f || now - ui.hit_at[t] < 200u;
         ui.ring_env[t] = e;
+        ui.ring_heard |= (uint8_t)((e > 0.02f) << t);
     }
     return moving;
 }
@@ -3558,8 +3564,21 @@ static void draw_seq_grid(void)
 /* GLO: VOICES, VELOCITY and METRONOME as the other pages' knobs are drawn; the identity and the version below */
 static void draw_glo(void)
 {
-    int32_t h, r;
+    int32_t h, r, x = 8;
+    uint32_t used = 0;
+    char t[8];
     draw_dials(knob_row(&h, &r), 7u, 0);
+    for (uint32_t k = 0; k < SYNTH_S_TRACKS; k++) {   /* (0.27.1) the synth tracks' four voices: each's, the free */
+        cv_text(x, 26, &FONT_T, TRACK_NAME[k], k == track_sel ? C_HI : C_GRAY);
+        x += text_w(&FONT_T, TRACK_NAME[k]) + 3;
+        int_text(set.trk_voices[k], t);
+        cv_text(x, 26, &FONT_T, set.trk_voices[k] ? t : "OFF", set.trk_voices[k] ? C_WHITE : RGB(240, 55, 45));
+        x += text_w(&FONT_T, set.trk_voices[k] ? t : "OFF") + 10;
+        used += set.trk_voices[k];
+    }
+    int_text((int32_t)(SYNTH_POLY_VOICES - used), t);
+    cv_text(x, 26, &FONT_T, "FREE", C_GRAY);
+    cv_text(x + text_w(&FONT_T, "FREE") + 3, 26, &FONT_T, t, C_WHITE);
     cv_text(8, 130, &FONT_XS, "ID", C_GRAY);
     cv_text(26, 130, &FONT_XS, FELUCCA_ID, C_WHITE);
     cv_text(150, 130, &FONT_XS, "VER", C_GRAY);   /* (K3 was the version until 0.24: METRONOME now) */
@@ -3720,12 +3739,11 @@ static void draw_home_band(void)
     text_cat(t, n);
     cv_text(8, 6, &FONT_XS, t, C_GRAY);
     cv_text(60, 8, &FONT_T, grav_engine_name(*track_engine(tr)), C_DIM);
-    if (seq.mute >> tr & 1u)
-        cv_text(132, 6, &FONT_XS, "MUTE", RGB(240, 55, 45));
-    else if (ui.solo >> tr & 1u)
-        cv_text(132, 6, &FONT_XS, "SOLO", C_HI);
-    if (fx_freeze)
-        cv_text(132, 6, &FONT_XS, seq.mute >> tr & 1u || ui.solo >> tr & 1u ? "" : "FREEZE", C_HI);
+    const int silent = !SYNTH_IS_DRUM(tr) && !set.trk_voices[tr];   /* (0.27.1) VOICES OFF: it cannot sound */
+    const char *state = silent ? "NO VOICE" : seq.mute >> tr & 1u ? "MUTE" : ui.solo >> tr & 1u ? "SOLO"
+                      : fx_freeze ? "FREEZE" : "";
+    cv_text(172 - text_w(&FONT_XS, state), 6, &FONT_XS, state,   /* (ending clear of CPU) */
+            silent || seq.mute >> tr & 1u ? RGB(240, 55, 45) : C_HI);
     draw_cpu(178, 6);
     if (ui.shown_count) {                    /* counting in: the beats to come */
         t[0] = 'I'; t[1] = 'N'; t[2] = ' ';
@@ -4309,6 +4327,9 @@ int app_expect(const char *what, int *got)
         for (uint32_t t = 0; t < SEQ_TRACKS; t++)
             m |= (ui.ring_env[t] > 0.02f) << t;
         *got = m;
+    } else if (!strcmp(what, "rings_heard")) {   /* (0.27.1) those that sounded since asked last */
+        *got = ui.ring_heard;
+        ui.ring_heard = 0;
     } else if (!strcmp(what, "solo"))          /* (0.26.1) the tracks soloed */
         *got = ui.solo;
     else if (!strcmp(what, "send"))          /* the selected track's SEND, LEVEL; the effect's RETURN (DRY/WET) */
