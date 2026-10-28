@@ -84,7 +84,7 @@ From the top:
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
-| HOME | HOME's rings (every track, 0.27) → OSC → extra sound pages → OUTPUT → the rings. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the rings. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
+| HOME | HOME's terricons (every track, 0.28) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
@@ -235,7 +235,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002702, version 0.27.2](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002800, version 0.28.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -266,11 +266,11 @@ The effect's three pages: section 7.
 
 ## 5. The sequencer
 
-![HOME playing: four rings, S1 (rose, outermost, selected: white at its core, a marker at its right), S2 (orange), D1 (green) and D3 (blue), each bending with its sound; S1 in the middle, its level at the bottom right; TRK 01, CHORDS below](img/screen-seq.png "HOME: the rings")
+![HOME playing: four terricons on the ridge, S1 (rose, at the left, selected: white at its core, a marker and its name over its peak), S2 (orange), D1 (green) and D3 (blue), each bending with its sound; S1's level at the top right; TRK 01, CHORDS below](img/screen-seq.png "HOME: the terricons")
 
 ![Step mode (SEQ) playing: the eight tracks' 16 steps a row each, S1 to S4 then D1 to D4, S1 on a teal ground; each track's step playing lit, its notes flashing; a notch marks a chord; the four pages; STEP in the bottom band](img/screen-seq-steps.png "Step mode: every track")
 
-![One bar playing, in the simulator: HOME's rings at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
+![One bar playing, in the simulator: HOME's terricons at the left, step mode's eight tracks at the right](img/seq-playing.gif "SEQ playing")
 
 ![SELECT turned: the eight tracks, S2 (VA VCF) selected, each with its engine and voices (DRUM: a drum track's own)](img/screen-tracks.png "The tracks' list")
 
@@ -287,28 +287,29 @@ four, its velocity and its length.
 A fresh FM-1's tracks are a lead (WAVESHAPE), a bass (VA VCF), chords (CHORDS) and a pluck (STRING), one voice each,
 and a kit: a kick (D1), a snare (D2), a closed hi-hat (D3) and an open one (D4).
 
-### HOME: the rings (0.27)
+### HOME: the terricons (0.28)
 
-HOME opens on the song at a glance: eight concentric rings, a track each, S1 the outermost and D4 the innermost,
-each in a colour of its own (rose, orange, amber, yellow, green, teal, blue, violet, outside in).
+HOME opens on the song at a glance: a ridge of eight terricons, a track each, S1 at the left to D4 at the right on
+one ground line, each in a colour of its own (rose, orange, amber, yellow, green, teal, blue, violet, left to
+right). Each has its own height and place; where they overlap, the lower one stands in front.
 
-- **A track with no step on** in the pattern has no ring; its place stays empty, so every ring keeps its place.
-- **A quiet track's ring** is its colour, dim and round. **A sounding one** lives: it bends and swells with the
-  track's own sound (measured before the mix, followed with an attack and a release), a glow under it brighter the
-  louder. How it moves comes from its engine: a kick a strong quick bulge as it hits, a snare a sharper one, a
-  hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
-- **A muted track's ring** (or one silenced by another's solo, the mixer) is grey and still.
-- **The selected track's ring** is thicker, white at its core, with a marker at its right; its name is in the middle
-  and its level at the bottom right. SELECT picks another.
+- **A track with no step on** in the pattern has no terricon; its place stays empty, so every one keeps its place.
+- **A quiet track's terricon** is its colour, dim and still. **A sounding one** lives: its slopes bend with the
+  track's own sound (measured before the mix, followed with an attack and a release), a glow under its line
+  brighter the louder. How it moves comes from its engine: a kick a strong quick bulge, its peak jumping up as it
+  hits, a snare a sharper one, a hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
+- **A muted track's terricon** (or one silenced by another's solo, the mixer) is grey and still.
+- **The selected track's terricon** is thicker, white at its core, with a marker and its name over its peak; its
+  level is at the top right. SELECT picks another.
 - **The bottom band:** TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name large (a * once changed
   after its preset). A moment's message (TEMPO 120, PATTERN ...) takes its place, and while counting in IN 4 .. 1.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's), **K2 SWING** (the selected track's, 50 % straight to
   75 %; with SEQ held, the pattern's, every track's), **K3 LENGTH** (the selected track's, 1 to 64 steps), K4 the
   pattern, as before; their values show in the bottom band as they turn.
 
-The rings redraw on their own while anything sounds, about 30 times a second (10 while the sound takes 75 % or
-more); still, nothing moves. Until 0.27 HOME showed the selected track as a piano roll; step mode (SEQ) shows every
-track's steps.
+The terricons redraw on their own while anything sounds, about 30 times a second (10 while the sound takes 75 % or
+more); still, nothing moves. In 0.27 HOME showed eight concentric rings, and before it the selected track as a
+piano roll; step mode (SEQ) shows every track's steps.
 
 A list over the page (the tracks, the patterns, a preset's slots, the presets' browser) stops it until the list
 goes.
@@ -349,7 +350,7 @@ recording, live.
 ### Live recording (REC while playing)
 
 While the sequencer plays, REC records what you play into the selected track as it goes round (PLAY red, REC
-lighting on each beat, a red dot in the header; HOME's rings show it sounding). REC again stops recording and the sequencer plays on; stopping (PLAY) ends it too. REC while stopped and
+lighting on each beat, a red dot in the header; HOME's terricons show it sounding). REC again stops recording and the sequencer plays on; stopping (PLAY) ends it too. REC while stopped and
 then PLAY records from the first step (with METRONOME at COUNT, after a bar of clicks: IN 4 .. IN 1 in the bottom
 band; nothing plays or records meanwhile but a note in the last half step, which goes to the first).
 

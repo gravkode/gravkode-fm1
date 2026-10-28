@@ -1,17 +1,18 @@
-# HOME's rings and the presets' browser (0.27). HOME opens on eight concentric rings, a track each: one with a step
-# on has its ring, a sounding one moves. PRESET opens the browser over the page: every sound the track can play,
-# engine after engine (ALGO's order), each one chosen plays at once, the engine changing with it; the sequencer, the
-# mixer and the other tracks as they were, nothing written. OCT+ shows the engine's alone (round), OCT- puts the
-# sound back as it was; it closes 3 s after the last turn, or with a page's button or another track, keeping it.
+# HOME's terricons and the presets' browser (0.27; terricons since 0.28, rings before). HOME opens on a ridge of eight
+# terricons, a track each: one with a step on has its terricon, a sounding one moves. PRESET opens the browser over
+# the page: every sound the track can play, engine after engine (ALGO's order), each one chosen plays at once, the
+# engine changing with it; the sequencer, the mixer and the other tracks as they were, nothing written. OCT+ shows the
+# engine's alone (round), OCT- puts the sound back as it was; it closes 3 s after the last turn, or with a page's
+# button or another track, keeping it.
 #   tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/browser.txt grav-code/build/host
 wait 600
 expect page 8
-expect rings 0
+expect terricons 0
 expect engine 0
 expect preset 0
 listen
-# S1's step 1: its ring
+# S1's step 1: its terricon
 tap SEQ
 wait 30
 key 0 down 100 0
@@ -20,7 +21,7 @@ key 0 up
 wait 30
 tap SEQ
 wait 30
-expect rings 1
+expect terricons 1
 # PRESET: the browser, all engines; WAVESHAPE's next
 turn PRESET 1
 wait 30
@@ -76,9 +77,9 @@ expect send 70
 expect store_writes 0
 tap PLAY
 wait 600
-expect rings_sounding 1
-shot rings.png
-# muted (the mixer's white key 1), S1's ring stands still, grey; on again, it moves
+expect terricons_sounding 1
+shot terricons.png
+# muted (the mixer's white key 1), S1's terricon stands still, grey; on again, it moves
 tap SEL
 wait 30
 key 0 down 100 0
@@ -88,7 +89,7 @@ wait 30
 tap SEL
 wait 600
 expect page 8
-expect rings_sounding 0
+expect terricons_sounding 0
 tap SEL
 wait 30
 key 0 down 100 0
@@ -97,7 +98,7 @@ key 0 up
 wait 30
 tap SEL
 wait 600
-expect rings_sounding 1
+expect terricons_sounding 1
 turn PRESET 1
 wait 30
 turn PRESET 3
@@ -136,10 +137,10 @@ expect browser 1
 expect browser_n 24
 tap PLAY
 wait 60
-# stopped and silent: the rings still
+# stopped and silent: the terricons still
 tap SEQ
 wait 30
 tap HOME
 wait 1500
 expect page 8
-expect rings_sounding 0
+expect terricons_sounding 0

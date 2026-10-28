@@ -6,7 +6,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | File | What |
 | --- | --- |
 | `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
-| `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's rings, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages), the presets' browser, recording, FREEZE and SEED; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
+| `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's terricons, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages), the presets' browser, recording, FREEZE and SEED; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
 | `synth/` | The voices (`synth.c`: four shared out among the synth tracks S1..S4, each MONO with legato, POLY or none, and one for each drum track D1..D4; the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
 | `sound/` | Engine control/page metadata, native FM byte mapping and validation; AUTO follows the original macros |
 | `presets/` | Four factory starting points per engine; a 64-slot expanded preset log (184-byte sounds), indexed in flash with a bounded pending queue, CRC/commit and compaction tests |
@@ -63,13 +63,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.27.2    # grav-code/build/grav_code-0.27.2.fwsc, identity FM-1_73002702
+    python3 tools/build.py grav-code --release 0.28.0    # grav-code/build/grav_code-0.28.0.fwsc, identity FM-1_73002800
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.27.2.fwsc 0.27.2 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.28.0.fwsc 0.28.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.27.2   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.28.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

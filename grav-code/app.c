@@ -838,9 +838,9 @@ static struct {
     uint8_t sel_down, sel_used;          /* SEL held; and as SEED meanwhile (let go: no mixer) */
     uint32_t sel_at;                     /* SEL pressed, when */
     uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
-    float ring_env[SYNTH_TRACKS];        /* (0.27) HOME's rings: each track's level, followed */
-    uint8_t ring_heard;                  /* (0.27.1) the rings that sounded since a test last asked (a bit each) */
-    uint32_t ring_at;                    /* (its last update) */
+    float level[SYNTH_TRACKS];           /* (0.27) each track's level, followed: HOME's terricons (0.28; rings before) */
+    uint8_t level_heard;                 /* (0.27.1) the tracks that sounded since a test last asked (a bit each) */
+    uint32_t level_at;                   /* (its last update) */
     uint8_t preset_edited;               /* (0.27) the tracks whose sound was changed after its preset (a * by it) */
     uint8_t solo;                        /* (0.26.1) the tracks soloed, a bit each (black keys 1..8 on the mixer; not
                                           * saved): some, and only they sound, whatever their mutes */
@@ -1932,8 +1932,8 @@ static void step_mode_off(void)
     ui.step_held = -1;
 }
 
-/* HOME's own view: the rings (SEQ's page, step mode off) */
-static void show_rings(void)
+/* HOME's own view: the terricons (SEQ's page, step mode off) */
+static void show_home(void)
 {
     step_mode_off();
     active_page = home_page = PAGE_SEQ;
@@ -2177,7 +2177,7 @@ static void rec_follow(uint32_t now)
     }
 }
 
-/* what the sequencer played since: each track's note begun (its lights and ring flash), the selected track's step,
+/* what the sequencer played since: each track's note begun (its lights and terricon flash), the selected track's step,
  * the quarter notes (the bar's first marked) */
 static void seq_follow(uint32_t now)
 {
@@ -2337,7 +2337,7 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
         fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : active_page == PAGE_FX_GRAIN ? PAGE_FX_SHAPE :
                   PAGE_FX_MIX;            /* (0.26.2: MIX, GRAIN, SHAPE) */
     if (k == B_HOME && ui.step_mode) {       /* from step mode (every track): HOME's own view, the one track */
-        show_rings();
+        show_home();
         app_say("HOME", TRACK_NAME[track_sel]);
         return;
     }
@@ -2474,10 +2474,10 @@ static void rec_press(void)
     if (!ui.rec)
         app_say("REC", "OFF");
     else if (seq.playing) {
-        show_rings();
+        show_home();
         app_say("REC", "LIVE");
     } else {
-        show_rings();
+        show_home();
         ui.rec_pos = (uint8_t)(ui.view_page * SEQ_PAGE < TRK.length ? ui.view_page * SEQ_PAGE : 0u);
         rec_step_say();
     }
@@ -3232,7 +3232,7 @@ static int animate_dials(uint32_t now)
     for (uint32_t n = 0; n < 3; n++, dial = (dial + 1u) % 3u)
         if (ui.dial_dirty & 1u << dial) break;
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
-    if (active_page == PAGE_SEQ && !ui.step_mode)   /* (HOME's rings: no knobs drawn) */
+    if (active_page == PAGE_SEQ && !ui.step_mode)   /* (HOME's terricons: no knobs drawn) */
         return 0;
     if (active_page == PAGE_SEQ || active_page == PAGE_MIXER) {   /* (SEQ's and the mixer's: small, below) */
         cv_begin(80, CHIP_H, C_BLACK);
@@ -3250,13 +3250,9 @@ static int animate_dials(uint32_t now)
 }
 
 /* SEQ's page (HOME), in two views:
- *   HOME (the page as it opens; 0.27): the song at a glance, eight concentric rings, a track each, S1 the outermost
- *   and D4 the innermost, each in a colour of its own. A track with no step on in its pattern has none; one silent
- *   (muted, or another soloed) is grey and round; one quiet is its colour, dim and round; one sounding lives: its
- *   ring bends and swells with its sound (its level as the render measures it, followed with an attack and a
- *   release), in a way of its engine's: a kick a strong, quick bulge as it hits; a hi-hat small, quick teeth; a pad
- *   slow waves. The selected track's ring is thicker, white at its core, a marker at its right; its name in the
- *   middle, its level at the bottom right. The bottom band names the track, its sound and engine.
+ *   HOME (the page as it opens): the song at a glance, a ridge of eight terricons (0.28; 0.27: concentric rings), a
+ *   track each, S1 at the left and D4 at the right, each in a colour of its own, moving with its sound
+ *   (draw_terricons). The bottom band names the track, its sound and engine.
  *   SEQ (step mode: the white keys the steps, the black ones the tracks): every track's 16 steps of the page shown,
  *   a row each, S1..S4 then D1..D4, named at the left; a step on lit (the selected track's in the theme's colour,
  *   brighter the harder), each track's own length and step playing, a note flashing white as it begins; under them
@@ -3299,18 +3295,23 @@ static void draw_pages(int32_t dy, uint32_t page, int32_t playing, int32_t frac)
     }
 }
 
-/* HOME: the rings (0.27). Their centre, their radii (S1 64 .. D4 15, 7 apart; a ring's bend ~6 px at most) */
-#define RING_CX 120
-#define RING_CY 72
-#define RING_N 96                            /* points round a ring */
-static const uint16_t RING_HUE[SEQ_TRACKS] = {   /* each track's colour, outside in: rose to violet */
+/* HOME: the terricons (0.28; 0.27's rings before). A ridge of eight, S1 at the left to D4 at the right, on one
+ * ground line; each its height and place, the overlapping ones drawn from the tallest (furthest) to the lowest */
+#define TC_BASE 136                          /* the ground line */
+#define TC_HALF 36                           /* half a terricon's foot */
+#define TC_N 22                              /* points up each slope (2 TC_N + 1 along it) */
+static const uint8_t TC_X[SEQ_TRACKS] = {26, 56, 86, 116, 146, 176, 204, 228};   /* its peak's x */
+static const uint8_t TC_H[SEQ_TRACKS] = {96, 78, 88, 70, 58, 64, 48, 52};        /* its height */
+static const uint8_t TC_ORDER[SEQ_TRACKS] = {0, 2, 1, 3, 5, 4, 7, 6};            /* tallest first */
+static const uint16_t TRACK_HUE[SEQ_TRACKS] = {   /* each track's colour, left to right: rose to violet */
     RGB(255, 61, 127), RGB(255, 106, 61), RGB(255, 166, 43), RGB(255, 225, 74),
     RGB(75, 227, 122), RGB(30, 196, 170), RGB(61, 155, 255), RGB(155, 107, 255)};
 
-/* how a ring moves, by its engine: three waves round it (how many to a turn, their share, how fast they travel, in
- * radians a second), how far it bends at full level (px, the outermost ring's) and how fast its level falls (ms) */
+/* how a terricon moves, by its engine: up to three waves along its slopes (how many half waves from foot to foot,
+ * their share, how fast they travel, in radians a second), how far they bend at full level (px, the tallest's) and
+ * how fast its level falls (ms) */
 enum { LOOK_KICK, LOOK_SNARE, LOOK_HAT, LOOK_BASS, LOOK_LEAD, LOOK_PAD, LOOK_PLUCK, LOOK_TEXTURE };
-static const struct { uint8_t k[3]; float w[3], speed[3], depth, release; } RING_LOOK[] = {
+static const struct { uint8_t k[3]; float w[3], speed[3], depth, release; } TRACK_LOOK[] = {
     {{3, 5, 0}, {1.0f, 0.5f, 0.0f}, {4.0f, 7.0f, 0.0f}, 6.0f, 140.0f},      /* a kick: a strong bulge, quick */
     {{7, 11, 0}, {0.8f, 0.6f, 0.0f}, {6.0f, 9.0f, 0.0f}, 4.5f, 160.0f},     /* a snare */
     {{13, 19, 23}, {0.6f, 0.5f, 0.4f}, {9.0f, 13.0f, 17.0f}, 3.0f, 90.0f},  /* a hi-hat: small quick teeth */
@@ -3320,7 +3321,7 @@ static const struct { uint8_t k[3]; float w[3], speed[3], depth, release; } RING
     {{4, 6, 0}, {0.7f, 0.5f, 0.0f}, {3.0f, 4.0f, 0.0f}, 4.0f, 180.0f},      /* a pluck */
     {{9, 14, 0}, {0.6f, 0.5f, 0.0f}, {5.0f, 8.0f, 0.0f}, 3.0f, 130.0f}};    /* noise, grains, words */
 
-static uint32_t ring_look(uint32_t engine)
+static uint32_t track_look(uint32_t engine)
 {
     switch (engine) {
     case GRAV_ENGINE_BASS_DRUM: case GRAV_ENGINE_SYN_KICK: return LOOK_KICK;
@@ -3335,7 +3336,7 @@ static uint32_t ring_look(uint32_t engine)
     }
 }
 
-static int track_used(uint32_t t)            /* a step on in its pattern: it has a ring */
+static int track_used(uint32_t t)            /* a step on in its pattern: it has a terricon */
 {
     const seq_track_t *tr = &seq.pat.track[t];
     for (uint32_t i = 0; i < tr->length && i < SEQ_STEPS; i++)
@@ -3344,37 +3345,35 @@ static int track_used(uint32_t t)            /* a step on in its pattern: it has
     return 0;
 }
 
-/* each ring's level: the render's measure of its track (grav_track_peak, every block), up at once, falling back as
- * its look says; a silent track's none. 1 while any ring moves (or a drum's hit still swells) */
-static int rings_update(uint32_t now)
+/* each track's level: the render's measure of it (grav_track_peak, every block), up at once, falling back as its
+ * look says; a silent track's none. 1 while any moves (or a drum's hit still swells) */
+static int levels_update(uint32_t now)
 {
-    const uint32_t dt = now - ui.ring_at;
+    const uint32_t dt = now - ui.level_at;
     int moving = 0;
-    ui.ring_at = now;
+    ui.level_at = now;
     for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
         const float p = grav_track_peak[t], v = p > 0.0f ? p / (p + 0.12f) : 0.0f;
-        float e = ui.ring_env[t] * fm_expf(-(float)dt / RING_LOOK[ring_look(*track_engine(t))].release);
+        float e = ui.level[t] * fm_expf(-(float)dt / TRACK_LOOK[track_look(*track_engine(t))].release);
         if (v > e)
             e = v;
         if (seq.mute >> t & 1u || e < 0.004f)
             e = 0.0f;
-        moving |= e != ui.ring_env[t] || e > 0.0f || now - ui.hit_at[t] < 200u;
-        ui.ring_env[t] = e;
-        ui.ring_heard |= (uint8_t)((e > 0.02f) << t);
+        moving |= e != ui.level[t] || e > 0.0f || now - ui.hit_at[t] < 200u;
+        ui.level[t] = e;
+        ui.level_heard |= (uint8_t)((e > 0.02f) << t);
     }
     return moving;
 }
 
-/* a closed line through n points, w pixels thick: cv_line's pixels along it, a w x w square on each, a run of them
- * along a row or a column filled as one rectangle. The pixels w x w lines would set, for a fraction of the work (a
- * sounding ring's glow: ~5 times less) */
-static void ring_line(const int16_t *x, const int16_t *y, uint32_t n, uint16_t c, int32_t w)
+/* a line through n points, w pixels thick: cv_line's pixels along it, a w x w square on each, a run of them along a
+ * row or a column filled as one rectangle (the pixels of w x w one-pixel lines, for a fraction of the work) */
+static void thick_line(const int16_t *x, const int16_t *y, uint32_t n, uint16_t c, int32_t w)
 {
     const int32_t o = (w - 1) / 2;
-    for (uint32_t i = 0; i < n; i++) {
-        const uint32_t j = i + 1u < n ? i + 1u : 0u;
+    for (uint32_t i = 0; i + 1u < n; i++) {
         int32_t x0 = x[i], y0 = y[i];
-        const int32_t x1 = x[j], y1 = y[j];
+        const int32_t x1 = x[i + 1u], y1 = y[i + 1u];
         const int32_t dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
         const int32_t dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
         int32_t err = dx + dy, lx = x0, hx = x0, ly = y0, hy = y0;   /* the run so far: lx..hx, ly..hy */
@@ -3403,62 +3402,77 @@ static void ring_line(const int16_t *x, const int16_t *y, uint32_t n, uint16_t c
     }
 }
 
-static void draw_rings(int32_t dy, uint32_t now)
+/* the ground under a line through n points left to right, down to the base: black (what is behind it hidden) */
+static void ground_under(const int16_t *x, const int16_t *y, uint32_t n, int32_t base)
 {
-    const float time = (float)(now % 600000u) * 0.001f, step = 6.2831853f / (float)RING_N;
-    int16_t px[RING_N], py[RING_N];
-    float ca[RING_N], sa[RING_N];            /* (round every ring: the same angles) */
-    for (uint32_t i = 0; i < RING_N; i++) {
-        ca[i] = fm_cosf(step * (float)i);
-        sa[i] = fm_sinf(step * (float)i);
-    }
-    for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
-        if (!track_used(t))                  /* empty: no ring */
+    for (uint32_t i = 0; i + 1u < n; i++)
+        for (int32_t c = x[i]; c < x[i + 1u]; c++) {
+            const int32_t yy = y[i] + (y[i + 1u] - y[i]) * (c - x[i]) / (x[i + 1u] - x[i]);
+            cv_rect(c, yy, 1, base - yy, C_BLACK);
+        }
+}
+
+/* HOME: the terricons. A track with no step on in its pattern has none; one silent (muted, or another soloed) is
+ * grey and still; one quiet is its colour, dim and still; one sounding lives: its slopes bend with its sound (its
+ * level, followed), in its engine's way (a kick a strong, quick bulge, and its peak jumps as it hits; a hi-hat small,
+ * quick teeth; a pad slow waves). The selected track's is thicker, white at its core, a marker and its name over
+ * its peak; its level at the top right */
+static void draw_terricons(int32_t dy, uint32_t now)
+{
+    const float time = (float)(now % 600000u) * 0.001f;
+    const int32_t base = TC_BASE + dy;
+    int16_t px[2 * TC_N + 1], py[2 * TC_N + 1];
+    for (uint32_t o = 0; o < SEQ_TRACKS; o++) {
+        const uint32_t t = TC_ORDER[o];
+        if (!track_used(t))                  /* empty: no terricon */
             continue;
         const int muted = seq.mute >> t & 1u, sel = t == track_sel;
-        const uint32_t look = ring_look(*track_engine(t));
-        const float R = 64.0f - 7.0f * (float)t;
-        float amp = muted ? 0.0f : ui.ring_env[t];
-        if (!muted && look <= LOOK_HAT && now - ui.hit_at[t] < 400u)   /* a drum's hit: a swell as it begins */
-            amp += 0.6f * fm_expf(-(float)(now - ui.hit_at[t]) / 90.0f);
+        const uint32_t look = track_look(*track_engine(t)), since = now - ui.hit_at[t];
+        const int drum_hit = !muted && look <= LOOK_HAT && since < 400u;
+        float amp = muted ? 0.0f : ui.level[t];
+        if (drum_hit)                        /* a drum's hit: a swell as it begins, its peak up a moment */
+            amp += 0.6f * fm_expf(-(float)since / 90.0f);
         if (amp > 1.2f)
             amp = 1.2f;
-        const float depth = 1.3f * RING_LOOK[look].depth * (0.55f + 0.45f * R / 64.0f) * amp;
-        const float wsum = RING_LOOK[look].w[0] + RING_LOOK[look].w[1] + RING_LOOK[look].w[2];
-        for (uint32_t i = 0; i < RING_N; i++) {
-            const float a = step * (float)i;
+        const float h = (float)TC_H[t] * (drum_hit ? 1.0f + 0.18f * fm_expf(-(float)since / 120.0f) : 1.0f);
+        const float depth = 1.3f * TRACK_LOOK[look].depth * (0.55f + 0.45f * (float)TC_H[t] / 96.0f) * amp;
+        const float wsum = TRACK_LOOK[look].w[0] + TRACK_LOOK[look].w[1] + TRACK_LOOK[look].w[2];
+        for (uint32_t i = 0; i <= 2u * TC_N; i++) {
+            const float u = (float)i / (float)TC_N - 1.0f, au = u < 0.0f ? -u : u;   /* -1 .. 1, foot to foot */
             float d = 0.0f;
             if (depth > 0.05f)
-                for (uint32_t h = 0; h < 3u; h++)
-                    if (RING_LOOK[look].k[h])
-                        d += RING_LOOK[look].w[h] * fm_sinf((float)RING_LOOK[look].k[h] * a +
-                                                            RING_LOOK[look].speed[h] * time + 1.3f * (float)t);
-            const float r = R + depth * d / wsum;
-            px[i] = (int16_t)(RING_CX + r * ca[i] + 0.5f);
-            py[i] = (int16_t)(RING_CY + dy + r * sa[i] + 0.5f);
+                for (uint32_t k = 0; k < 3u; k++)
+                    if (TRACK_LOOK[look].k[k])
+                        d += TRACK_LOOK[look].w[k] * fm_sinf((float)TRACK_LOOK[look].k[k] * 3.1415927f * (u + 1.0f) +
+                                                             TRACK_LOOK[look].speed[k] * time + 1.3f * (float)t);
+            const float bend = depth * d / wsum * 4.0f * au * (1.0f - au);   /* (none at the feet, nor the peak) */
+            px[i] = (int16_t)(TC_X[t] + (int32_t)((float)TC_HALF * u + (u < 0.0f ? -0.5f : 0.5f)));
+            py[i] = (int16_t)((float)base - h * (1.0f - au) * (1.0f - 0.12f * u * u) - bend + 0.5f);
         }
-        if (muted)                           /* silent: grey, round */
-            ring_line(px, py, RING_N, C_DIM, sel ? 2 : 1);
+        ground_under(px, py, 2u * TC_N + 1u, base);
+        if (muted)                           /* silent: grey, still */
+            thick_line(px, py, 2u * TC_N + 1u, C_DIM, sel ? 2 : 1);
         else if (amp < 0.02f)                /* quiet: its colour, dim */
-            ring_line(px, py, RING_N, mix565(C_BLACK, RING_HUE[t], sel ? 200 : 120), sel ? 2 : 1);
+            thick_line(px, py, 2u * TC_N + 1u, mix565(C_BLACK, TRACK_HUE[t], sel ? 200 : 120), sel ? 2 : 1);
         else {                               /* sounding: a glow under, brighter the louder; its colour on it */
-            ring_line(px, py, RING_N, mix565(C_BLACK, RING_HUE[t], 40 + (int32_t)(amp * 90.0f)), sel ? 5 : 4);
-            ring_line(px, py, RING_N, RING_HUE[t], 2);
+            thick_line(px, py, 2u * TC_N + 1u, mix565(C_BLACK, TRACK_HUE[t], 40 + (int32_t)(amp * 90.0f)), sel ? 5 : 4);
+            thick_line(px, py, 2u * TC_N + 1u, TRACK_HUE[t], 2);
         }
-        if (sel) {                           /* the selected track's: a white core, a marker at its right */
+        if (sel) {                           /* the selected track's: a white core; over its peak a marker, its name */
+            const int32_t tx = px[TC_N], ty = py[TC_N];
             if (!muted)
-                ring_line(px, py, RING_N, C_WHITE, 1);
-            const int32_t mx = px[0] + 5, my = py[0];   /* (a triangle, its point at the ring) */
+                thick_line(px, py, 2u * TC_N + 1u, C_WHITE, 1);
             for (int32_t k = 0; k < 6; k++)
-                cv_rect(mx + k, my - k, 1, 2 * k + 1, C_WHITE);
+                cv_rect(tx - k, ty - 5 - k, 2 * k + 1, 1, C_WHITE);
+            cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2, ty - 24, &FONT_T, TRACK_NAME[t], C_WHITE);
         }
     }
-    {                                        /* the selected track's name in the middle; its level, bottom right */
-        const char *n = TRACK_NAME[track_sel];
-        const int32_t lv = (int32_t)(ui.ring_env[track_sel] * 6.0f + 0.5f);
-        cv_text(RING_CX - text_w(&FONT_T, n) / 2, RING_CY + dy - 6, &FONT_T, n, C_WHITE);
+    cv_rect(0, base + 1, 240, 144, C_BLACK); /* the ground, and nothing under it (the feet's glow cut) */
+    cv_rect(0, base, 240, 1, C_LINE);
+    {                                        /* the selected track's level, top right */
+        const int32_t lv = (int32_t)(ui.level[track_sel] * 6.0f + 0.5f);
         for (int32_t k = 0; k < 6; k++)
-            cv_rect(198 + k * 6, 128 + dy, 4, 10, k < lv ? RING_HUE[track_sel] : C_LINE);
+            cv_rect(198 + k * 6, 4 + dy, 4, 10, k < lv ? TRACK_HUE[track_sel] : C_LINE);
     }
 }
 
@@ -3510,7 +3524,7 @@ static void draw_seq_body(int32_t dy)        /* the strip (rows STRIP_Y on), dra
     if (ui.step_mode)
         draw_grid(dy, plat_ms());
     else
-        draw_rings(dy, plat_ms());
+        draw_terricons(dy, plat_ms());
 }
 
 static void draw_seq(void)
@@ -3705,9 +3719,9 @@ static void draw_splash(void)
 /* only the strip under the track's line (the steps moved, a flash, the cursor): not the whole screen */
 static void draw_seq_grid(void)
 {
-    if (active_page == PAGE_SEQ && !ui.step_mode) {   /* (0.27) HOME's rings: the whole page */
+    if (active_page == PAGE_SEQ && !ui.step_mode) {   /* HOME's terricons: the whole page */
         cv_begin(240, 144, C_BLACK);
-        draw_rings(0, plat_ms());
+        draw_terricons(0, plat_ms());
         cv_blit(0, 36);
         return;
     }
@@ -4005,7 +4019,7 @@ static void draw_header(void)
     cv_blit(0, 0);
 }
 
-/* the page: the track and its engine above it (HOME's rings name it in the bottom band), FREEZE and MUTE or SOLO on
+/* the page: the track and its engine above it (HOME's terricons name it in the bottom band), FREEZE and MUTE or SOLO on
  * every page; then the page's own, and a splash or a list over it */
 static void draw_page(void)
 {
@@ -4174,16 +4188,16 @@ static void frame_changes(uint32_t now, uint32_t pct)
     }
 }
 
-/* SEQ's page: HOME's rings while they move (0.27); step mode's grid when a step moves, and while it plays its
+/* SEQ's page: HOME's terricons while they move; step mode's grid when a step moves, and while it plays its
  * flashes and cursor; ~30 times a second (10 while the sound is busy), not under a list. The count-in's beats to
  * come (4 .. 1, in the bottom band); the volume's moment over */
 static void seq_frame(uint32_t now)
 {
     if (!ui.step_mode) {
-        if (now - ui.grid_at >= frame_ms() && rings_update(now))
+        if (now - ui.grid_at >= frame_ms() && levels_update(now))
             ui.redraw_grid = 1;
     } else {
-        ui.ring_at = now;
+        ui.level_at = now;
         if (seq.step[track_sel] != ui.shown_step) {
             ui.shown_step = seq.step[track_sel];
             ui.redraw_grid = 1;
@@ -4489,19 +4503,19 @@ int app_expect(const char *what, int *got)
         *got = ui.preset_edited >> track_sel & 1u;
     else if (!strcmp(what, "engine"))        /* the selected track's engine (GRAV_ENGINE_*) */
         *got = *track_engine(track_sel);
-    else if (!strcmp(what, "rings")) {       /* (0.27) HOME's rings drawn (a bit each), and those sounding */
+    else if (!strcmp(what, "terricons")) {   /* HOME's terricons drawn (a bit each), and those sounding */
         int m = 0;
         for (uint32_t t = 0; t < SEQ_TRACKS; t++)
             m |= track_used(t) << t;
         *got = m;
-    } else if (!strcmp(what, "rings_sounding")) {
+    } else if (!strcmp(what, "terricons_sounding")) {
         int m = 0;
         for (uint32_t t = 0; t < SEQ_TRACKS; t++)
-            m |= (ui.ring_env[t] > 0.02f) << t;
+            m |= (ui.level[t] > 0.02f) << t;
         *got = m;
-    } else if (!strcmp(what, "rings_heard")) {   /* (0.27.1) those that sounded since asked last */
-        *got = ui.ring_heard;
-        ui.ring_heard = 0;
+    } else if (!strcmp(what, "terricons_heard")) {   /* (0.27.1) those that sounded since asked last */
+        *got = ui.level_heard;
+        ui.level_heard = 0;
     } else if (!strcmp(what, "solo"))          /* (0.26.1) the tracks soloed */
         *got = ui.solo;
     else if (!strcmp(what, "send"))          /* the selected track's SEND, LEVEL; the effect's RETURN (DRY/WET) */
