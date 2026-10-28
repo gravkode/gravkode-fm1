@@ -123,7 +123,7 @@ theme's colour for a moment. The page title and number and a compact live engine
 in the engine's own colour (since 0.28; the engines' poster in section 6), and moves with its knobs and its notes:
 WAVESHAPE's ribbons fold further as TIMBRE goes up, FM 2-OP's loops bend with INDEX and multiply with RATIO, CHORDS
 stacks a plane for each note of its chord, a kick's rings jump out at each hit, a snare bursts into rays. Lines that
-cross grow brighter, as neon does. A drum's DRUM and SHAPE pages show it the same way.
+cross grow brighter, as neon does. Each keeps inside its box with a margin (0.29.3), never cut by its edge. A drum's DRUM and SHAPE pages show it the same way.
 
 ![ALGO turned: SPEECH's splash, its icon alive, its name and its line](img/screen-splash.png "The engine's splash")
 
@@ -236,7 +236,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002902, version 0.29.2](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73002903, version 0.29.3](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -300,8 +300,8 @@ running down them. Each has its own height and place; where they overlap, the lo
 ![HOME at night, in the simulator: the moon at the top right, shimmering; stars coming out and fading; the terricons in their colours](img/home-night.gif "HOME at night")
 
 - **The sky** (GLO's SCREEN, K2 SKY; 0.29): by DAY, as it comes, a deep blue sky (one colour since 0.29.2), its sun at the top right
-  flaring at each kick, three clouds drifting across at the tempo's pace, the heaps dark against it (their tracks'
-  colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a crescent moon at the top right,
+  flaring at each kick, three clouds drifting across at the tempo's pace, low over the heaps' tops, the heaps dark against it (their tracks'
+  colours only on their rims, a little brighter as they sound; 0.29.1); by NIGHT a clean crescent moon at the top right (its dark part the sky's, its glow by its lit edge),
   its light shimmering, its glow breathing, a ripple of light going out from it now and again, and stars that come
   out, shine a few seconds, fade and come out again elsewhere, twinkling, the brighter ones flashing at each hi-hat;
   now and then a shooting star (0.29.1); OFF, black as before. With a sky the page moves on its own, about 20 times
@@ -314,7 +314,7 @@ running down them. Each has its own height and place; where they overlap, the lo
   hits, a snare a sharper one, a hi-hat small quick teeth, a bass big smooth waves, a pad slow ones.
 - **A muted track's terricon** (or one silenced by another's solo, the mixer) is grey and still.
 - **The selected track's terricon** is thicker, white at its core, with a marker and its name over its top; its
-  level, six segments in its colour, is at the right of the bottom band (0.29.1).
+  level, six segments in its colour, is at the right of the bottom band (0.29.1), under CPU, their edges in line.
 - **The scene is taller** (0.29.2): it goes on under the page, 28 rows more, so the heaps stand bigger, and HOME's
   bottom band is half as high, its sound's name smaller. SELECT picks another.
 - **The bottom band** (32 pixels high since 0.29.2): TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name (a * once changed

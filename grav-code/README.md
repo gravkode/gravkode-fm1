@@ -63,13 +63,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.29.2    # grav-code/build/grav_code-0.29.2.fwsc, identity FM-1_73002902
+    python3 tools/build.py grav-code --release 0.29.3    # grav-code/build/grav_code-0.29.3.fwsc, identity FM-1_73002903
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.29.2.fwsc 0.29.2 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.29.3.fwsc 0.29.3 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.29.2   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.29.3   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

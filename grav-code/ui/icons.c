@@ -18,7 +18,8 @@ typedef struct {
 #define IC_PI 3.14159265f
 #define IC_TAU 6.2831853f
 
-static const icon_t *ic;                 /* the icon being drawn */
+static const icon_t *ic;                 /* the icon being drawn: its shapes inside its box's margin (0.29.3) */
+static int32_t ic_x0, ic_y0, ic_x1, ic_y1;   /* its whole box: where light is clipped (a glow may reach the margin) */
 static uint16_t ic_halo;                 /* the glow added round each pixel of a line (0: none) */
 
 static uint16_t ic_dim(uint16_t c, int32_t t)   /* c at t/256 */
@@ -37,7 +38,7 @@ static uint16_t ic_mix(uint16_t a, uint16_t b, float u)   /* a to b, u 0..1 */
 /* light added to the pixel (clipped to the box): saturating, so that crossings brighten */
 static void ic_add(int32_t x, int32_t y, uint16_t c)
 {
-    if (x < ic->x || x >= ic->x + ic->w || y < ic->y || y >= ic->y + ic->h)
+    if (x < ic_x0 || x >= ic_x1 || y < ic_y0 || y >= ic_y1)
         return;
     const int32_t yy = y + cv_oy;
     if ((uint32_t)x >= cv_w || yy < cv_y0 || yy >= cv_y1)
@@ -261,7 +262,7 @@ static void i_fm(void)                   /* lens-shaped loops: as many as the ra
     const int32_t n = SMALL ? 2 : 5;
     const float lobes = 2.0f + (float)(int32_t)(K2 * 3.0f), fb = K1 * 0.35f;
     for (int32_t j = 0; j < n; j++) {
-        const float a = H * 0.42f * (1.0f - 0.16f * (float)j) * (0.75f + 0.25f * LIVE);
+        const float a = H * 0.48f * (1.0f - 0.16f * (float)j) * (0.75f + 0.25f * LIVE) / (1.0f + fb);
         const uint16_t c = ic_dim(ic_hue, j == 0 ? 256 : 150 - 20 * j);
         ic_glow(ic_hue, j == 0 ? 55 : 0);
         for (int32_t side = -1; side <= 1; side += 2) {
@@ -281,7 +282,7 @@ static void i_fm(void)                   /* lens-shaped loops: as many as the ra
 static void i_grain(void)                /* grains, a cloud of dots along a wave: its formant (K0), its width (K1) */
 {
     const int32_t n = SMALL ? 14 : 60 + (int32_t)W;
-    const float spread = H * (0.1f + 0.24f * K1);
+    const float spread = H * (0.08f + 0.16f * K1);
     if (!SMALL) {                        /* the path, faint */
         ic_glow(ic_hue, 0);
         ic_move(X0, CY - H * 0.26f * fm_sinf(T * 0.7f) * LIVE);
@@ -293,7 +294,7 @@ static void i_grain(void)                /* grains, a cloud of dots along a wave
         float u = ic_rnd((uint32_t)i * 5u) + T * 0.04f;
         u -= fm_floorf(u);
         const float path = CY - H * 0.26f * fm_sinf(IC_TAU * (1.0f + K0) * u + T * 0.7f) * LIVE;
-        const float y = path + ic_gauss((uint32_t)i * 5u + 1u) * spread;
+        const float y = fm_clampf(path + ic_gauss((uint32_t)i * 5u + 1u) * spread, Y0, Y0 + H);
         const float tw = 0.5f + 0.5f * fm_sinf(T * 5.0f + (float)i * 1.7f);
         const uint16_t c = ic_dim(ic_hue, 130 + (int32_t)(126.0f * tw));
         ic_add(ic_round(X0 + u * W), ic_round(y), c);
@@ -312,7 +313,8 @@ static void i_additive(void)             /* the harmonics as lines, orange to pi
     for (int32_t i = 0; i < n; i++) {
         const float d = ((float)i - centre) * bumps / (float)n * 3.0f, rep = d - fm_floorf(d + 0.5f);
         const float a = fm_expf(-rep * rep * 30.0f / width) * (0.75f + 0.25f * fm_sinf(T * 3.0f + (float)i));
-        const float bh = H * (0.08f + 0.85f * a * LIVE), x = X0 + bw * ((float)i + 0.5f), base = Y0 + H - 1.0f;
+        const float bh = fm_minf(H - 2.0f, H * (0.08f + 0.85f * a * LIVE)), x = X0 + bw * ((float)i + 0.5f),
+                    base = Y0 + H - 1.0f;
         const uint16_t c = ic_mix(ic_hue, pink, (float)i / (float)n);
         ic_halo = SMALL || ic->h < 30 ? 0 : ic_dim(c, 45);
         ic_line(x, base, x, base - bh, c);
@@ -357,7 +359,7 @@ static void i_chords(void)               /* the chord's notes as stacked planes:
     static const uint8_t NOTES[5] = {4, 4, 3, 4, 3};
     const int32_t n = SMALL ? 3 : NOTES[(int32_t)fm_minf(4.0f, K2 * 5.0f)];
     const int32_t top = (int32_t)(K0 * 3.99f) % n;
-    const float rx = fm_minf(W * 0.3f, H * 0.7f), ry = rx * 0.42f;
+    const float rx = fm_minf(W * 0.3f, H * 0.62f), ry = rx * 0.42f;
     const float gap = H * (0.13f + 0.04f * HIT * fm_sinf(T * 9.0f) + 0.05f * K1);
     const float y0 = CY + gap * (float)(n - 1) * 0.5f;
     for (int32_t i = 0; i < n; i++) {
@@ -424,7 +426,7 @@ static void i_speech(void)               /* a face of dots in profile, speaking 
 static void i_swarm(void)                /* a spiral of dots turning, the inner faster: how many (K0), how loose (K2) */
 {
     const int32_t n = SMALL ? 14 : 80 + (int32_t)(K0 * 100.0f);
-    const float R = fm_minf(W * 0.48f, H * 0.95f);
+    const float R = fm_minf(W * 0.42f, H * 0.95f);   /* (a dot at most 1.15 R out) */
     if (!SMALL) {
         ic_glow(ic_hue, 0);
         ic_ellipse(CX, CY, R * 0.95f, R * 0.32f, -0.25f, ic_dim(ic_hue, 60), 1);
@@ -447,7 +449,7 @@ static void i_noise(void)                /* a cloud of white noise, new each fra
 {
     const uint32_t frame = (uint32_t)(T * 20.0f);
     const int32_t n = SMALL ? 18 : 120 + (int32_t)(W * 2.0f);
-    const float rx = W * (0.3f + 0.4f * K0) * (0.85f + 0.15f * LIVE), ry = H * (0.42f + 0.3f * K0);
+    const float rx = W * (0.3f + 0.17f * K0) * (0.85f + 0.15f * LIVE), ry = H * (0.3f + 0.17f * K0);
     for (int32_t i = 0; i < n; i++) {
         const uint32_t s = frame * 977u + (uint32_t)i * 3u;
         float gx = ic_gauss(s), gy = ic_gauss(s + 1u);
@@ -464,7 +466,9 @@ static void i_noise(void)                /* a cloud of white noise, new each fra
 static void i_particle(void)             /* orbs on tilted orbits, sparkling: how many (K0), a flash at each note */
 {
     const int32_t orbs = SMALL ? 3 : 4 + (int32_t)(K0 * 6.0f);
-    const float R = fm_minf(W * 0.46f, H * 0.95f);
+    const float orb = SMALL ? 0.6f : ic->h < 30 ? 1.0f + 0.5f * HIT : 1.2f + 1.2f * 0.5f + 1.5f * HIT;   /* (its orbs) */
+    const float R = fm_minf(W * 0.42f, (H * 0.5f - (SMALL ? 1.0f : ic->h < 30 ? 2.0f : 4.5f)) / 0.48f);   /* (an orbit,
+                                                                          * tilted: 0.48 R high) */
     if (!SMALL) {
         ic_glow(ic_hue, 0);
         ic_ellipse(CX, CY, R, R * 0.34f, 0.35f, ic_dim(ic_hue, 110), 0);
@@ -475,7 +479,7 @@ static void i_particle(void)             /* orbs on tilted orbits, sparkling: ho
         const float rx = (i & 1 ? 0.7f : 1.0f) * R, ry = (i & 1 ? 0.42f : 0.34f) * R;
         const float ex = rx * fm_cosf(a), ey = ry * fm_sinf(a);
         const float x = CX + ex * fm_cosf(tilt) - ey * fm_sinf(tilt), y = CY + ex * fm_sinf(tilt) + ey * fm_cosf(tilt);
-        const float size = SMALL ? 0.6f : 1.2f + 1.2f * ic_rnd((uint32_t)i) + 1.5f * HIT;
+        const float size = SMALL || ic->h < 30 ? orb : 1.2f + 1.2f * ic_rnd((uint32_t)i) + 1.5f * HIT;
         ic_disc(x, y, size + 1.0f, ic_dim(ic_hue, 70));
         ic_disc(x, y, size, ic_mix(ic_hue, C_WHITE, 0.25f + 0.5f * HIT));
     }
@@ -490,7 +494,8 @@ static void i_string(void)               /* a ribbon of strings swaying, ringing
                                           * a shimmer on it */
 {
     const int32_t n = SMALL ? 2 : 6;
-    const float a = H * (0.12f + 0.24f * HIT);
+    const float spread = (float)(n - 1) * 0.5f * (SMALL ? 2.0f : 1.6f);
+    const float a = (H * 0.5f - spread - 0.5f) * (0.33f + 0.67f * HIT) / (1.0f + 0.3f * K2);
     for (int32_t j = 0; j < n; j++) {
         const float off = ((float)j - (float)(n - 1) * 0.5f) * (SMALL ? 2.0f : 1.6f);
         ic_glow(ic_hue, j == n / 2 ? 55 : 0);
@@ -537,11 +542,11 @@ static void i_modal(void)                /* a struck dome, its ripples spreading
 static void i_kick(void)                 /* rings round a glowing core, jumping out at each hit: the punch (K2)
                                           * spreads them, the decay (K1) keeps them lit */
 {
-    const float R = fm_minf(W * 0.48f, H * 0.48f);
+    const float R = fm_minf(W * 0.5f, H * 0.5f) - 0.5f;
     const int32_t n = SMALL ? 2 : 4;
     for (int32_t i = n - 1; i >= 0; i--) {
-        const float r = R * (0.3f + (0.7f / (float)n) * (float)(i + 1) * (0.85f + 0.3f * K2)) *
-                        (1.0f + 0.25f * HIT * (1.0f - (float)i * 0.15f));
+        const float out = (float)(i + 1) / (float)n;   /* (the outermost at 0.97 R, its jump the least) */
+        const float r = R * (0.3f + 0.62f * out * (0.9f + 0.1f * K2)) * (1.0f + 0.3f * HIT * (1.0f - out) + 0.05f * HIT);
         ic_glow(ic_hue, 60);
         ic_ellipse(CX, CY, r, r, 0.0f, ic_dim(ic_hue, (int32_t)(256.0f - (float)i * (70.0f - 40.0f * K1))), 0);
     }
@@ -576,7 +581,7 @@ static void i_snare(void)                /* a starburst at each hit: its rays (S
 
 static void i_syn_snare(void)            /* SYN SNARE: an FM drum's ring, its noise bursting round it (SNAPPY) */
 {
-    const float R = fm_minf(W * 0.3f, H * 0.32f) * (1.0f + 0.25f * HIT);
+    const float R = fm_minf(W * 0.24f, H * 0.24f) * (1.0f + 0.2f * HIT);
     ic_glow(ic_hue, 60);
     ic_ellipse(CX, CY, R, R, 0.0f, ic_hue, 0);
     ic_ellipse(CX, CY, R * 0.5f, R * 0.5f, 0.0f, ic_dim(ic_hue, 160), 0);
@@ -584,7 +589,8 @@ static void i_syn_snare(void)            /* SYN SNARE: an FM drum's ring, its no
     const uint32_t frame = (uint32_t)(T * 25.0f);
     for (int32_t i = 0; i < n; i++) {
         const float a = ic_rnd(frame * 31u + (uint32_t)i) * IC_TAU, r = R * (1.2f + 0.9f * ic_rnd(frame * 57u + (uint32_t)i));
-        ic_add(ic_round(CX + fm_cosf(a) * r * 1.3f), ic_round(CY + fm_sinf(a) * r), ic_dim(RGB(220, 230, 255), 200));
+        ic_add(ic_round(CX + fm_clampf(fm_cosf(a) * r * 1.3f, -W * 0.5f, W * 0.5f)),
+               ic_round(CY + fm_clampf(fm_sinf(a) * r, -H * 0.5f, H * 0.5f)), ic_dim(RGB(220, 230, 255), 200));
     }
 }
 
@@ -620,7 +626,7 @@ static void i_vcf(void)                  /* a low-pass's curve, its resonant pea
     float px = 0.0f, py = 0.0f;
     for (int32_t i = 0; i <= ic->w; i++) {
         const float u = (float)i / W, fc = 0.18f + 0.62f * K0 + 0.05f * fm_sinf(T * 1.5f) * LIVE, d = (u - fc) * 10.0f;
-        const float g = 1.0f / (1.0f + fm_expf(d)) + (0.25f + K2 * 0.8f) * fm_expf(-d * d * 1.5f);
+        const float g = fm_minf(1.45f, 1.0f / (1.0f + fm_expf(d)) + (0.25f + K2 * 0.8f) * fm_expf(-d * d * 1.5f));
         const float x = X0 + (float)i, y = Y0 + H * (0.92f - 0.62f * g);
         if (!SMALL && (i % 3) == 0)          /* the light under it */
             ic_line(x, y + 2.0f, x, Y0 + H - 1.0f, ic_dim(ic_hue, (int32_t)(30.0f + 50.0f * g)));
@@ -658,12 +664,12 @@ static void i_six_op(uint32_t bank)      /* a sphere of wire loops turning: as m
                                           * the patch (K2) their tilts */
 {
     const int32_t n = SMALL ? 2 : 4 + (int32_t)(K0 * 2.0f);
-    const float R = fm_minf(W * 0.42f, H * 0.46f) * (1.0f + 0.08f * HIT);
+    const float R = fm_minf(W * 0.46f, H * 0.5f - 1.0f) * (0.92f + 0.08f * HIT);
     for (int32_t k = 0; k < n; k++) {
         const float psi = IC_PI * (float)k / (float)n + (float)bank * 0.4f + K2 * 1.3f;
         const float ry = R * fm_fabsf(fm_cosf(T * 0.6f + (float)k * 1.1f + K2 * 2.0f));
         ic_glow(ic_hue, k == 0 ? 55 : 30);
-        ic_ellipse(CX, CY, R * (W > H ? 1.25f : 1.0f), ry + 1.0f, psi, ic_dim(ic_hue, k == 0 ? 256 : 180), 0);
+        ic_ellipse(CX, CY, R, fm_minf(R, ry + 1.0f), psi, ic_dim(ic_hue, k == 0 ? 256 : 180), 0);
     }
 }
 
@@ -719,7 +725,7 @@ static void i_chiptune(void)             /* pixels stepping up an arpeggio, 8-bi
     const int32_t n = (int32_t)(W / step), shift = (int32_t)(T * (4.0f + K0 * 4.0f));
     for (int32_t i = 0; i < n; i++) {
         const int32_t v = ARP[(i + shift) & 7];
-        const float x = X0 + (float)i * step, y = CY - s * 0.5f + ((float)v - 2.5f) * (H * 0.15f) * LIVE;
+        const float x = X0 + (float)i * step, y = CY - s * 0.5f + ((float)v - 2.5f) * ((H - s) * 0.18f) * LIVE;
         const float sz = s * (0.7f + 0.3f * K1);
         ic_halo = 0;
         for (int32_t j = 0; j < (int32_t)sz; j++)
@@ -730,15 +736,26 @@ static void i_chiptune(void)             /* pixels stepping up an arpeggio, 8-bi
             ic_line(x + sz, y + sz * 0.5f, x + step, y + sz * 0.5f, ic_dim(ic_hue, 70));
             ic_line(x + step, y + sz * 0.5f, x + step, ny + sz * 0.5f, ic_dim(ic_hue, 70));
         }
-        if (!SMALL && ic_rnd((uint32_t)(i * 31 + shift)) > 0.7f)   /* a stray pixel near */
+        if (!SMALL && ic_rnd((uint32_t)(i * 31 + shift)) > 0.7f && y - step * 1.5f >= Y0)   /* a stray pixel near */
             ic_add(ic_round(x), ic_round(y - step * 1.5f), ic_dim(ic_hue, 110));
     }
 }
 
-/* an engine's icon (GRAV_ENGINE_*), drawn into i's box */
+/* an engine's icon (GRAV_ENGINE_*), drawn into i's box: its shapes inside a margin (0.29.3: 6 pixels on the splash, 2
+ * on a sound page, 1 in a list), so that none is cut by the box's edge */
 static void icon_draw(uint32_t engine, const icon_t *i)
 {
-    ic = i;
+    const int32_t pad = i->small || i->h < 16 ? 1 : i->h < 30 ? 2 : 6;
+    icon_t inner = *i;
+    ic_x0 = i->x;
+    ic_y0 = i->y;
+    ic_x1 = i->x + i->w;
+    ic_y1 = i->y + i->h;
+    inner.x += pad;
+    inner.y += pad;
+    inner.w -= 2 * pad + 1;                  /* (a line's last point, at X0 + W, inside it) */
+    inner.h -= 2 * pad + 1;
+    ic = &inner;
     ic_hue = ENGINE_HUE[engine < GRAV_ENGINE_ALL ? engine : 0];
     ic_halo = 0;
     switch (engine) {

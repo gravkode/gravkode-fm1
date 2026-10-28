@@ -3331,10 +3331,10 @@ static void draw_pages(int32_t dy, uint32_t page, int32_t playing, int32_t frac)
                                               * 144 rows at most each); its band, 32 high, under it */
 #define HOME_BAND_Y (180 + HOME_FOOT)
 #define TC_BASE 160                          /* the ground line (in the scene, from the page's top) */
-#define TC_HALF 42                           /* half a terricon's foot */
+#define TC_HALF 44                           /* half a terricon's foot */
 #define TC_N 22                              /* points up each slope (2 TC_N + 1 along it) */
 static const uint8_t TC_X[SEQ_TRACKS] = {26, 58, 92, 124, 152, 180, 206, 230};   /* its middle's x */
-static const uint8_t TC_H[SEQ_TRACKS] = {98, 80, 90, 71, 63, 71, 51, 56};        /* its height (to its point, cut) */
+static const uint8_t TC_H[SEQ_TRACKS] = {108, 88, 99, 78, 69, 78, 56, 62};       /* its height (to its point, cut) */
 static const uint8_t TC_ORDER[SEQ_TRACKS] = {0, 2, 1, 3, 5, 4, 7, 6};            /* tallest first */
 static const uint16_t TRACK_HUE[SEQ_TRACKS] = {   /* each track's colour, left to right: rose to violet */
     RGB(255, 61, 127), RGB(255, 106, 61), RGB(255, 166, 43), RGB(255, 225, 74),
@@ -3488,10 +3488,11 @@ static void sky_light(int32_t cx, int32_t cy, float r, float g, uint16_t c, uint
 }
 
 /* (0.29.1) the moon, at the top right: a crescent, its light shimmering, its glow breathing, a ripple of light going
- * out from it now and again */
+ * out from it now and again. (0.29.3) A clean crescent: its glow by its lit edge alone, its dark part the sky */
 static void draw_moon(int32_t cx, int32_t cy, int32_t base, float time)
 {
-    const float r = 12.0f, g = 16.0f + 3.0f * fm_sinf(time * 0.6f);
+    const float r = 12.0f, rc = 11.0f, g = 14.0f + 3.0f * fm_sinf(time * 0.6f);   /* (rc: the disc taken out of it, at
+                                                                               * (6, -4) from its middle) */
     const float a = 0.22f + 0.08f * fm_sinf(time * 0.9f) + 0.05f * fm_sinf(time * 2.3f);
     float ring = time * 5.0f;
     ring -= fm_floorf(ring / 19.0f) * 19.0f;
@@ -3502,17 +3503,20 @@ static void draw_moon(int32_t cx, int32_t cy, int32_t base, float time)
             continue;
         const uint16_t sky = sky_at(y, base);
         for (int32_t x = cx - e; x <= cx + e; x++) {
-            const float fx = (float)(x - cx), fy = (float)(y - cy), d = fm_sqrtf(fx * fx + fy * fy);
-            if (d <= r) {                    /* the crescent: the disc but for its dark part */
-                const float ox = fx - 6.0f, oy = fy + 4.0f, dd = fm_sqrtf(ox * ox + oy * oy);
-                if (dd > 11.0f)              /* (softer towards the dark) */
-                    cv_rect(x, y, 1, 1, mix565(sky, lit, (int32_t)(256.0f * fm_minf(1.0f, (dd - 11.0f) * 0.7f + 0.35f))));
+            const float fx = (float)(x - cx), fy = (float)(y - cy), ox = fx - 6.0f, oy = fy + 4.0f;
+            const float d1 = fm_sqrtf(fx * fx + fy * fy), d2 = fm_sqrtf(ox * ox + oy * oy);
+            if (d1 <= r) {                   /* the crescent, softer towards its dark side; its dark part the sky's */
+                if (d2 > rc)
+                    cv_rect(x, y, 1, 1, mix565(sky, lit, (int32_t)(256.0f * fm_minf(1.0f, (d2 - rc) * 0.7f + 0.35f))));
                 continue;
             }
-            if (d > r + g)
+            if (d1 - r > g)
                 continue;
-            const float k = 1.0f - (d - r) / g, w = d - r - ring;
-            const float glow = a * k * k + 0.12f * fm_expf(-w * w / 3.0f) * (1.0f - ring / 19.0f);
+            /* the glow: as lit as the disc's edge nearest it (none by its dark part) */
+            const float qx = fx / d1 * r - 6.0f, qy = fy / d1 * r + 4.0f;
+            const float lit_edge = fm_clampf((fm_sqrtf(qx * qx + qy * qy) - rc) * 0.25f + 0.3f, 0.0f, 1.0f);
+            const float k = 1.0f - (d1 - r) / g, w = d1 - r - ring;
+            const float glow = (a * k * k + 0.12f * fm_expf(-w * w / 3.0f) * (1.0f - ring / 19.0f)) * lit_edge;
             cv_rect(x, y, 1, 1, mix565(sky, RGB(230, 230, 205), (int32_t)(256.0f * fm_minf(1.0f, glow))));
         }
     }
@@ -3529,21 +3533,22 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
         const float kick = sky_flare(LOOK_KICK, now, 120.0f);   /* the sun, flaring at each kick */
         sky_light(196, 26 + dy, 11.0f + 2.0f * kick, 15.0f, RGB(255, 226, 110), RGB(255, 220, 90), 0.45f + 0.4f * kick, base,
                   0, 0, 0.0f);
-        static const int8_t PUFF[4][3] = {{0, 0, 9}, {10, -5, 11}, {22, 0, 9}, {12, 3, 9}};
-        static const uint8_t AT[3] = {0, 90, 170}, Y[3] = {12, 30, 6}, SCALE[3] = {100, 80, 70};   /* (over the
-                                                                                   * heaps' names) */
+        static const int8_t PUFF[7][3] = {{0, 0, 8}, {9, -6, 10}, {20, -8, 11}, {31, -4, 9}, {38, 1, 8}, {18, 3, 10},
+                                          {8, 4, 8}};   /* (0.29.3: puffier, seven puffs) */
+        static const uint8_t AT[3] = {0, 90, 170}, Y[3] = {36, 50, 28}, SCALE[3] = {100, 80, 70};   /* (low in the
+                                                                                   * sky, over the heaps' tops) */
         const float speed = 12.0f * (float)seq_bpm(&seq) / 60.0f;   /* the clouds: at the tempo's pace */
         for (uint32_t c = 0; c < 3u; c++) {
             const float sc = (float)SCALE[c] * 0.01f;
             float pos = (float)AT[c] + time * speed * sc;
             pos -= fm_floorf(pos / 300.0f) * 300.0f;
             const int32_t x0 = (int32_t)pos - 40, y0 = Y[c] + dy;
-            for (int32_t y = y0 - (int32_t)(16.0f * sc); y <= y0 + (int32_t)(12.0f * sc); y++) {
+            for (int32_t y = y0 - (int32_t)(20.0f * sc); y <= y0 + (int32_t)(14.0f * sc); y++) {
                 if (y < 0 || y >= base)
                     continue;
                 const uint16_t cloud = mix565(sky_at(y, base), RGB(235, 240, 250), 218);
-                for (int32_t x = x0 - (int32_t)(10.0f * sc); x <= x0 + (int32_t)(32.0f * sc); x++)
-                    for (uint32_t k = 0; k < 4u; k++) {
+                for (int32_t x = x0 - (int32_t)(10.0f * sc); x <= x0 + (int32_t)(48.0f * sc); x++)
+                    for (uint32_t k = 0; k < 7u; k++) {
                         const float fx = (float)(x - x0) - (float)PUFF[k][0] * sc, fy = (float)(y - y0) - (float)PUFF[k][1] * sc;
                         const float rr = (float)PUFF[k][2] * sc;
                         if (fx * fx + fy * fy <= rr * rr) {
@@ -3668,8 +3673,11 @@ static void draw_terricons(int32_t dy, uint32_t now)
             const int32_t tx = px[TC_N], ty = py[TC_N];
             if (!muted)
                 thick_line(px, py, 2u * TC_N + 1u, day ? mix565(earth, C_WHITE, 170) : C_WHITE, 1);
-            for (int32_t k = 0; k < 6; k++)
+            for (int32_t k = 0; k < 6; k++) {   /* (a shadow under: readable over a cloud) */
+                cv_rect(tx - k + 1, ty - 4 - k, 2 * k + 1, 1, C_BLACK);
                 cv_rect(tx - k, ty - 5 - k, 2 * k + 1, 1, C_WHITE);
+            }
+            cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2 + 1, ty - 23, &FONT_T, TRACK_NAME[t], C_BLACK);
             cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2, ty - 24, &FONT_T, TRACK_NAME[t], C_WHITE);
         }
     }
@@ -3679,13 +3687,13 @@ static void draw_terricons(int32_t dy, uint32_t now)
 }
 
 /* the selected track's level, six segments in its colour: in HOME's bottom band, at its right (0.29.1) */
-#define LEVEL_X 198
+#define LEVEL_X 192                          /* (0.29.3: under CPU, their edges in line) */
 #define LEVEL_Y 21
 static void draw_level(int32_t x, int32_t y)
 {
     const int32_t lv = (int32_t)(ui.level[track_sel] * 6.0f + 0.5f);
     for (int32_t k = 0; k < 6; k++)
-        cv_rect(x + k * 6, y, 4, 8, k < lv ? TRACK_HUE[track_sel] : C_LINE);
+        cv_rect(x + k * 7, y, 5, 8, k < lv ? TRACK_HUE[track_sel] : C_LINE);
 }
 
 /* SEQ (step mode): every track's steps of the page shown, a row each, in the track's colour (its terricon's, 0.28):
@@ -3942,7 +3950,7 @@ static void draw_seq_grid(void)
         cv_begin(240, HOME_FOOT, C_BLACK);
         draw_terricons(-144, now);
         cv_blit(0, 180);
-        cv_begin(36, 8, C_BLACK);
+        cv_begin(40, 8, C_BLACK);
         draw_level(0, 0);
         cv_blit(LEVEL_X, HOME_BAND_Y + LEVEL_Y);
         return;
@@ -4154,9 +4162,15 @@ static void draw_home_band(void)
     const int silent = !SYNTH_IS_DRUM(tr) && !set.trk_voices[tr];   /* (0.27.1) VOICES OFF: it cannot sound */
     const char *state = silent ? "NO VOICE" : seq.mute >> tr & 1u ? "MUTE" : ui.solo >> tr & 1u ? "SOLO"
                       : fx_freeze ? "FREEZE" : "";
-    cv_text(172 - text_w(&FONT_XS, state), 1, &FONT_XS, state,   /* (ending clear of CPU) */
+    cv_text(186 - text_w(&FONT_XS, state), 1, &FONT_XS, state,   /* (ending clear of CPU) */
             silent || seq.mute >> tr & 1u ? C_RED : C_HI);
-    draw_cpu(178, 1);
+    {                                        /* CPU over the level, their edges in line (0.29.3) */
+        char c[8];
+        int_text((int32_t)ui.cpu, c);
+        text_cat(c, "%");
+        cv_text(LEVEL_X, 1, &FONT_XS, "CPU", C_GRAY);
+        cv_text(LEVEL_X + 40 - text_w(&FONT_XS, c), 1, &FONT_XS, c, ui.xruns ? C_RED : C_HI);
+    }
     draw_level(LEVEL_X, LEVEL_Y);
     if (ui.shown_count) {                    /* counting in: the beats to come */
         t[0] = 'I'; t[1] = 'N'; t[2] = ' ';
