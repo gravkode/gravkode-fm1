@@ -409,13 +409,24 @@ key 4 up
 wait 30
 tap EDIT
 wait 30
-# (0.36.2) HOME's next page (from the terricons, HOME again): TEMPO, SWING, LENGTH as knobs
+# (0.36.2) HOME's next page (from the terricons, HOME again): TEMPO, SWING, LENGTH as knobs; (0.38) its keys tapping
+# the tempo, four beats 488 ms apart: 123
 tap SEQ
 wait 30
 tap HOME
 wait 30
 tap HOME
 wait 400
+tapkey 0 100
+wait 398
+tapkey 2 100
+wait 398
+tapkey 4 100
+wait 398
+tapkey 6 100
+wait 398
+tapkey 7 100
+wait 200
 shot screen-tempo.png
 # (0.36) the splash at power-on: the logo, as the FM-1 draws it
 splash

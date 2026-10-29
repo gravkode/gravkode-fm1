@@ -88,7 +88,7 @@ From the top:
 
 | Control | What it does |
 | --- | --- |
-| Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0 |
+| Keys | Play, with velocity (or a fixed one: GLO). 27 keys, F3 to G5 at OCT +0. On the TEMPO page (0.38): tap the tempo |
 | OCT- / OCT+ | The octave, -2 to +2. Keys held keep their notes until they are let go. In step mode: the pages |
 | ALGO (knob) | The selected track's engine: all 24 in Plaits' order, round from the last to the first; a drum track's: its drum, one of six (section 6). Each turn shows the engine's splash for a moment |
 | PRESET (knob) | The presets' browser (0.27, section 9): every sound the track can play, engine after engine; each chosen plays at once, the engine changing with it. OCT+ its engine's alone, OCT- back as it was; it closes 3 s after the last turn. A sound changed after its preset reads its name with a * |
@@ -123,13 +123,20 @@ chip's update mode, a way to install when Terykons starts but its USB can't be r
 
 The sequencer's page, Terykons' main one: section 5.
 
-### TEMPO (HOME again, 0.36.2)
+### TEMPO (HOME again, 0.36.2; tap tempo, 0.38)
 
-![The TEMPO page: TEMPO 123, SWING 58%, LENGTH 16 as knobs; HOME NEXT PAGE in the bottom band](img/screen-tempo.png "TEMPO")
+![The TEMPO page tapped: TEMPO 123 lit, SWING 58%, LENGTH 16 as knobs; HOME NEXT PAGE and ANY KEY TAP TEMPO in the bottom band, TAP TEMPO 123 under them](img/screen-tempo.png "TEMPO, tapped")
 
 From HOME's terricons, HOME again shows the song's time as knobs: **TEMPO** (K1, 30 to 300 BPM, the whole song's),
 **SWING** (K2, the selected track's, grey while it is the pattern's) and **LENGTH** (K3, the selected track's steps,
 1 to 64). They are the knobs HOME's terricons and step mode have too (section 5), shown here. HOME again: OSC.
+
+**Tap tempo (0.38).** On this page every key taps the tempo instead of playing (no note, no MIDI out): tap along with
+the beat, and from the second tap TEMPO is the taps' average over the last four beats (TAP TEMPO and the BPM; the
+first says TAP AGAIN). A pause longer than 2.5 s starts a new count; it stays within 30 to 300 BPM. While the song
+plays it follows at once. SAVE keeps it, as TEMPO turned. A key held from another page still lets its note go; HOME
+held with a white key still picks a pattern, and in LOCK mode the white keys are still the steps. Following a MIDI
+clock in, the clock leads: a tap says TEMPO MIDI CLOCK and changes nothing.
 
 ### OSC (HOME a third time)
 
@@ -267,7 +274,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003700, version 0.37.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003800, version 0.38.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 

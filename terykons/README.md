@@ -21,7 +21,7 @@ arpeggiator's, 0.34; LOCK mode on EDIT, the parameter locks, 0.35), the presets'
 | `vendor/` | Plaits, Beads' reverb engine and tape, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
 | `words.tsv` | The screen reader's words |
-| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `arp.txt`, `locks.txt`, `envlfo.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
+| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `arp.txt`, `locks.txt`, `envlfo.txt`, `tap.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
 | `docs/` | The manual and its pictures (`docs/img/compose.py` makes the README's from them) |
 | `site/landing.md` | The site's front page |
 
@@ -64,13 +64,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py terykons --release 0.37.0    # terykons/build/terykons-0.37.0.fwsc, identity FM-1_73003700
+    python3 tools/build.py terykons --release 0.38.0    # terykons/build/terykons-0.38.0.fwsc, identity FM-1_73003800
     python3 tools/build.py terykons --web
-    python3 tools/make_site.py terykons terykons/build/terykons-0.37.0.fwsc 0.37.0 terykons/build/site
+    python3 tools/make_site.py terykons terykons/build/terykons-0.38.0.fwsc 0.38.0 terykons/build/site
 
 ## The pictures
 
-    python3 tools/build.py terykons --host --release 0.37.0   # (so GLO shows the version and identity)
+    python3 tools/build.py terykons --host --release 0.38.0   # (so GLO shows the version and identity)
     terykons/build/host/terykons_host terykons/tests/screens.txt terykons/docs/img
     python3 terykons/docs/img/compose.py
 

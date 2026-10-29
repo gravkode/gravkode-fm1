@@ -110,6 +110,8 @@ static const uint8_t DRUM_OSC[SYNTH_D_TRACKS][3] = {{40, 55, 40}, {50, 50, 50}, 
 static const uint8_t DRUM_NOTE[SYNTH_D_TRACKS] = {36, 55, 60, 60};
 #define VOICES_DEFAULT SYNTH_POLY_VOICES
 #define FIXED_VELOCITY 100u              /* the keys' velocity with VELOCITY off */
+#define TAP_TAPS 5u                       /* (0.38) tap tempo: the last five taps, four beats, averaged */
+#define TAP_GAP_MS 2500u                 /* a pause longer: a new count (30 BPM is 2000 ms a beat) */
 static settings_t set;
 static settings_t set_stored;            /* as the flash has it: SAVE writes the settings only when they differ */
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit (or the pattern unsaved) */
@@ -989,6 +991,9 @@ static struct {
     uint16_t lock_held;                  /* the view page's steps held in LOCK mode, a bit each */
     uint32_t key_lock;                   /* the keys pressed as LOCK's steps (let go as such) */
     uint32_t key_mix;                    /* (0.26) the keys pressed on the mixer (mutes, tracks: let go as such) */
+    uint32_t key_tap;                    /* (0.38) the keys tapped on TEMPO (let go as such) */
+    uint32_t tap_at[TAP_TAPS];           /* the last taps, oldest first (ms) */
+    uint8_t tap_n;                       /* how many of them count */
     uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
     uint8_t sel_down;                    /* SEL held (let go: the mixer) */
     uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
@@ -2780,7 +2785,38 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
  * let go as such, whatever the mode is by then; no pressure sent, no chord */
 static uint32_t keys_taken(void)
 {
-    return ui.key_preset | ui.key_pat | ui.key_mix | ui.key_step | ui.key_lock;
+    return ui.key_preset | ui.key_pat | ui.key_mix | ui.key_step | ui.key_lock | ui.key_tap;
+}
+
+/* (0.38) a key on TEMPO: a tap. The tempo is the last taps' (up to TAP_TAPS: four beats) average; a pause longer than
+ * TAP_GAP_MS starts a new count. Following a MIDI clock in, the clock leads: no tap. */
+static void tempo_tap(void)
+{
+    const uint32_t now = plat_ms();
+    char t[12];
+    if (seq.ext) {
+        app_say("TEMPO", "MIDI CLOCK");
+        return;
+    }
+    if (ui.tap_n && now - ui.tap_at[ui.tap_n - 1u] > TAP_GAP_MS)
+        ui.tap_n = 0;
+    if (ui.tap_n == TAP_TAPS) {
+        memmove(ui.tap_at, ui.tap_at + 1, sizeof ui.tap_at - sizeof ui.tap_at[0]);
+        ui.tap_n--;
+    }
+    ui.tap_at[ui.tap_n++] = now;
+    if (ui.tap_n < 2u) {
+        app_say("TAP", "AGAIN");
+        return;
+    }
+    const uint32_t span = now - ui.tap_at[0], beats = ui.tap_n - 1u;
+    const uint32_t bpm = span ? (60000u * beats + span / 2u) / span : SEQ_BPM_MAX;
+    seq.bpm = (uint16_t)clamp((int32_t)bpm, SEQ_BPM_MIN, SEQ_BPM_MAX);
+    set_dirty = 1;
+    ui.turned_at[EN_K1] = now;               /* (TEMPO's knob lit, easing to it, as turned) */
+    ui.redraw = 1;
+    int_text(seq.bpm, t);
+    app_say("TAP TEMPO", t);
 }
 
 /* a key pressed: SAVE held, a preset slot; HOME held, a pattern (1..16); the mixer, a mute (white 1..8) or a solo
@@ -2821,6 +2857,9 @@ static void key_down(uint32_t k)
             step_key((uint32_t)w, 1);
         else if (b >= 0 && b < (int)SYNTH_TRACKS)
             track_select((uint32_t)b);
+    } else if (active_page == PAGE_TEMPO) {  /* (0.38) TEMPO: every key taps it (none plays) */
+        ui.key_tap |= bit;
+        tempo_tap();
     } else {                                 /* a note: key 0 is F3 (MIDI 53), the octave as it is now */
         const int32_t note = 53 + (int32_t)k + 12 * set.octave;
         const uint32_t v = set.velocity_off ? FIXED_VELOCITY : touch_vel(k);   /* GLO VELOCITY: the keys', or fixed */
@@ -2865,6 +2904,7 @@ static void key_up(uint32_t k)
         ui.key_preset &= ~bit;
         ui.key_pat &= ~bit;
         ui.key_mix &= ~bit;
+        ui.key_tap &= ~bit;
     } else {
         const int32_t note = ui.note[k];
         ui.prs[k] = 0;
@@ -5370,7 +5410,10 @@ static void draw_mixer_band(void)
 /* the page's state, in the bottom band's first line: a sound page's HOME */
 static void draw_status(int32_t y)
 {
-    if (IS_SOUND_PAGE(active_page) || active_page == PAGE_TEMPO) {
+    if (active_page == PAGE_TEMPO) {         /* (0.38: its keys tap) */
+        cv_text(8, y + 2, &FONT_T, "HOME  NEXT PAGE", C_GRAY);
+        cv_text(232 - text_w(&FONT_T, "ANY KEY  TAP TEMPO"), y + 2, &FONT_T, "ANY KEY  TAP TEMPO", C_GRAY);
+    } else if (IS_SOUND_PAGE(active_page)) {
         cv_text(8, y + 2, &FONT_T, "HOME  NEXT PAGE", C_GRAY);
         cv_text(232 - text_w(&FONT_T, "HOLD HOME + SELECT  JUMP"), y + 2, &FONT_T, "HOLD HOME + SELECT  JUMP", C_DIM);
     }

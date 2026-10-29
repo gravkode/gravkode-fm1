@@ -1,0 +1,162 @@
+# Tap tempo (0.38): on the TEMPO page (HOME from HOME's terricons) every key taps the tempo instead of playing: the
+# last four beats averaged, a pause over 2.5 s a new count, 30..300 BPM; following a MIDI clock in, the clock leads.
+#   terykons/build/host/terykons_host terykons/tests/tap.txt terykons/build/host
+wait 600
+expect seq_bpm 120
+expect page 8
+# a key held from the terricons (a note) is let go as a note on TEMPO
+key 4 down 100 0
+wait 30
+expect voices_held 1
+tap HOME
+wait 30
+expect page 16
+key 4 up
+wait 300
+expect voices_held 0
+# the first tap: no tempo yet; then four beats 400 ms apart: 150 BPM; no note, no MIDI out (key 4's two only)
+out
+listen
+tapkey 0 100
+wait 310
+said TAP AGAIN
+expect seq_bpm 120
+expect voices_held 0
+tapkey 0 100
+wait 310
+tapkey 2 100
+wait 310
+tapkey 4 100
+wait 310
+tapkey 6 100
+wait 30
+expect seq_bpm 150
+said TAP TEMPO 150
+expect midi_out 2
+expect voices_held 0
+expect dirty 1
+# uneven taps averaged (380, 420, 390, 410 ms: 400, 150 BPM), the black keys too; only the last five count
+wait 3000
+tapkey 1 100
+wait 290
+tapkey 1 100
+wait 330
+tapkey 3 100
+wait 300
+tapkey 5 100
+wait 320
+tapkey 8 100
+wait 30
+expect seq_bpm 150
+# a pause over 2.5 s: a new count, 600 ms apart: 100 BPM
+wait 3000
+tapkey 0 100
+wait 510
+said TAP AGAIN
+tapkey 0 100
+wait 510
+tapkey 0 100
+wait 30
+expect seq_bpm 100
+said TAP TEMPO 100
+# too fast: 300 at most; too slow: 30 at least
+wait 3000
+tapkey 0 100
+wait 60
+tapkey 0 100
+wait 60
+tapkey 0 100
+wait 30
+expect seq_bpm 300
+wait 3000
+tapkey 0 100
+wait 2310
+tapkey 0 100
+wait 30
+expect seq_bpm 30
+# while playing: the sequencer follows at once and plays on
+wait 3000
+tap PLAY
+wait 100
+expect seq_playing 1
+tapkey 0 100
+wait 410
+tapkey 0 100
+wait 410
+tapkey 0 100
+wait 30
+expect seq_bpm 120
+expect seq_playing 1
+tap PLAY
+wait 300
+expect seq_playing 0
+# HOME held and a white key: a pattern, not a tap
+press HOME
+wait 400
+key 2 down 100 0
+wait 30
+key 2 up
+release HOME
+wait 30
+expect page 16
+expect pattern 1
+expect seq_bpm 120
+# following a MIDI clock in: the clock leads, a tap says so and keeps the song's tempo
+listen
+midi FA
+clock 48 21
+expect seq_ext 1
+tapkey 0 100
+wait 210
+tapkey 0 100
+wait 30
+said TEMPO MIDI CLOCK
+midi FC
+wait 800
+expect seq_ext 0
+expect seq_bpm 120
+# LOCK mode: the white keys are its steps, on TEMPO too
+tap EDIT
+wait 30
+expect lock_mode 1
+tapkey 0 100
+wait 310
+tapkey 0 100
+wait 310
+tapkey 0 100
+wait 30
+expect seq_bpm 120
+tap EDIT
+wait 30
+# HOME again: OSC, the keys play
+tap HOME
+wait 30
+expect page 0
+key 0 down 100 0
+wait 30
+expect voices_held 1
+key 0 up
+wait 300
+# SAVE keeps the tapped tempo (back to TEMPO: step mode, HOME's terricons, TEMPO)
+tap SEQ
+wait 30
+tap HOME
+wait 30
+tap HOME
+wait 30
+expect page 16
+wait 3000
+tapkey 0 100
+wait 340
+tapkey 0 100
+wait 340
+tapkey 0 100
+wait 340
+tapkey 0 100
+wait 30
+expect seq_bpm 140
+tap SAVE
+wait 300
+reboot
+wait 600
+expect seq_bpm 140
