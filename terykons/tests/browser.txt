@@ -1,0 +1,148 @@
+# HOME's terricons and the presets' browser (0.27; terricons since 0.28, rings before). HOME opens on a ridge of eight
+# terricons, a track each: one with a step on has its terricon, a sounding one moves. PRESET opens the browser over
+# the page: every sound the track can play, engine after engine (ALGO's order), each one chosen plays at once, the
+# engine changing with it; the sequencer, the mixer and the other tracks as they were, nothing written. OCT+ shows the
+# engine's alone (round), OCT- puts the sound back as it was; it closes 3 s after the last turn, or with a page's
+# button or another track, keeping it.
+#   tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/browser.txt terykons/build/host
+wait 600
+expect page 8
+expect terricons 0
+expect engine 0
+expect preset 0
+listen
+# S1's step 1: its terricon
+tap SEQ
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect terricons 1
+# PRESET: the browser, all engines; WAVESHAPE's next
+turn PRESET 1
+wait 30
+expect browser 1
+expect browser_all 1
+expect browser_n 96
+expect engine 0
+expect preset 1
+said PRESET SOFT FOLD
+shot browser-all.png
+# past WAVESHAPE's four: FM's first, the engine changing with it
+turn PRESET 3
+wait 30
+expect engine 1
+expect preset 0
+# OCT-: back as it was when it opened; no octave changed
+tap OCT-
+wait 30
+expect browser 0
+expect engine 0
+expect preset 0
+expect octave 0
+said PRESET CANCEL
+# back from WAVESHAPE's first: the engine before (ANALOG)'s third; OCT+ its engine's alone, round
+turn PRESET -2
+wait 30
+expect engine 2
+expect preset 2
+tap OCT+
+wait 30
+expect browser_all 0
+said PRESETS
+shot browser-engine.png
+turn PRESET 2
+wait 30
+expect engine 2
+expect preset 0
+# 3 s after the last turn it closes, the sound kept
+wait 3100
+expect browser 0
+expect engine 2
+expect preset 0
+# the mixer and the steps stay as they are as the sound changes, playing; nothing written
+tap SEL
+wait 30
+turn K1 -20
+turn K2 -30
+wait 30
+tap SEL
+wait 30
+expect vol 80
+expect send 70
+expect store_writes 0
+tap PLAY
+wait 600
+expect terricons_sounding 1
+shot terricons.png
+# muted (the mixer's white key 1), S1's terricon stands still, grey; on again, it moves
+tap SEL
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+tap SEL
+wait 600
+expect page 8
+expect terricons_sounding 0
+tap SEL
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+tap SEL
+wait 600
+expect terricons_sounding 1
+turn PRESET 1
+wait 30
+turn PRESET 3
+wait 30
+expect seq_playing 1
+expect step0 1
+expect vol 80
+expect send 70
+expect mute 0
+expect store_writes 0
+# a page's button closes it, keeping the sound (and opens its page)
+tap HOME
+wait 30
+expect browser 0
+expect page 0
+# a sound changed after its preset (OSC's K1): the name kept, marked *; loaded anew: not
+turn PRESET 1
+wait 3100
+expect browser 0
+expect page 0
+turn K1 5
+wait 30
+expect preset_edited 1
+turn PRESET -1
+turn PRESET 1
+wait 30
+expect preset_edited 0
+# another track: it closes; a drum track's list, its six drums'
+turn SELECT 4
+wait 30
+expect browser 0
+wait 1600
+turn PRESET 1
+wait 30
+expect browser 1
+expect browser_n 24
+tap PLAY
+wait 60
+# stopped and silent: the terricons still
+tap SEQ
+wait 30
+tap HOME
+wait 1500
+expect page 8
+expect terricons_sounding 0

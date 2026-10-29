@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read GRAV CODE's dual-core DEBUG counters over USB-MIDI, without changing settings."""
+"""Read Terykons' dual-core DEBUG counters over USB-MIDI, without changing settings."""
 import json
 from fm1_remote import FM1
 

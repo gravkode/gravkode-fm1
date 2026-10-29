@@ -42,7 +42,7 @@ static const palette_t PALETTES[] = {
     {"CYAN", {NEUTRALS, RGB(60, 180, 235), RGB(150, 225, 255)}},
     {"RED", {NEUTRALS, RGB(232, 76, 60), RGB(255, 132, 112)}},
     {"MONO", {NEUTRALS, RGB(196, 196, 202), RGB(236, 236, 240)}},
-    {"VIOLET", {NEUTRALS, RGB(146, 112, 255), RGB(198, 172, 255)}},   /* (5..9: 2026-10, GRAV CODE's choosing; it took TEAL) */
+    {"VIOLET", {NEUTRALS, RGB(146, 112, 255), RGB(198, 172, 255)}},   /* (5..9: 2026-10, Terykons' choosing; it took TEAL) */
     {"TEAL", {NEUTRALS, RGB(30, 196, 170), RGB(120, 236, 212)}},
     {"ICE", {NEUTRALS, RGB(92, 156, 255), RGB(172, 208, 255)}},
     {"PINK", {NEUTRALS, RGB(236, 72, 150), RGB(255, 142, 198)}},

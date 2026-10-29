@@ -1,0 +1,262 @@
+# Live recording and the metronome (0.24). REC while playing (or REC, then PLAY): the keys' notes go to the selected
+# track as they play, each to its nearest step (the one playing if early in it, else the next, which then does not
+# play again this time round); notes within 60 ms of each other make a chord; a note's length is how long its key is
+# held; a step's first note replaces what was there. Stopping ends it. GLO's METRONOME (K3): REC, a click on each
+# quarter note while recording live (the bar's first louder), or OFF. SEQ held and REC: the track cleared.
+#   tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/rec.txt terykons/build/host
+wait 600
+expect page 8
+expect metro 0
+expect clicks 0
+listen
+# PLAY, REC: recording live; no click yet without a beat since
+tap PLAY
+tap REC
+wait 20
+expect rec 1
+expect rec_live 1
+said REC LIVE
+# a note early in the step playing (the second): written there, its velocity the key's, nothing skipped
+expect seq_step 1
+expect seq_ahead 0
+key 7 down 100 0
+wait 30
+expect step1 1
+expect stepnote1 60
+expect stepn1 1
+expect seq_skip 0
+# held about two steps: its length 2
+wait 200
+key 7 up
+wait 30
+expect steplen1 2
+# late in a step: the next one's, and that one does not play it this time (heard already)
+expect seq_ahead 1
+expect seq_step 3
+key 14 down 90 0
+wait 30
+expect step4 1
+expect stepnote4 67
+expect stepvel4 90
+expect seq_skip 5
+out
+wait 100
+expect seq_skip 0
+expect_no_out USB 90 43 5A
+key 14 up
+wait 30
+# a chord: three keys within 60 ms, one step, its velocity the first's
+wait 100
+key 4 down 80 0
+key 11 down 120 0
+key 18 down 100 0
+wait 40
+key 4 up
+key 11 up
+key 18 up
+wait 30
+expect stepn6 3
+expect stepnote6 57
+expect stepvel6 80
+# the metronome: a click on each quarter note while recording
+expect clicks >0
+# the next time round: the notes recorded play (step 4's G4 too)
+out
+wait 1800
+expect_out USB 90 3C 64
+expect_out USB 90 43 5A
+# GLO's METRONOME off: no more clicks; back on: clicks again
+tap GLO
+wait 30
+turn K3 -1
+wait 30
+expect metro 1
+said METRONOME OFF
+expect dirty 1
+tap HOME
+wait 30
+expect page 8
+expect rec 1
+expect clicks 5
+wait 1000
+expect clicks 5
+tap GLO
+wait 30
+turn K3 1
+wait 30
+expect metro 0
+tap HOME
+wait 600
+expect clicks >5
+# REC again: no more recording, the keys only play
+tap REC
+wait 30
+expect rec 0
+said REC OFF
+key 26 down 100 0
+wait 200
+key 26 up
+wait 30
+expect stepnote4 67
+expect stepnote6 57
+# REC, then PLAY stopped: recording ends with the stop
+tap REC
+wait 30
+expect rec 1
+tap PLAY
+wait 60
+expect seq_playing 0
+expect rec 0
+expect rec_live 0
+# REC stopped (step recording), then PLAY: recording live from the start
+tap REC
+wait 30
+expect rec 1
+expect rec_live 0
+tap PLAY
+wait 30
+expect rec 1
+expect rec_live 1
+said REC LIVE
+tap PLAY
+wait 60
+expect rec 0
+# a drum track (D1): any key writes the drum's own note
+turn SELECT 4
+wait 1600
+tap PLAY
+tap REC
+wait 20
+key 20 down 110 0
+wait 30
+key 20 up
+wait 30
+expect stepnote1 36
+expect stepvel1 107
+tap PLAY
+wait 60
+# SEQ held, REC: the track cleared (its length kept); SEQ let go does not switch step mode
+expect step1 1
+press SEQ
+wait 30
+tap REC
+wait 30
+release SEQ
+wait 30
+expect step1 0
+expect step_mode 0
+expect seq_length 16
+said CLEAR D1
+# the settings saved, a restart: the metronome as it was set
+turn SELECT -4
+wait 1600
+tap GLO
+wait 30
+turn K3 -1
+wait 30
+tap SAVE
+wait 100
+reboot
+wait 600
+expect metro 1
+# the click heard: every track empty (S1 cleared too), recording live: with the metronome off, silence; on, the
+# clicks alone, well under full scale
+press SEQ
+wait 30
+tap REC
+wait 30
+release SEQ
+wait 30
+expect step1 0
+tap PLAY
+tap REC
+wait 30
+expect rec_live 1
+peakreset
+wait 1000
+expect peak_db_max -90
+tap GLO
+wait 30
+turn K3 1
+wait 30
+tap HOME
+wait 30
+peakreset
+wait 1000
+expect clicks >1
+expect peak_db_min -40
+expect peak_db_max -6
+tap PLAY
+wait 60
+# (0.25) a track's own swing: K2 on S1 its own; S2 still the pattern's; SEQ held and K2: the pattern's, every track's
+# own gone (SEQ let go: no step mode)
+turn K2 5
+wait 30
+expect track_swing 55
+expect seq_swing 55
+said SWING 55%
+turn SELECT 1
+wait 1600
+expect track_swing 0
+expect seq_swing 50
+press SEQ
+wait 30
+turn K2 10
+wait 30
+release SEQ
+wait 30
+expect step_mode 0
+expect seq_swing 60
+said SWING ALL 60%
+turn SELECT -1
+wait 1600
+expect track_swing 0
+expect seq_swing 60
+# (0.25) the count-in: METRONOME at COUNT; REC (stopped), PLAY: a bar's four clicks first, no step played, a note
+# early in it not recorded
+tap GLO
+wait 30
+turn K3 1
+wait 30
+expect metro 2
+said METRONOME COUNT
+tap HOME
+wait 30
+tap REC
+wait 30
+expect clicks 9
+tap PLAY
+wait 30
+said COUNT IN
+expect count_in 15
+expect seq_step -1
+key 7 down 100 0
+wait 60
+key 7 up
+wait 30
+expect step0 0
+wait 1900
+expect count_in 0
+expect clicks 14
+expect seq_step 0
+# (0.25) MIDI in's notes recorded live too, with their velocity; the length from the note-off
+midi 90 48 50
+wait 260
+midi 80 48 00
+wait 30
+expect step1 1
+expect stepnote1 72
+expect stepvel1 80
+expect steplen1 2
+# (0.25) SEQ held while recording live: the steps it passes erased (a loop: all); let go: no step mode
+press SEQ
+wait 2100
+said ERASE S1
+release SEQ
+wait 30
+expect step1 0
+expect step_mode 0
+expect rec 1
+tap PLAY
+wait 60

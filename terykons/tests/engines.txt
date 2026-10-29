@@ -1,0 +1,326 @@
+# Every engine of Plaits', in ALGO's order (Plaits' own), from the default, Waveshaping, round to it again:
+# each is chosen, named, and sounds for a held C4. tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/engines.txt terykons/build/host
+wait 600
+# each engine's RAM in a voice (20 KB each, dsp/grav_plaits.cpp kVoiceRam) is checked once it is chosen: what its
+# Init took, with 2 KB to spare (host pointers are 8 bytes, the FM-1's 4: it takes less there)
+expect wave 0
+expect engine_ram <18433
+listen
+# WAVESHAPE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 1
+said ALGO FM 2-OP
+expect engine_ram <18433
+# FM 2-OP
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 4
+said ALGO GRAIN
+expect engine_ram <18433
+# GRAIN
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 5
+said ALGO ADDITIVE
+expect engine_ram <18433
+# ADDITIVE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 6
+said ALGO WAVETABLE
+expect engine_ram <18433
+# WAVETABLE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 7
+said ALGO CHORDS
+expect engine_ram <18433
+# CHORDS
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 8
+said ALGO SPEECH
+expect engine_ram <18433
+# SPEECH
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 9
+said ALGO SWARM
+expect engine_ram <18433
+# SWARM
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 10
+said ALGO NOISE
+expect engine_ram <18433
+# NOISE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 11
+said ALGO PARTICLE
+expect engine_ram <18433
+expect engine_ram >16000
+# PARTICLE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 12
+said ALGO STRING
+expect engine_ram <18433
+# STRING
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 3
+said ALGO MODAL
+expect engine_ram <18433
+# MODAL
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 13
+said ALGO KICK
+expect engine_ram <18433
+# KICK
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 14
+said ALGO SNARE
+expect engine_ram <18433
+# SNARE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 15
+said ALGO HI-HAT
+expect engine_ram <18433
+# HI-HAT
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 16
+said ALGO VA VCF
+expect engine_ram <18433
+# VA VCF
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 17
+said ALGO PHASE DIST
+expect engine_ram <18433
+# PHASE DIST
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 18
+said ALGO 6-OP FM 1
+expect engine_ram <18433
+# 6-OP FM 1
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 19
+said ALGO 6-OP FM 2
+expect engine_ram <18433
+# 6-OP FM 2
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 20
+said ALGO 6-OP FM 3
+expect engine_ram <18433
+# 6-OP FM 3
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 21
+said ALGO TERRAIN
+expect engine_ram <18433
+# TERRAIN
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 22
+said ALGO STRING MCH
+expect engine_ram <18433
+# STRING MCH
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 23
+said ALGO CHIPTUNE
+expect engine_ram <18433
+# CHIPTUNE
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+turn ALGO 1
+wait 30
+expect wave 2
+said ALGO ANALOG
+expect engine_ram <18433
+# ANALOG
+midi 90 3C 64
+wait 10
+peakreset
+wait 600
+expect peak_db_min -45
+midi 80 3C 00
+wait 300
+# round the other way: from the first (Analog) back to the last, and on again
+turn ALGO -1
+wait 30
+expect wave 23
+said ALGO CHIPTUNE
+expect engine_ram <18433
+turn ALGO 1
+wait 30
+expect wave 2

@@ -1,0 +1,96 @@
+# The engines' icons (0.20): drawn by code, alive; their knobs named by what they do (0.21). A sound page (OSC; a drum's DRUM and SHAPE) shows the track's
+# engine's icon in a live area, redrawn alone ~30 times a second between the screen's redraws; ALGO shows the
+# engine's splash for 1.5 s (its icon alive, its name, its line); a list over the page stops the live area; the
+# other pages have none. The track's line and the tracks' list show each engine's icon, small.
+#   terykons/build/host/terykons_host terykons/tests/icons.txt terykons/build/host
+wait 600
+# SEQ: no live area
+expect page 8
+expect live_w 0
+# OSC (HOME): the icon alive, ~30 frames a second
+tap HOME
+wait 30
+expect page 0
+expect live_w 38
+key 7 down 100 0
+wait 1000
+expect live_frames >24
+shot icon-osc.png
+key 7 up
+wait 30
+# the knobs by what they do: WAVESHAPE's FOLD
+listen
+turn K1 1
+wait 30
+said FOLD 66
+turn K1 -1
+wait 30
+# ALGO: the splash, its icon alive (140 wide), gone after 1.5 s
+turn ALGO 1
+wait 300
+expect splash 1
+expect live_w 140
+expect wave 1
+shot icon-splash.png
+wait 1500
+expect splash 0
+expect live_w 38
+# FM 2-OP's knobs: INDEX, FEEDBACK, RATIO
+turn K1 1
+wait 30
+said INDEX
+turn K2 1
+wait 30
+said FEEDBACK
+turn K3 1
+wait 30
+said RATIO
+wait 300
+shot icon-knobs.png
+# SELECT: the tracks' list over the page: no live area while it shows
+turn SELECT 1
+wait 300
+expect live_w 0
+shot icon-list.png
+wait 1600
+expect live_w 38
+turn SELECT -1
+wait 1600
+# HOME held: the patterns' grid over it, no live area
+press HOME
+wait 400
+expect live_w 0
+release HOME
+wait 100
+expect page 10
+expect live_w 38
+tap SEQ
+wait 30
+tap HOME
+wait 30
+expect page 8
+# a drum's DRUM and SHAPE pages: the drum's icon
+turn SELECT 4
+wait 1600
+tap HOME
+wait 30
+expect page 0
+expect live_w 38
+tap HOME
+wait 30
+expect page 9
+expect live_w 38
+shot icon-shape.png
+# MOD, ENV, GLO, FX: none
+tap LFO
+wait 30
+expect live_w 0
+tap ENV
+wait 30
+expect live_w 0
+tap GLO
+wait 30
+expect live_w 0
+tap FX
+wait 30
+expect live_w 0

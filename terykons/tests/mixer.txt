@@ -1,0 +1,169 @@
+# The mixer (0.26, SEL): the eight tracks a strip each: VOL (K1, the selected track's fader; 0.27: its own, not its
+# sound's OUTPUT LEVEL),
+# SEND (K2: its share through the effect; the rest goes past it), the effect's RETURN (K3: HALL's AMOUNT, 0.32), the
+# mutes on white keys 1..8 (a muted track's steps start no notes), the tracks on black keys 1..8. SEL again: back.
+# On the effect's pages too (SEED, held there, went with Beads' grains in 0.32). Saved with the settings.
+#   tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/mixer.txt terykons/build/host
+wait 600
+expect page 8
+expect send 100
+expect mute 0
+listen
+# S1's step 1 (step mode, then off: SEQ's page again)
+tap SEQ
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+tap SEQ
+wait 30
+expect step0 1
+# SEL: the mixer; K1, K2, K3
+tap SEL
+wait 30
+expect page 13
+said PAGE MIXER
+turn K1 -20
+wait 30
+expect vol 80
+expect level 100
+said VOL S1
+turn K2 -50
+wait 30
+expect send 50
+said SEND S1
+expect fx_return 0
+turn K3 10
+wait 30
+expect fx_return 10
+said RETURN
+# white key 1 (key 0): S1 muted; playing, its step plays no note; again: on, and it does
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect mute 257
+said S1 MUTE
+tap PLAY
+wait 30
+out
+wait 2100
+expect_no_out USB 90 3C 64
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect mute 0
+said S1 ON
+out
+wait 2100
+expect_out USB 90 3C 64
+tap PLAY
+wait 60
+# (0.26.1) black key 2 (key 3): S2 soloed: only it sounds, S1's step plays no note; black 1 too: S1 sounds again;
+# both off: as before, S1's mute kept beneath
+tap PLAY
+wait 30
+key 3 down 100 0
+wait 30
+key 3 up
+wait 30
+expect solo 2
+expect mute 64768
+said S2 SOLO
+out
+wait 2100
+expect_no_out USB 90 3C 64
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+expect solo 3
+out
+wait 2100
+expect_out USB 90 3C 64
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect mute 64513
+key 1 down 100 0
+wait 30
+key 1 up
+key 3 down 100 0
+wait 30
+key 3 up
+wait 30
+expect solo 0
+expect mute 257
+said SOLO OFF
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+expect mute 0
+tap PLAY
+wait 60
+# SELECT: D1 selected (its LEVEL, SEND); the meters fall to rest once silent
+turn SELECT 4
+wait 1600
+expect send 100
+expect vol 100
+wait 900
+expect meter 0
+# SEL again: back to SEQ's page; from an FX page too (0.26.2), held there as well (0.32)
+tap SEL
+wait 30
+expect page 8
+tap FX
+wait 30
+expect page 4
+tap SEL
+wait 30
+expect page 13
+tap SEL
+wait 30
+expect page 4
+press SEL
+wait 500
+release SEL
+wait 30
+expect page 13
+tap SEL
+wait 30
+expect page 4
+# white key 2 (key 2): S2 muted; saved; a restart: as it was
+turn SELECT -4
+wait 1600
+tap HOME
+wait 30
+tap SEL
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+wait 30
+expect mute 514
+tap SAVE
+wait 100
+reboot
+wait 600
+expect mute 514
+expect send 50
+expect vol 80
+# the settings as 0.26 saved them (no faders): each fader at 100, the rest kept; as 0.21..0.25 (no mixer): every
+# track sent whole, none muted
+save026
+reboot
+wait 600
+expect vol 100
+expect mute 514
+expect send 50
+save025
+reboot
+wait 600
+expect mute 0
+expect send 100
+expect vol 100

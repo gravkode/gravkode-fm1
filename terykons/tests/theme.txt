@@ -1,0 +1,89 @@
+# GLO's SCREEN page (0.25.1, GLO again): K1 THEME, the screen's colours: device/gfx.c's palettes in the knob's order,
+# the app's own (TEAL) first; shown at once, saved with the settings, as it was after a restart. GLO again: DEBUG.
+# (0.29) K2 SKY, HOME's sky: OFF, DAY, NIGHT (as it comes since 0.30.2); saved too.
+#   tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/theme.txt terykons/build/host
+wait 600
+expect theme 0
+expect palette 6
+listen
+tap GLO
+wait 30
+tap GLO
+wait 30
+expect page 12
+said PAGE SCREEN
+# AMBER, the next; TEAL again at the knob's start
+turn K1 1
+wait 30
+expect palette 1
+expect theme 2
+said THEME AMBER
+expect dirty 1
+turn K1 -5
+wait 30
+expect palette 6
+said THEME TEAL
+# three on: ICE; K3 does nothing here (K2, SKY since 0.28, leaves the palette as it is)
+turn K1 3
+wait 30
+expect palette 7
+said THEME ICE
+turn K3 -2
+wait 30
+expect palette 7
+expect sky 1
+shot theme-ice.png
+# saved; a restart: ICE again
+tap SAVE
+wait 100
+reboot
+wait 600
+expect theme 8
+expect palette 7
+# GLO, GLO: SCREEN; GLO again: DEBUG; back at the knob's start: TEAL
+tap GLO
+wait 30
+tap GLO
+wait 30
+expect page 12
+tap GLO
+wait 30
+expect page 7
+tap GLO
+wait 30
+tap GLO
+wait 30
+expect page 12
+turn K1 -9
+wait 30
+expect palette 6
+expect theme 7
+# (0.29) K2 SKY: NIGHT at first (0.30.2), no further right; left DAY, then OFF, no further; right DAY again; saved,
+# a restart: DAY
+expect sky 1
+listen
+turn K2 1
+wait 30
+expect sky 1
+said SKY NIGHT
+turn K2 -1
+wait 30
+expect sky 3
+said SKY DAY
+turn K2 -1
+wait 30
+expect sky 2
+said SKY OFF
+turn K2 -1
+wait 30
+expect sky 2
+turn K2 1
+wait 30
+expect sky 3
+expect dirty 1
+tap SAVE
+wait 100
+reboot
+wait 600
+expect sky 3

@@ -1,4 +1,4 @@
-> **This is fm1-base's own README, kept as the platform's documentation.** GRAV CODE (its README: `README.md`) is
+> **This is fm1-base's own README, kept as the platform's documentation.** Terykons (its README: `README.md`) is
 > built on fm1-base. Of the parts this README names, `examples/` and `skill/` are not in this repository: see
 > [charlesvestal/fm1-base](https://github.com/charlesvestal/fm1-base).
 

@@ -1,0 +1,408 @@
+# The manual's and the README's screenshots (terykons/docs/img): tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/screens.txt terykons/docs/img
+# and the README's composites from them: python3 terykons/docs/img/compose.py
+wait 900
+# HOME again (from SEQ): the OSC page at rest, Waveshaping
+tap HOME
+wait 400
+shot screen-osc.png
+# a chord on CHORDS (five on from Waveshaping, in ALGO's order), its CHORD knob just turned (grown, lit)
+turn ALGO 5
+wait 1600
+key 7 down 100 60
+key 11 down 70 20
+key 14 down 115 85
+wait 300
+turn K3 2
+wait 120
+shot screen-playing.png
+key 7 up
+key 11 up
+key 14 up
+wait 30
+# LFO: the MOD page, its depth up
+tap LFO
+wait 30
+turn K2 40
+wait 400
+shot screen-mod.png
+turn K2 -40
+wait 30
+# ENV: the envelope page
+tap ENV
+wait 400
+shot screen-env.png
+# GLO: the firmware and its global settings
+tap GLO
+wait 400
+shot screen-glo.png
+# FX (0.32): HALL on (AMOUNT 40, TIME 60, TONE 45), then TAPE (QUALITY VINTAGE; DIFFUSE, MOD as they come), then
+# ECHO on (AMOUNT 30 at 1/8., FEEDBACK 45). (0.33: their pages shot later, the pattern playing into the lake)
+tap FX
+wait 30
+turn K1 40
+turn K2 20
+turn K3 -10
+wait 400
+tap FX
+wait 30
+turn K1 1
+wait 400
+tap FX
+wait 30
+turn K1 30
+turn K3 10
+wait 400
+tap HOME
+wait 30
+
+# SCREEN (GLO again, 0.25.1): THEME, every palette's swatch under it, the one shown framed
+tap GLO
+wait 30
+tap GLO
+wait 1400
+shot screen-theme.png
+# DEBUG (GLO again): its fields and controls, with the effect still on
+tap GLO
+wait 400
+shot screen-debug.png
+# SEQ (HOME, the one shown last of SEQ and OSC, then again): a pattern playing, S1 as a piano roll. Step mode:
+# steps 1, 5, 9, 13 on, step 9 a fifth up and softer; step recording: a chord on step 3; swing 58 %; PLAY, the shot
+# as step 13 begins (its flash; PLAY's message gone)
+tap HOME
+wait 30
+tap HOME
+wait 30
+tap SEQ
+wait 30
+key 0 down 100 0
+key 0 up
+key 7 down 100 0
+key 7 up
+key 14 down 100 0
+key 14 up
+key 21 down 100 0
+key 21 up
+wait 30
+key 14 down 100 0
+wait 30
+turn K1 7
+turn K2 -40
+wait 30
+key 14 up
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap REC
+wait 30
+turn SELECT 2
+wait 30
+key 4 down 90 0
+key 8 down 90 0
+key 11 down 90 0
+wait 50
+key 4 up
+key 8 up
+key 11 up
+wait 30
+tap REC
+wait 30
+# (0.31) and three single notes: E4 on step 7, A4 on step 11, D4 on step 15
+tap REC
+wait 30
+turn SELECT 6
+wait 30
+key 11 down 90 0
+wait 50
+key 11 up
+wait 30
+turn SELECT 3
+wait 30
+key 16 down 110 0
+wait 50
+key 16 up
+wait 30
+turn SELECT 3
+wait 30
+key 9 down 80 0
+wait 50
+key 9 up
+wait 30
+tap REC
+wait 30
+# S2 (the black key 2 in step mode): steps 2, 4, 7, 10, 14; D1 (black 5) a kick on 1, 5, 9, 13; D3 (black 7) a
+# hi-hat on 3, 7, 11, 15; then S1 again (black 1)
+tap SEQ
+wait 30
+key 3 down 100 0
+wait 30
+key 3 up
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+key 6 down 100 0
+wait 30
+key 6 up
+key 11 down 100 0
+wait 30
+key 11 up
+key 16 down 100 0
+wait 30
+key 16 up
+key 23 down 100 0
+wait 30
+key 23 up
+wait 30
+key 10 down 100 0
+wait 30
+key 10 up
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+key 7 down 100 0
+wait 30
+key 7 up
+key 14 down 100 0
+wait 30
+key 14 up
+key 21 down 100 0
+wait 30
+key 21 up
+wait 30
+key 15 down 100 0
+wait 30
+key 15 up
+wait 30
+key 4 down 100 0
+wait 30
+key 4 up
+key 11 down 100 0
+wait 30
+key 11 up
+key 18 down 100 0
+wait 30
+key 18 up
+key 24 down 100 0
+wait 30
+key 24 up
+wait 30
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 1600
+turn K2 8
+tap PLAY
+wait 1476
+shot screen-seq.png
+# SEQ (step mode): every track's steps of the page shown, still playing, a bar later (STEP ON's message gone)
+tap SEQ
+wait 2000
+shot screen-seq-steps.png
+# (0.31) SEQ again: S1 alone, its notes as a piano roll; steps 7 and 15 two steps long (held, K3)
+tap SEQ
+wait 30
+key 11 down 100 0
+wait 30
+turn K3 1
+wait 30
+key 11 up
+wait 30
+key 24 down 100 0
+wait 30
+turn K3 1
+wait 30
+key 24 up
+wait 1400
+shot screen-seq-notes.png
+# D1 alone (black key 5): its steps, a page a row; 32 long, its second page some softer kicks
+key 10 down 100 0
+wait 30
+key 10 up
+wait 30
+turn K3 16
+wait 30
+tap OCT+
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+key 11 down 100 0
+wait 30
+turn K2 -50
+wait 30
+key 11 up
+key 14 down 100 0
+wait 30
+key 14 up
+key 18 down 100 0
+wait 30
+turn K2 -75
+wait 30
+key 18 up
+key 21 down 100 0
+wait 30
+key 21 up
+wait 1600
+shot screen-seq-drum.png
+tap OCT-
+wait 30
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+tap SEQ
+wait 30
+# (0.28) HOME at night (as it comes, 0.30.2), still playing: the moon, the stars; by day (GLO's SCREEN, K2 SKY: the
+# sun, the clouds), and at night again after
+wait 600
+shot screen-night.png
+sky 3
+wait 600
+shot screen-day.png
+sky 1
+wait 30
+# the mixer (SEL, 0.26), still playing: the tracks' faders, meters, sends, mutes
+tap SEL
+wait 600
+shot screen-mixer.png
+tap SEL
+wait 30
+# (0.33) the effect's pages, still playing: the lake under the terricons, the pattern dropping into it, the echoes
+# following, the tail rippling. FX: ECHO (the page shown last), again HALL, again TAPE; then HOME
+tap FX
+wait 1400
+shot screen-fx-echo.png
+tap FX
+wait 1400
+shot screen-fx-hall.png
+tap FX
+wait 1400
+shot screen-fx-tape.png
+tap HOME
+wait 30
+# (0.27) the presets' browser over HOME, still playing: PRESET, then OCT- (the sound back as it was)
+turn PRESET 1
+wait 600
+shot screen-browser.png
+tap OCT-
+wait 30
+tap PLAY
+wait 30
+# SELECT: the tracks' list, all eight
+turn SELECT 1
+wait 300
+shot screen-tracks.png
+turn SELECT -1
+wait 1600
+# HOME held: the patterns, pattern 1 playing (its steps); pattern 3 with steps too, pattern 2 next
+turn K4 2
+wait 60
+tap SEQ
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+turn K4 -2
+wait 100
+tap PLAY
+wait 200
+turn K4 1
+wait 30
+press HOME
+wait 400
+shot screen-patterns.png
+release HOME
+tap PLAY
+wait 30
+# a drum track's two pages (HOME on D1, the kick): DRUM with TUNE +1.5, then SHAPE with DRIVE 20
+turn SELECT 4
+wait 30
+tap SEQ
+wait 30
+tap HOME
+wait 30
+tap HOME
+wait 30
+turn K1 3
+wait 1600
+shot screen-drum.png
+tap HOME
+wait 30
+turn K3 20
+wait 400
+shot screen-shape.png
+wait 30
+# ALGO on S1: the next engine's splash, its icon alive
+turn SELECT -4
+wait 1600
+turn ALGO 1
+wait 300
+shot screen-splash.png
+# (0.34) ARP on S1 (CHORDS again): UP-DOWN over two octaves, C E G held, stopped (on its own ticks): its ladder, the
+# note playing
+turn ALGO -1
+wait 1600
+tap ARP
+wait 30
+turn K1 3
+turn K3 1
+wait 30
+key 7 down 100 0
+key 11 down 90 0
+key 14 down 110 0
+wait 1700
+shot screen-arp.png
+key 7 up
+key 11 up
+key 14 up
+wait 30
+# (0.35) LOCK (EDIT), the arp off again, pattern 1 again: on the OSC page S1's step 3 held, INVERSION and CHORD locked on it (in the
+# theme's colour, marked), step 7 MORPH, step 6 (no note) INVERSION; the steps in the bottom band, the locked marked
+turn K1 -3
+wait 30
+turn K4 -1
+wait 600
+tap EDIT
+wait 30
+tap HOME
+wait 400
+key 4 down 100 0
+wait 30
+turn K1 -30
+turn K3 20
+wait 30
+key 4 up
+key 11 down 100 0
+wait 30
+turn K2 30
+wait 30
+key 11 up
+key 9 down 100 0
+wait 30
+turn K1 25
+wait 30
+key 9 up
+wait 30
+key 4 down 100 0
+wait 600
+shot screen-lock.png
+key 4 up
+wait 30
+tap EDIT
+wait 30
+# (0.36) the splash at power-on: the logo, as the FM-1 draws it
+splash
+shot screen-logo.png

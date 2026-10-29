@@ -1,4 +1,6 @@
-# GRAV CODE
+# Terykons
+
+<p align="center"><img src="terykons/docs/img/screen-logo.png" width="240" alt="Terykons' logo: five terricons in ink before a teal sun, the name under them"></p>
 
 **A polyphonic synthesizer firmware for the M-VAVE FM-1, on all 24 sound engines of Mutable Instruments' Plaits,
 with an echo and the reverb of Mutable Instruments' Beads.**
@@ -7,13 +9,15 @@ Up to four voices, each its own engine, played from the FM-1's keys with velocit
 sequencer, shaped by an envelope, moved by an LFO and played through an echo in time with the tempo and Beads'
 reverb, all on the FM-1's own panel and screen.
 
-<p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE on the FM-1's screen: a chord on CHORDS, its sound page with its knobs, CHORD just turned"></p>
+<p align="center"><img src="terykons/docs/img/readme-playing.png" width="480" alt="Terykons on the FM-1's screen: a chord on CHORDS, its sound page with its knobs, CHORD just turned"></p>
 
-[Українська версія](README.uk.md) · [The manual](grav-code/docs/MANUAL.md)
+[Українська версія](README.uk.md) · [The manual](terykons/docs/MANUAL.md)
 
 ---
 
-Current version: **0.35.0**: parameter locks: EDIT turns on LOCK mode, the white keys the selected track's steps
+Current version: **0.36.0**: GRAV CODE is Terykons now: its name on the screen, over USB and in the package
+(`terykons-0.36.0.fwsc`), and a logo at power-on, five terricons before a teal sun; settings, presets and patterns
+carry on as they were. 0.35: parameter locks: EDIT turns on LOCK mode, the white keys the selected track's steps
 on every page; hold a step and turn a knob (OSC's, a drum's DRUM and SHAPE, the mixer's VOL and SEND) to lock it on
 that step; a step off can lock alone, without a note; recording live, the knobs' moves are recorded as locks. 0.34:
 an arpeggiator on ARP, each synth track's, part of its sound: UP, DOWN, UP-DOWN,
@@ -32,11 +36,11 @@ tracks' colours, its knobs at the top; every engine's icon a neon picture in its
 it: 0.27, the presets' browser on PRESET and the mixer's VOL its own fader; 0.26, the mixer on SEL (levels, sends,
 mutes, solos); 0.25, recording finished and the colours chosen on GLO; 0.24, live recording. HOME advances pages;
 hold HOME and turn SELECT to jump.
-[All sound controls](grav-code/docs/SOUND_CONTROLS.md).
+[All sound controls](terykons/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
+<p align="center"><img src="terykons/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="terykons/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
-<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ again, one bar playing, in the simulator: S1's notes as a piano roll, and D1's steps a page a row"> <img src="grav-code/docs/img/fx-lake.gif" width="240" alt="The effect's pages playing, in the simulator: the terricons over the lake, the notes dropping in, the echoes and the tail's rings"></p>
+<p align="center"><img src="terykons/docs/img/seq-notes.gif" width="490" alt="SEQ again, one bar playing, in the simulator: S1's notes as a piano roll, and D1's steps a page a row"> <img src="terykons/docs/img/fx-lake.gif" width="240" alt="The effect's pages playing, in the simulator: the terricons over the lake, the notes dropping in, the echoes and the tail's rings"></p>
 
 ## What it does
 
@@ -67,9 +71,9 @@ hold HOME and turn SELECT to jump.
 
 ## The screen and its pages
 
-<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME as a note value, FEEDBACK), GLO (VOICES, VELOCITY, the version) and ARP (the arp's ladder, MODE, RATE, OCTAVES)"></p>
+<p align="center"><img src="terykons/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME as a note value, FEEDBACK), GLO (VOICES, VELOCITY, the version) and ARP (the arp's ladder, MODE, RATE, OCTAVES)"></p>
 
-<p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="The engines' poster: each engine's neon icon in its own colour, with its name"></p>
+<p align="center"><img src="terykons/docs/img/readme-icons.png" width="560" alt="The engines' poster: each engine's neon icon in its own colour, with its name"></p>
 
 | Button | Page | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
@@ -102,7 +106,7 @@ off, and costs nothing then.
 
 DEBUG keeps two-core mode on by default. Its controls are temporary and are not saved. Heavy FX settings can
 still trigger voice cuts above 90% of an audio block; the smoothed CPU meter can hide short peaks. See
-[the measured results](grav-code/docs/DUAL_CORE_RESULTS.md) and [the debug guide](grav-code/docs/DUAL_CORE_DEBUG.md).
+[the measured results](terykons/docs/DUAL_CORE_RESULTS.md) and [the debug guide](terykons/docs/DUAL_CORE_DEBUG.md).
 
 ## The engines
 
@@ -137,16 +141,16 @@ K1 TIMBRE, K2 MORPH, K3 HARMONICS (shown with engine-specific names); in ALGO's 
 
 A note plays an engine as Plaits' trigger would: most engines sound while the note is held; STRING and MODAL are
 struck, then keep sounding; the drums, the 6-OP FM banks, SPEECH's words and PARTICLE take each note as a gate. The
-manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
+manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 
 ## Install
 
-1. Build or download the package, `grav_code-VERSION.fwsc`.
+1. Build or download the package, `terykons-VERSION.fwsc`.
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.35.0.fwsc 0.35.0 grav-code/build/site
-   python3 -m http.server 8080 --directory grav-code/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.36.0.fwsc 0.36.0 terykons/build/site
+   python3 -m http.server 8080 --directory terykons/build/site
    ```
 
 3. In Chrome or Edge, open `http://localhost:8080/install/`, connect the FM-1 by USB and press Install.
@@ -155,40 +159,40 @@ The same page writes M-VAVE's stock firmware back. Installing is at your own ris
 
 ## Build
 
-GRAV CODE builds with fm1-base's `tools/build.py`: JieLi's toolchain (Linux x86-64; on macOS it runs in Docker) and
+Terykons builds with fm1-base's `tools/build.py`: JieLi's toolchain (Linux x86-64; on macOS it runs in Docker) and
 JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.35.0      # grav-code/build/grav_code-0.35.0.fwsc
-python3 tools/build.py grav-code --host                # the simulator, for the tests:
-grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
-python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
+python3 tools/build.py terykons --release 0.36.0      # terykons/build/terykons-0.36.0.fwsc
+python3 tools/build.py terykons --host                # the simulator, for the tests:
+terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
+python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)
 ```
 
-The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
+The tests (`terykons/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
-[grav-code/README.md](grav-code/README.md).
+[terykons/README.md](terykons/README.md).
 
 ## The repository
 
 | Path | What |
 | --- | --- |
-| `grav-code/` | GRAV CODE: the app (`app.c`), its DSP (`dsp/`: Plaits' engines per voice, the effect, the mixer), its voices and modulation (`synth/`), the sequencer (`seq/`), Plaits, Beads' reverb and the other vendored code (`vendor/`), tests, docs, the site's page |
+| `terykons/` | Terykons: the app (`app.c`), its DSP (`dsp/`: Plaits' engines per voice, the effect, the mixer), its voices and modulation (`synth/`), the sequencer (`seq/`), Plaits, Beads' reverb and the other vendored code (`vendor/`), tests, docs, the site's page |
 | `device/`, `include/`, `lib/`, `host/`, `web/`, `tools/` | fm1-base: the FM-1 platform, the simulator, the emulator, the installer, the build ([FM1-BASE.md](FM1-BASE.md)) |
 | `bsp/` | felucca-bsp: the FM-1's chip and board support |
-| `template/`, `tests/`, `ble/` | fm1-base's reference app and its platform tests, its Bluetooth stack (not built into GRAV CODE) |
+| `template/`, `tests/`, `ble/` | fm1-base's reference app and its platform tests, its Bluetooth stack (not built into Terykons) |
 
 ## Credits and licences
 
 - Built on **fm1-base** by Charles Vestal and **felucca-bsp** by Leo Kuroshita (Hügelton Instruments), MPL-2.0;
   see [CREDITS.md](CREDITS.md) and [LICENSING.md](LICENSING.md).
 - Sound engines: **Mutable Instruments Plaits**; reverb and tape: **Mutable Instruments Beads**; their library **stmlib**; by
-  Émilie Gillet, MIT License ([grav-code/vendor/plaits/LICENSE](grav-code/vendor/plaits/LICENSE),
-  [grav-code/vendor/beads/LICENSE](grav-code/vendor/beads/LICENSE)); what else is vendored and under which licence:
-  [grav-code/vendor/README.md](grav-code/vendor/README.md).
-- GRAV CODE's own code: MPL-2.0.
+  Émilie Gillet, MIT License ([terykons/vendor/plaits/LICENSE](terykons/vendor/plaits/LICENSE),
+  [terykons/vendor/beads/LICENSE](terykons/vendor/beads/LICENSE)); what else is vendored and under which licence:
+  [terykons/vendor/README.md](terykons/vendor/README.md).
+- Terykons' own code: MPL-2.0.
 
-M-VAVE and FM-1 are trademarks of their owners. GRAV CODE is not affiliated with M-VAVE or Mutable Instruments.
+M-VAVE and FM-1 are trademarks of their owners. Terykons is not affiliated with M-VAVE or Mutable Instruments.

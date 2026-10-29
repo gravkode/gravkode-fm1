@@ -1,0 +1,222 @@
+# The README's poster of the engines' icons: each engine's splash (ALGO turned: its icon at its biggest, its name
+# under it), a moment after a note, the 24 synth engines in ALGO's order, then D1's six drum models.
+#   tools/build.py terykons --host, then
+#   terykons/build/host/terykons_host terykons/tests/icon_sheet.txt terykons/docs/img
+# and python3 terykons/docs/img/compose.py (it makes readme-icons.png of them, and removes them)
+wait 600
+tap HOME
+wait 30
+turn ALGO -1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-00.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-01.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-02.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-03.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-04.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-05.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-06.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-07.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-08.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-09.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-10.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-11.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-12.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-13.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-14.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-15.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-16.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-17.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-18.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-19.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-20.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-21.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-22.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-23.png
+key 7 up
+wait 60
+# the drum track D1: its six drums, from the kick on
+wait 1600
+turn SELECT 4
+wait 1700
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-24.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-25.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-26.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-27.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-28.png
+key 7 up
+wait 60
+turn ALGO 1
+wait 60
+key 7 down 100 0
+wait 140
+shot icon-29.png
+key 7 up
+wait 60

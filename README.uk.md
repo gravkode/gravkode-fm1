@@ -1,4 +1,6 @@
-# GRAV CODE
+# Terykons
+
+<p align="center"><img src="terykons/docs/img/screen-logo.png" width="240" alt="Логотип Terykons: п'ять териконів перед бірюзовим сонцем, під ними назва"></p>
 
 **Поліфонічна прошивка-синтезатор для M-VAVE FM-1 на всіх 24 звукових рушіях Mutable Instruments Plaits,
 з луною й ревербом Mutable Instruments Beads.**
@@ -7,13 +9,15 @@
 формує обвідна, рух дає LFO, а далі він іде через луну в темп і реверб Beads. Усе керується з панелі та екрана
 самого FM-1.
 
-<p align="center"><img src="grav-code/docs/img/readme-playing.png" width="480" alt="GRAV CODE на екрані FM-1: акорд на рушії CHORDS, сторінка звуку з ручками, CHORD щойно повернули"></p>
+<p align="center"><img src="terykons/docs/img/readme-playing.png" width="480" alt="Terykons на екрані FM-1: акорд на рушії CHORDS, сторінка звуку з ручками, CHORD щойно повернули"></p>
 
-[English](README.md) · [Посібник (англійською)](grav-code/docs/MANUAL.md)
+[English](README.md) · [Посібник (англійською)](terykons/docs/MANUAL.md)
 
 ---
 
-Поточна версія: **0.35.0**: параметр-локи: EDIT вмикає режим LOCK, білі клавіші — кроки вибраної доріжки на будь-якій
+Поточна версія: **0.36.0**: GRAV CODE тепер називається Terykons: нова назва на екрані, по USB і в пакеті
+(`terykons-0.36.0.fwsc`), а при ввімкненні — логотип, п'ять териконів перед бірюзовим сонцем; налаштування, пресети й
+патерни лишаються такими, як були. 0.35: параметр-локи: EDIT вмикає режим LOCK, білі клавіші — кроки вибраної доріжки на будь-якій
 сторінці; затисни крок і покрути ручку (OSC, у барабанів DRUM і SHAPE, VOL і SEND мікшера) — значення закріпиться на
 цьому кроці; вимкнений крок може тримати лок і без ноти; під час живого запису рухи ручок записуються в локи. 0.34:
 арпеджіатор на ARP, у кожної синтової доріжки свій, частина її звуку: UP, DOWN,
@@ -32,11 +36,11 @@ Beads, що його забарвлюють) і ECHO (затримка в тем
 0.27 — браузер пресетів на PRESET і VOL у мікшері — власний фейдер; 0.26 — мікшер на SEL (гучність, посили, м'ют,
 соло); 0.25 — доведення запису й вибір кольорів на GLO; 0.24 — живий запис. HOME гортає сторінки; затиснутий HOME +
 SELECT перемикає їх швидко.
-[Усі параметри й керування](grav-code/docs/SOUND_CONTROLS.md).
+[Усі параметри й керування](terykons/docs/SOUND_CONTROLS.md).
 
-<p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт у симуляторі: терикони HOME і сітка всіх восьми доріжок у покроковому режимі"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки сторінки звуку плавно доходять до значення, у симуляторі"></p>
+<p align="center"><img src="terykons/docs/img/seq-playing.gif" width="490" alt="Один такт у симуляторі: терикони HOME і сітка всіх восьми доріжок у покроковому режимі"> <img src="terykons/docs/img/sound-dials.gif" width="240" alt="Ручки сторінки звуку плавно доходять до значення, у симуляторі"></p>
 
-<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ ще раз, один такт у симуляторі: ноти S1 як піано-рол і кроки D1, по сторінці в рядку"> <img src="grav-code/docs/img/fx-lake.gif" width="240" alt="Сторінки ефекту під час гри, у симуляторі: терикони над озером, ноти падають у воду, кола повторів і хвоста"></p>
+<p align="center"><img src="terykons/docs/img/seq-notes.gif" width="490" alt="SEQ ще раз, один такт у симуляторі: ноти S1 як піано-рол і кроки D1, по сторінці в рядку"> <img src="terykons/docs/img/fx-lake.gif" width="240" alt="Сторінки ефекту під час гри, у симуляторі: терикони над озером, ноти падають у воду, кола повторів і хвоста"></p>
 
 ## Можливості
 
@@ -68,9 +72,9 @@ SELECT перемикає їх швидко.
 
 ## Екран і сторінки
 
-<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Вісім сторінок: SEQ (кроки, що грають, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (швидкість, глибина й призначення LFO), ENV (атака, спад, затухання), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME як тривалість ноти, FEEDBACK), GLO (голоси, velocity, версія) і ARP (драбинка арпеджіатора, MODE, RATE, OCTAVES)"></p>
+<p align="center"><img src="terykons/docs/img/readme-pages.png" width="488" alt="Вісім сторінок: SEQ (кроки, що грають, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (швидкість, глибина й призначення LFO), ENV (атака, спад, затухання), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME як тривалість ноти, FEEDBACK), GLO (голоси, velocity, версія) і ARP (драбинка арпеджіатора, MODE, RATE, OCTAVES)"></p>
 
-<p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="Постер рушіїв: неонова іконка кожного рушія у своєму кольорі, з назвою"></p>
+<p align="center"><img src="terykons/docs/img/readme-icons.png" width="560" alt="Постер рушіїв: неонова іконка кожного рушія у своєму кольорі, з назвою"></p>
 
 | Кнопка | Сторінка | K1 | K2 | K3 |
 | --- | --- | --- | --- | --- |
@@ -106,8 +110,8 @@ LOCK (параметр-локи). PRESET відкриває браузер
 
 За замовчуванням працюють два ядра. Перемикання режиму в DEBUG тимчасове, через SAVE воно не зберігається.
 За важких налаштувань FX захист усе ще може вимикати голоси на піках понад 90% часу аудіоблоку, навіть коли
-середній CPU нижчий. Див. [результати вимірів](grav-code/docs/DUAL_CORE_RESULTS.md) і
-[опис DEBUG](grav-code/docs/DUAL_CORE_DEBUG.md).
+середній CPU нижчий. Див. [результати вимірів](terykons/docs/DUAL_CORE_RESULTS.md) і
+[опис DEBUG](terykons/docs/DUAL_CORE_DEBUG.md).
 
 ## Рушії
 
@@ -142,16 +146,16 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 
 Нота працює як тригер Plaits. Більшість рушіїв звучать, поки нота затиснута. STRING і MODAL отримують удар і
 звучать далі, поки тримаєш клавішу. Ударні, банки 6-OP FM, слова SPEECH і PARTICLE сприймають ноту як гейт.
-Подробиці — у [посібнику](grav-code/docs/MANUAL.md).
+Подробиці — у [посібнику](terykons/docs/MANUAL.md).
 
 ## Встановлення
 
-1. Зберіть або завантажте пакет `grav_code-ВЕРСІЯ.fwsc`.
+1. Зберіть або завантажте пакет `terykons-ВЕРСІЯ.fwsc`.
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.35.0.fwsc 0.35.0 grav-code/build/site
-   python3 -m http.server 8080 --directory grav-code/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.36.0.fwsc 0.36.0 terykons/build/site
+   python3 -m http.server 8080 --directory terykons/build/site
    ```
 
 3. У Chrome або Edge відкрийте `http://localhost:8080/install/`, підключіть FM-1 по USB і натисніть Install.
@@ -160,42 +164,42 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 
 ## Збирання
 
-GRAV CODE збирається інструментом fm1-base `tools/build.py`: потрібен тулчейн JieLi (Linux x86-64; на macOS він
+Terykons збирається інструментом fm1-base `tools/build.py`: потрібен тулчейн JieLi (Linux x86-64; на macOS він
 запускається в Docker) і AC79 SDK від JieLi.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.35.0      # grav-code/build/grav_code-0.35.0.fwsc
-python3 tools/build.py grav-code --host                # симулятор для тестів:
-grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
-python3 tools/build.py grav-code --web                 # емулятор у браузері (Emscripten)
+python3 tools/build.py terykons --release 0.36.0      # terykons/build/terykons-0.36.0.fwsc
+python3 tools/build.py terykons --host                # симулятор для тестів:
+terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
+python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)
 ```
 
-Тести (`grav-code/tests/`): `basic.txt` (клавіші, октава, збереження, MIDI), `engines.txt` (усі рушії звучать),
+Тести (`terykons/tests/`): `basic.txt` (клавіші, октава, збереження, MIDI), `engines.txt` (усі рушії звучать),
 `voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор), `locks.txt` (параметр-локи),
 `seq.txt` (секвенсор), `rec.txt` (живий запис, метроном), `theme.txt` (кольори екрана й небо), `mixer.txt`
 (мікшер), `browser.txt` (терикони HOME, браузер пресетів), `playback.txt` (усі вісім доріжок грають, розподіл
 голосів VOICES), `tracks.txt` (синтові доріжки), `drums.txt` (барабанні доріжки), `patterns.txt` (патерни),
 `icons.txt` (іконки), `seq_test.c` (його таймінг до семпла) і `bank_test.c` (патерни у флеші): `run_seq_test.py`,
-`screens.txt` (знімки екрана). Докладніше — у [grav-code/README.md](grav-code/README.md).
+`screens.txt` (знімки екрана). Докладніше — у [terykons/README.md](terykons/README.md).
 
 ## Що де лежить
 
 | Шлях | Що |
 | --- | --- |
-| `grav-code/` | Сама прошивка: застосунок (`app.c`), DSP (`dsp/`: рушії Plaits по голосах, ефект, мікшер), голоси й модуляція (`synth/`), Plaits, реверб Beads та інший сторонній код (`vendor/`), тести, документація, сторінка сайту |
+| `terykons/` | Сама прошивка: застосунок (`app.c`), DSP (`dsp/`: рушії Plaits по голосах, ефект, мікшер), голоси й модуляція (`synth/`), Plaits, реверб Beads та інший сторонній код (`vendor/`), тести, документація, сторінка сайту |
 | `device/`, `include/`, `lib/`, `host/`, `web/`, `tools/` | Платформа fm1-base: робота з FM-1, симулятор, емулятор, інсталятор, збирання ([FM1-BASE.md](FM1-BASE.md)) |
 | `bsp/` | felucca-bsp: підтримка чипа й плати FM-1 |
-| `template/`, `tests/`, `ble/` | Еталонний застосунок fm1-base і тести платформи, стек Bluetooth (у GRAV CODE не збирається) |
+| `template/`, `tests/`, `ble/` | Еталонний застосунок fm1-base і тести платформи, стек Bluetooth (у Terykons не збирається) |
 
 ## Автори й ліцензії
 
 - Основа: **fm1-base** (Charles Vestal) і **felucca-bsp** (Leo Kuroshita, Hügelton Instruments), MPL-2.0; див.
   [CREDITS.md](CREDITS.md) і [LICENSING.md](LICENSING.md).
 - Звукові рушії — **Mutable Instruments Plaits**, реверб і стрічка — **Mutable Instruments Beads**, їхня бібліотека —
-  **stmlib**; авторка — Émilie Gillet, ліцензія MIT ([grav-code/vendor/plaits/LICENSE](grav-code/vendor/plaits/LICENSE),
-  [grav-code/vendor/beads/LICENSE](grav-code/vendor/beads/LICENSE)); що ще взято зі сторони й під якими
-  ліцензіями — [grav-code/vendor/README.md](grav-code/vendor/README.md).
-- Власний код GRAV CODE — MPL-2.0.
+  **stmlib**; авторка — Émilie Gillet, ліцензія MIT ([terykons/vendor/plaits/LICENSE](terykons/vendor/plaits/LICENSE),
+  [terykons/vendor/beads/LICENSE](terykons/vendor/beads/LICENSE)); що ще взято зі сторони й під якими
+  ліцензіями — [terykons/vendor/README.md](terykons/vendor/README.md).
+- Власний код Terykons — MPL-2.0.
 
-M-VAVE і FM-1 — товарні знаки їхніх власників. GRAV CODE не пов'язаний із M-VAVE і Mutable Instruments.
+M-VAVE і FM-1 — товарні знаки їхніх власників. Terykons не пов'язаний із M-VAVE і Mutable Instruments.
