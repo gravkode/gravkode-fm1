@@ -192,10 +192,32 @@ int main(void)
         CHECK(bank_pattern(&b, 4) != 0, "the new one still there");
     }
 
+    {   /* (0.40) the copy: a 17th pattern, BANK_CLIP, saved and found again, newer over older, beside the 16 */
+        tidy(&b);
+        seq_defaults(&q);
+        q.track[2].step[5].on = 1;
+        q.track[2].step[5].note[0] = 64;
+        save(&b, BANK_CLIP, &q);
+        q.track[2].step[5].note[0] = 65;
+        save(&b, BANK_CLIP, &q);
+        bank_init(&b);
+        const seq_pattern_t *c = bank_pattern(&b, BANK_CLIP);
+        CHECK(c != 0 && c->track[2].step[5].on && c->track[2].step[5].note[0] == 65, "the copy, its newest");
+        CHECK(bank_pattern(&b, 4) != 0 && bank_pattern(&b, 9) != 0, "the patterns beside it");
+        CHECK(bank_pattern(&b, BANK_CLIP + 1u) == 0 && bank_begin(&b, BANK_CLIP + 1u) == -1, "none past the copy");
+        static seq_t s;
+        seq_init(&s);
+        s.pat.track[0].step[0].on = 1;
+        seq_replace(&s, c);
+        CHECK(!s.pat.track[0].step[0].on && s.pat.track[2].step[5].note[0] == 65, "pasted");
+        seq_replace(&s, 0);
+        CHECK(!s.pat.track[2].step[5].on && s.pat.track[0].length == SEQ_PAGE, "cleared");
+    }
+
     if (fails) {
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: the patterns' bank (saves, newest copy, cut short, failed write, damage, wear, full, locks, 0.34's patterns)\n");
+    printf("PASS: the patterns' bank (saves, newest copy, cut short, failed write, damage, wear, full, locks, 0.34's patterns, the copy)\n");
     return 0;
 }

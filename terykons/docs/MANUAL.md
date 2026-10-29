@@ -95,7 +95,7 @@ From the top:
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
-| HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
+| HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern; with OCT-, OCT+, REC: copy, paste, clear it (0.40, section 5) |
 | LFO | The MOD page: the selected synth track's LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: the selected synth track's ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again MIDI (0.39: the tracks' channels, IN, CLOCK); again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
@@ -274,7 +274,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003900, version 0.39.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004000, version 0.40.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -551,7 +551,7 @@ it): a swung hi-hat over a straight kick, say.
 
 ### Patterns (HOME held, K4)
 
-![HOME held: the sixteen patterns, pattern 1 playing (lit), pattern 2 next (blinking), pattern 3 with steps (underlined), the others empty (dim)](img/screen-patterns.png "The patterns")
+![HOME held: the sixteen patterns, pattern 1 playing (lit), pattern 2 next (blinking), pattern 3 with steps (underlined), the others empty (dim); under them OCT- COPY, OCT+ PASTE, REC CLEAR](img/screen-patterns.png "The patterns")
 
 There are sixteen patterns. Each has its own steps, LENGTH for each track, and SWING. The sound of the tracks (their
 engines, knobs and voices) and the TEMPO are the song's: the same whichever pattern plays.
@@ -562,6 +562,12 @@ engines, knobs and voices) and the TEMPO are the song's: the same whichever patt
 - **K4** picks the pattern after the one playing (or the one queued), or before it, and shows the sixteen for a
   moment.
 - **A MIDI program change** 0 to 15 (any channel, USB or TRS) picks pattern 1 to 16.
+- **Copy, paste, clear (0.40)**, as on Elektron's machines, with HOME held: **OCT-** copies the pattern playing (COPY
+  and its number at the grid's top), **OCT+** pastes the copy into the pattern playing, **REC** clears it (every
+  step, lock, LENGTH and SWING as an empty pattern's). To copy one pattern into another: copy it, pick the other, paste.
+  A paste or a clear is heard at once, playing or not (the tracks go on from where they are), and is saved as any
+  edit. The octave, REC and the page stay as they were. The copy is kept in the flash across a restart (PASTE then
+  no longer knows its number); PASTE NOTHING COPIED if there is none. There is no undo.
 
 Stopped, the pattern changes at once. Playing, the one picked is queued (NEXT, blinking) and comes in at the end
 of the pattern playing: when its longest track with steps comes round (a pattern with no steps: every 16 steps).

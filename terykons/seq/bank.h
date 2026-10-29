@@ -2,13 +2,16 @@
  * slots of 8 KiB (two sectors) used in turn. A pattern is saved into an erased slot a page (256 bytes) at a time,
  * each with the interrupts off for well under a millisecond (the sound goes on), its header last: until then the
  * slot holds no pattern, so a save cut short loses nothing. Its older copy is then stale, to be erased (bank_tidy):
- * an erase stops the sound for tens of ms, so the app does it only while nothing sounds, and at power-on. With 16
- * slots more than patterns, 16 saves can be made before an erase is needed. Main loop only. */
+ * an erase stops the sound for tens of ms, so the app does it only while nothing sounds, and at power-on. With 15
+ * slots more than patterns and the copy, 15 saves can be made before an erase is needed. (0.40) The copy (HOME +
+ * OCT-, pasted with HOME + OCT+) is a pattern of its own, BANK_CLIP: older firmware finds no pattern in its slot and
+ * erases it. Main loop only. */
 #pragma once
 #include <stdint.h>
 #include "seq.h"
 
 #define BANK_PATTERNS 16u
+#define BANK_CLIP BANK_PATTERNS          /* (0.40) the copy: one pattern more, after the 16 */
 #define BANK_SLOTS 32u
 #define BANK_SLOT 0x2000u                /* two 4 KiB sectors */
 #define BANK_LO 0x97000u                 /* (plat.h PLAT_DATA_LO) .. 0xD7000; app.h's store objects from 0xD8000 */
@@ -32,7 +35,7 @@ typedef struct {                         /* at a slot's start, written last */
 typedef struct {
     uint8_t ok;                          /* the flash can be read (plat_data) */
     uint8_t state[BANK_SLOTS];           /* BANK_* */
-    int8_t live[BANK_PATTERNS];          /* each pattern's slot; -1: none (an empty pattern) */
+    int8_t live[BANK_PATTERNS + 1u];     /* each pattern's slot (and the copy's, BANK_CLIP); -1: none (an empty one) */
     uint32_t seq;                        /* the newest copy's */
     uint32_t next;                       /* where a save looks for a free slot first: in turn, to spread the wear */
     int8_t w_slot;                       /* a save under way: its slot (-1: none), its pattern, bytes written, CRC */
@@ -42,9 +45,11 @@ typedef struct {
 } bank_t;
 
 void bank_init(bank_t *b);               /* what the flash holds (nothing erased) */
-const seq_pattern_t *bank_pattern(const bank_t *b, uint32_t n);   /* pattern n, in the flash; 0: an empty one */
+const seq_pattern_t *bank_pattern(const bank_t *b, uint32_t n);   /* pattern n (or BANK_CLIP), in the flash; 0: an
+                                                                  * empty one */
 uint32_t bank_count(const bank_t *b, uint32_t state);              /* slots in a state (BANK_HALF counts as STALE) */
-int bank_begin(bank_t *b, uint32_t n);   /* a save of pattern n into a free slot: 0, or -1 (none free) */
+int bank_begin(bank_t *b, uint32_t n);   /* a save of pattern n (or BANK_CLIP) into a free slot: 0, or -1 (none
+                                          * free) */
 /* the save under way: up to pages more of p (a copy made a page at a time: p may change meanwhile); 1 saved, 0 more
  * to do, -1 failed (the slot is left to erase) */
 int bank_step(bank_t *b, const seq_pattern_t *p, uint32_t pages);

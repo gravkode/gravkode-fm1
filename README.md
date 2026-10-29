@@ -15,7 +15,8 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.39.0**: a MIDI page on GLO (GLO again): each track's MIDI channel (1 to 16, or OFF), IN
+Current version: **0.40.0**: patterns copied, pasted and cleared, as on Elektron's machines: HOME held with OCT-
+(copy), OCT+ (paste) or REC (clear). 0.39.0: a MIDI page on GLO (GLO again): each track's MIDI channel (1 to 16, or OFF), IN
 (the selected track from any channel, or each track from its own) and CLOCK (OFF, IN, OUT, IN+OUT). 0.38.0: tap tempo: on the TEMPO page (HOME from HOME's terricons) every key taps it, the last
 four beats averaged. 0.37.0: each synth track has its own envelope (ENV) and LFO (MOD), part of its sound: a user
 preset keeps them, and ATTACK, DECAY, RELEASE, LFO RATE and LFO DEPTH can be locked on a step. 0.36.2: HOME from HOME's
@@ -60,7 +61,7 @@ hold HOME and turn SELECT to jump.
 - **A sequencer of eight tracks:** four synth tracks (S1–S4), each its own engine and sound, voices (the four shared
   out: MONO, POLY or none), and four drum tracks (D1–D4), each a kick, snare or hi-hat of Plaits' (two models each)
   with six knobs (TUNE, DECAY, TONE; the kick's PUNCH, SWEEP, DRIVE), in a voice of its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
-  (polymeters), notes and chords with their velocity and length; sixteen patterns, switched at the pattern's end;
+  (polymeters), notes and chords with their velocity and length; sixteen patterns, switched at the pattern's end, copied and pasted;
   the song's tempo (tap it on the TEMPO page's keys), each pattern's swing; step recording, MIDI clock out and in (it follows one); each track's notes
   on its MIDI channel (1–8); parameter locks on the steps (EDIT: LOCK mode), with or without a note, the knobs'
   moves recorded live.
@@ -158,7 +159,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.39.0.fwsc 0.39.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.40.0.fwsc 0.40.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -173,14 +174,14 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.39.0      # terykons/build/terykons-0.39.0.fwsc
+python3 tools/build.py terykons --release 0.40.0      # terykons/build/terykons-0.40.0.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)
 ```
 
 The tests (`terykons/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
-`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO), `tap.txt` (tap tempo), `midi.txt` (GLO's MIDI page: channels, IN, CLOCK),
+`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO), `tap.txt` (tap tempo), `midi.txt` (GLO's MIDI page: channels, IN, CLOCK), `copy.txt` (patterns copied, pasted, cleared),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [terykons/README.md](terykons/README.md).

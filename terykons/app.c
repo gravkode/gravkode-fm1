@@ -127,6 +127,8 @@ static settings_t set;
 static settings_t set_stored;            /* as the flash has it: SAVE writes the settings only when they differ */
 static uint8_t set_dirty;                /* changed since the last save: SAVE is lit (or the pattern unsaved) */
 static bank_t bank;                      /* the patterns in the flash (seq/bank.h) */
+static int8_t copy_from = -1, clip_from = -1;   /* (0.40) the pattern copied (being, and done); -1: none, or not
+                                                * known (since a restart, the copy kept but not its number) */
 static uint32_t used_mask, used_seq;     /* the bank's patterns with a step on, as of its save used_seq (patterns_used) */
 
 /* Parameter pages: UI state only, independent of DSP. */
@@ -1001,7 +1003,8 @@ void app_init(void)
     bank_init(&bank);                        /* the patterns; their stale copies erased now, before the sound */
     while (bank_tidy(&bank))
         ;
-    if (bank_count(&bank, BANK_LIVE) == 0) { /* none yet: 0.17's pattern and before (OBJ_SEQ, OBJ_DRUMS) is pattern 1 */
+    copy_from = clip_from = -1;              /* (0.40: a copy kept, its number not) */
+    if (bank_count(&bank, BANK_LIVE) == (bank_pattern(&bank, BANK_CLIP) ? 1u : 0u)) {   /* (the copy is no pattern) */ /* none yet: 0.17's pattern and before (OBJ_SEQ, OBJ_DRUMS) is pattern 1 */
         union { seq_record_t r; seq_pattern_v1_t v1; seq_drum_record_t d; } rec;
         const int n = plat_store_load(OBJ_SEQ, &rec, sizeof rec);
         int found = 0;
@@ -1131,6 +1134,8 @@ static struct {
     uint32_t patterns_until;             /* K4 turned: the patterns' grid shown until then */
     uint8_t save_req;                    /* SAVE: the pattern too, then SAVED */
     uint8_t full_said;                   /* (no free slot while playing: said once) */
+    uint8_t copy_req, bank_copy;         /* (0.40) HOME + OCT-: the pattern to copy (into BANK_CLIP); its copy being
+                                          * written */
     uint8_t shown_pattern;               /* the pattern announced, + 1 (0: none yet) */
     uint32_t save_gen;                   /* the edits the save under way holds */
     uint32_t quiet_at, tidy_at, blink_at;   /* the last sound (stale copies erased 3 s after), an erase, a blink */
@@ -2337,6 +2342,70 @@ static void pattern_pick(int32_t n)
         app_say(seq.next != SEQ_NO_PATTERN ? "NEXT PATTERN" : "PATTERN", t);
 }
 
+/* (0.40) HOME held: OCT- copies the pattern playing (into the bank's copy slot, BANK_CLIP: kept across a restart),
+ * OCT+ pastes the copy into it, REC clears it. A paste or a clear is heard at once, and saved as any edit */
+static void pattern_text(int32_t n, char *t)    /* "PATTERN 3" (n < 0: "PATTERN") */
+{
+    char k[8];
+    t[0] = 0;
+    text_cat(t, "PATTERN");
+    if (n >= 0) {
+        int_text(n + 1, k);
+        text_cat(t, " ");
+        text_cat(t, k);
+    }
+}
+
+static void pattern_copy(void)
+{
+    char t[16];
+    ui.copy_req = 1;
+    copy_from = (int8_t)seq.pattern;
+    pattern_text(seq.pattern, t);
+    app_say("COPY", t);
+    ui.redraw = 1;
+}
+
+static void pattern_replaced(void)           /* (the tracks' locks heard so far: none, the new steps bring theirs) */
+{
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        lock_seq[t].mask = 0;
+    seq.edits++;
+    ui.step_held = -1;
+    ui.redraw = 1;
+}
+
+static void pattern_paste(void)
+{
+    char t[16];
+    if (ui.copy_req || ui.bank_copy) {       /* (the copy still on its way into the flash: a moment) */
+        app_say("PASTE", "WAIT");
+        return;
+    }
+    const seq_pattern_t *src = bank_pattern(&bank, BANK_CLIP);
+    if (!src) {
+        app_say("PASTE", "NOTHING COPIED");
+        return;
+    }
+    uint32_t f = plat_lock();
+    seq_replace(&seq, src);
+    pattern_replaced();
+    plat_unlock(f);
+    pattern_text(clip_from, t);
+    app_say("PASTE", t);
+}
+
+static void pattern_clear(void)
+{
+    char t[16];
+    uint32_t f = plat_lock();
+    seq_replace(&seq, 0);
+    pattern_replaced();
+    plat_unlock(f);
+    pattern_text(seq.pattern, t);
+    app_say("CLEAR", t);
+}
+
 static uint32_t patterns_used(void)          /* a bit for each pattern with a step on (the one playing: as it is) */
 {
     if (used_seq != bank.seq) {              /* (the flash's, again after each save) */
@@ -2367,12 +2436,30 @@ static void patterns(void)
     }
     if (bank_busy(&bank)) {
         const int r = bank_step(&bank, &seq.pat, 8u);   /* (each page a moment with interrupts off) */
-        if (r > 0) {
+        if (r > 0 && ui.bank_copy) {         /* (0.40) the copy: ready to paste */
+            ui.bank_copy = 0;
+            clip_from = copy_from;
+            ui.redraw = 1;
+        } else if (r > 0) {
             seq.saved = ui.save_gen;
             ui.redraw = 1;
+        } else if (r < 0 && ui.bank_copy) {
+            ui.bank_copy = 0;
+            app_say("COPY", "FAILED");
         } else if (r < 0) {
             ui.save_req = 0;
             app_say("SAVE", "FAILED");
+        }
+    } else if (ui.copy_req) {                /* (0.40) HOME + OCT-: the pattern as it is, into the copy's slot */
+        if (bank_begin(&bank, BANK_CLIP) == 0) {
+            ui.copy_req = 0;
+            ui.bank_copy = 1;
+            ui.full_said = 0;
+        } else if (!seq.playing) {
+            bank_tidy(&bank);                /* stopped: room made now */
+        } else if (!ui.full_said) {
+            ui.full_said = 1;
+            app_say("COPY", "STOP TO COPY");
         }
     } else if (dirty && (ui.save_req || seq.next != SEQ_NO_PATTERN)) {
         if (bank_begin(&bank, seq.pattern) == 0) {
@@ -3171,6 +3258,17 @@ static void octave_press(int32_t e)
  * and the knobs) */
 static void button_press(uint32_t k)
 {
+    if (ui.home_down && (k == B_OCTDN || k == B_OCTUP || k == B_REC)) {   /* (0.40) HOME held: the pattern's COPY,
+                                                                         * PASTE, CLEAR (no page change after) */
+        ui.home_used = 1;
+        if (k == B_OCTDN)
+            pattern_copy();
+        else if (k == B_OCTUP)
+            pattern_paste();
+        else
+            pattern_clear();
+        return;
+    }
     if (pb.open) {
         if (k == B_OCTUP) {
             pb.all = !pb.all;
@@ -5166,16 +5264,25 @@ static void draw_patterns(void)
 {
     const uint32_t used = patterns_used(), blink = (plat_ms() / 250u) & 1u;
     char t[8];
-    cv_rect(4, 20, 232, 118, C_LINE);
-    cv_rect(5, 21, 230, 116, C_BLACK);
+    cv_rect(4, 20, 232, 123, C_LINE);
+    cv_rect(5, 21, 230, 121, C_BLACK);
     cv_text(12, 24, &FONT_XS, "PATTERN", C_GRAY);
+    if (clip_from >= 0 || ui.copy_req || ui.bank_copy) {   /* (0.40) the copy, and the buttons for it */
+        cv_text(80, 24, &FONT_XS, "COPY", C_GRAY);
+        int_text((ui.copy_req || ui.bank_copy ? copy_from : clip_from) + 1, t);
+        cv_text(110, 24, &FONT_XS, t, C_WHITE);
+    }
+    cv_text(12, 129, &FONT_XS, "OCT- COPY", C_DIM);
+    cv_text(120 - text_w(&FONT_XS, "OCT+ PASTE") / 2, 129, &FONT_XS, "OCT+ PASTE", C_DIM);
+    cv_text(228 - text_w(&FONT_XS, "REC CLEAR"), 129, &FONT_XS, "REC CLEAR", C_DIM);
     if (seq.next != SEQ_NO_PATTERN) {
         cv_text(150, 24, &FONT_XS, "NEXT", C_GRAY);
         int_text(seq.next + 1, t);
         cv_text(184, 24, &FONT_XS, t, C_HI);
     }
     for (uint32_t n = 0; n < BANK_PATTERNS; n++) {
-        const int32_t x = 9 + (int32_t)(n % 4u) * 57, y = 42 + (int32_t)(n / 4u) * 23;
+        const int32_t x = 9 + (int32_t)(n % 4u) * 57, y = 39 + (int32_t)(n / 4u) * 22;   /* (0.40: room for the copy's
+                                                                                    * buttons under them) */
         const int cur = n == seq.pattern, nxt = n == seq.next;
         if (cur)
             cv_rect(x, y, 53, 20, C_HI);
@@ -6233,6 +6340,10 @@ int app_expect(const char *what, int *got)
         *got = ui.shown_ext;
     else if (!strcmp(what, "pattern"))       /* the pattern playing, 0..15; the next (-1: none); unsaved edits */
         *got = seq.pattern;
+    else if (!strcmp(what, "clip"))          /* (0.40) a copy to paste (1), its pattern (clip_from, -1 not known) */
+        *got = bank_pattern(&bank, BANK_CLIP) != 0;
+    else if (!strcmp(what, "clip_from"))
+        *got = clip_from;
     else if (!strcmp(what, "pattern_next"))
         *got = seq.next == SEQ_NO_PATTERN ? -1 : (int)seq.next;
     else if (!strcmp(what, "pattern_dirty"))

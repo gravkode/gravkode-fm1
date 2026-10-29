@@ -328,6 +328,19 @@ void seq_load(seq_t *s, const seq_pattern_t *src)
     steps_reset(s);
 }
 
+/* (0.40) the pattern replaced while it may play (a paste; src 0: a clear): its steps, lengths, swing and locks. The
+ * tracks go on from where they are (a step past a new length wraps, as LENGTH turned); the notes sounding end as
+ * they would */
+void seq_replace(seq_t *s, const seq_pattern_t *src)
+{
+    if (src)
+        memcpy(&s->pat, src, sizeof s->pat);
+    else
+        seq_defaults(&s->pat);
+    if (!seq_locks_valid(&s->pat))
+        s->pat.nlocks = 0;
+}
+
 /* a track's step: its notes start at at_q8 (one already sounding on the track is ended first), and end gate later */
 static void play_step(seq_t *s, uint32_t track, uint32_t step, int32_t at_q8, int32_t gate, seq_event_t *ev,
                       uint32_t *ne, uint32_t max)

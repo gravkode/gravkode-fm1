@@ -1,0 +1,131 @@
+# Copying patterns (0.40), as Elektron's: HOME held and OCT- copies the pattern playing (into a slot of its own in
+# the flash's bank: kept across a restart), HOME held and OCT+ pastes the copy into the pattern playing (heard at once,
+# saved as any edit), HOME held and REC clears it. The octave, REC and HOME's page stay as they were.
+#   terykons/build/host/terykons_host terykons/tests/copy.txt terykons/build/host
+wait 600
+expect clip 0
+expect clip_from -1
+# nothing copied yet
+listen
+press HOME
+wait 30
+tap OCT+
+wait 30
+release HOME
+wait 30
+said PASTE NOTHING COPIED
+expect page 8
+expect octave 0
+# pattern 1: S1's steps 1 and 5
+tap SEQ
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+key 7 down 100 0
+wait 30
+key 7 up
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+expect step0 1
+expect step4 1
+# copied: HOME held, OCT-; the grid shows the copy and the buttons
+press HOME
+wait 400
+tap OCT-
+wait 100
+shot copy-grid.png
+release HOME
+wait 30
+said COPY PATTERN 1
+expect clip 1
+expect clip_from 0
+expect octave 0
+expect page 8
+# pattern 2, empty; the copy pasted into it: S1's steps 1 and 5, pattern 2's own now
+press HOME
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+release HOME
+wait 300
+expect pattern 1
+expect step0 0
+press HOME
+wait 30
+tap OCT+
+wait 30
+release HOME
+wait 30
+said PASTE PATTERN 1
+expect step0 1
+expect step4 1
+expect pattern_dirty 1
+expect patterns_used 3
+# back to pattern 1 (pattern 2 saved on the way), then cleared: HOME held, REC; REC itself stays off
+press HOME
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+release HOME
+wait 300
+expect pattern 0
+expect step0 1
+press HOME
+wait 30
+tap REC
+wait 30
+release HOME
+wait 30
+said CLEAR PATTERN 1
+expect rec 0
+expect step0 0
+expect step4 0
+expect patterns_used 2
+# pasted while playing: heard at once, the song plays on
+tap PLAY
+wait 200
+expect seq_playing 1
+press HOME
+wait 30
+tap OCT+
+wait 30
+release HOME
+wait 300
+expect seq_playing 1
+expect step0 1
+expect seq_hits >0
+tap PLAY
+wait 300
+# the copy kept across a restart (its number not known then)
+tap SAVE
+wait 300
+reboot
+wait 600
+expect clip 1
+expect clip_from -1
+expect pattern 0
+expect step0 1
+press HOME
+wait 30
+key 4 down 100 0
+wait 30
+key 4 up
+release HOME
+wait 300
+expect pattern 2
+expect step0 0
+listen
+press HOME
+wait 30
+tap OCT+
+wait 30
+release HOME
+wait 30
+said PASTE PATTERN
+expect step0 1

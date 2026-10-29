@@ -210,6 +210,7 @@ int seq_has_steps(const seq_pattern_t *p);
 /* a pattern copied in to play (src: 0, an empty one), from its first step (the audio interrupt at a pattern's end;
  * the main loop, under plat_lock, while stopped) */
 void seq_load(seq_t *s, const seq_pattern_t *src);
+void seq_replace(seq_t *s, const seq_pattern_t *src);   /* (0.40) a paste (src) or a clear (0): the tracks go on */
 int seq_valid(const seq_pattern_t *p);   /* a loaded record that can be played (its steps: as 0.18 saved it) */
 int seq_locks_valid(const seq_pattern_t *p);   /* (0.35) its locks: sorted, each where a step can be */
 /* (0.35) the main loop, under plat_lock: a step's lock of param, its value (-1: none); set (value -1: removed; -1

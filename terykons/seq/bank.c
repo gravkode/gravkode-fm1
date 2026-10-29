@@ -6,7 +6,7 @@
 _Static_assert(BANK_LO >= PLAT_DATA_LO && BANK_HI <= 0xD8000u, "the bank in the data area, below the store objects");
 _Static_assert(BANK_DATA >= sizeof(bank_head_t) && BANK_DATA + sizeof(seq_pattern_t) <= BANK_SLOT,
                "a slot holds a header and a pattern");
-_Static_assert(BANK_PATTERNS < BANK_SLOTS && BANK_SLOTS <= 127u, "slots to spare; a slot's number in an int8_t");
+_Static_assert(BANK_PATTERNS + 1u < BANK_SLOTS && BANK_SLOTS <= 127u, "slots to spare; a slot's number in an int8_t");
 
 static uint8_t page[BANK_PAGE] __attribute__((aligned(4)));   /* a page on its way to the flash */
 
@@ -31,7 +31,7 @@ static const bank_head_t *head(uint32_t s) { return (const bank_head_t *)plat_da
 
 static int head_ok(const bank_head_t *h)
 {
-    return h->magic == BANK_MAGIC && h->pattern < BANK_PATTERNS &&
+    return h->magic == BANK_MAGIC && h->pattern <= BANK_CLIP &&
            (h->size == sizeof(seq_pattern_t) || h->size == SEQ_PATTERN_V018) &&   /* (0.35: or as saved before its
                                                                                   * locks: seq_load finds none) */
            h->hcrc == bank_crc32(h, offsetof(bank_head_t, hcrc), 0);
@@ -51,7 +51,7 @@ void bank_init(bank_t *b)
     int32_t newest = -1;
     memset(b, 0, sizeof *b);
     b->w_slot = -1;
-    for (uint32_t n = 0; n < BANK_PATTERNS; n++)
+    for (uint32_t n = 0; n <= BANK_CLIP; n++)
         b->live[n] = -1;
     b->ok = plat_data(BANK_LO) != 0 && plat_data(BANK_HI - 1u) != 0;
     if (!b->ok)
@@ -83,7 +83,7 @@ void bank_init(bank_t *b)
 
 const seq_pattern_t *bank_pattern(const bank_t *b, uint32_t n)
 {
-    if (!b->ok || n >= BANK_PATTERNS || b->live[n] < 0)
+    if (!b->ok || n > BANK_CLIP || b->live[n] < 0)
         return 0;
     return (const seq_pattern_t *)(plat_data(slot_off((uint32_t)b->live[n])) + BANK_DATA);
 }
@@ -98,7 +98,7 @@ uint32_t bank_count(const bank_t *b, uint32_t state)
 
 int bank_begin(bank_t *b, uint32_t n)
 {
-    if (!b->ok || bank_busy(b) || n >= BANK_PATTERNS)
+    if (!b->ok || bank_busy(b) || n > BANK_CLIP)
         return -1;
     for (uint32_t i = 0; i < BANK_SLOTS; i++) {
         const uint32_t s = (b->next + i) % BANK_SLOTS;
