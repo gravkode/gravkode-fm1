@@ -15,7 +15,8 @@
 
 ---
 
-Поточна версія: **0.36.0**: GRAV CODE тепер називається Terykons: нова назва на екрані, по USB і в пакеті
+Поточна версія: **0.36.1**: логотип при ввімкненні тримається близько двох секунд, під ним версія прошивки. 0.36:
+GRAV CODE тепер називається Terykons: нова назва на екрані, по USB і в пакеті
 (`terykons-0.36.0.fwsc`), а при ввімкненні — логотип, п'ять териконів перед бірюзовим сонцем; налаштування, пресети й
 патерни лишаються такими, як були. 0.35: параметр-локи: EDIT вмикає режим LOCK, білі клавіші — кроки вибраної доріжки на будь-якій
 сторінці; затисни крок і покрути ручку (OSC, у барабанів DRUM і SHAPE, VOL і SEND мікшера) — значення закріпиться на
@@ -154,7 +155,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.36.0.fwsc 0.36.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.36.1.fwsc 0.36.1 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -169,7 +170,7 @@ Terykons збирається інструментом fm1-base `tools/build.py`
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.36.0      # terykons/build/terykons-0.36.0.fwsc
+python3 tools/build.py terykons --release 0.36.1      # terykons/build/terykons-0.36.1.fwsc
 python3 tools/build.py terykons --host                # симулятор для тестів:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)

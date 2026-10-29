@@ -64,13 +64,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py terykons --release 0.36.0    # terykons/build/terykons-0.36.0.fwsc, identity FM-1_73003600
+    python3 tools/build.py terykons --release 0.36.1    # terykons/build/terykons-0.36.1.fwsc, identity FM-1_73003601
     python3 tools/build.py terykons --web
-    python3 tools/make_site.py terykons terykons/build/terykons-0.36.0.fwsc 0.36.0 terykons/build/site
+    python3 tools/make_site.py terykons terykons/build/terykons-0.36.1.fwsc 0.36.1 terykons/build/site
 
 ## The pictures
 
-    python3 tools/build.py terykons --host --release 0.36.0   # (so GLO shows the version and identity)
+    python3 tools/build.py terykons --host --release 0.36.1   # (so GLO shows the version and identity)
     terykons/build/host/terykons_host terykons/tests/screens.txt terykons/docs/img
     python3 terykons/docs/img/compose.py
 

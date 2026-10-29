@@ -15,7 +15,8 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.36.0**: GRAV CODE is Terykons now: its name on the screen, over USB and in the package
+Current version: **0.36.1**: the logo at power-on stays about two seconds, the version under it. 0.36: GRAV CODE is
+Terykons now: its name on the screen, over USB and in the package
 (`terykons-0.36.0.fwsc`), and a logo at power-on, five terricons before a teal sun; settings, presets and patterns
 carry on as they were. 0.35: parameter locks: EDIT turns on LOCK mode, the white keys the selected track's steps
 on every page; hold a step and turn a knob (OSC's, a drum's DRUM and SHAPE, the mixer's VOL and SEND) to lock it on
@@ -149,7 +150,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.36.0.fwsc 0.36.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.36.1.fwsc 0.36.1 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -164,7 +165,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.36.0      # terykons/build/terykons-0.36.0.fwsc
+python3 tools/build.py terykons --release 0.36.1      # terykons/build/terykons-0.36.1.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)

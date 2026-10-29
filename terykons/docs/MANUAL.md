@@ -51,7 +51,8 @@ your own risk.
 
 ![Terykons' splash at power-on: five terricons in ink before a teal sun, on paper; TERYKONS and SYNTHESIZER FOR THE M-VAVE FM-1 under them](img/screen-logo.png "The splash")
 
-At power-on, the logo (0.36): five terricons before a teal sun, the name under them, while the FM-1 starts.
+At power-on, the logo (0.36): five terricons before a teal sun, the name and the version under them (0.36.1), for
+about two seconds while the FM-1 starts (a key, a button or a knob turned ends it at once; the FM-1 plays meanwhile).
 
 ![The OSC page at rest: the engine (WAVESHAPE) and the tempo (120 BPM) at the top, the battery at the right; S1 and WAVESHAPE; its icon, alive, and its line; FOLD 65, ASYMMETRY 50, CURVE 75 as knobs; the page's state, OCT +0, PRESET INIT, VOL 50%, CPU 0%](img/screen-osc.png "The OSC page")
 
@@ -247,7 +248,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003600, version 0.36.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003601, version 0.36.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 

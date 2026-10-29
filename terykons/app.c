@@ -935,6 +935,7 @@ static struct {
     uint32_t home_at;                    /* when HOME went down */
     uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
     uint32_t key_midi;                   /* (0.34) the keys whose notes went out over MIDI (not to an arp: its notes go) */
+    uint8_t logo;                        /* (0.36.1) the logo at power-on still shown (until LOGO_MS, or a touch) */
     uint32_t arp_sig, arp_at;            /* (0.34) the ARP page: what its ladder showed, when it last changed; */
     uint8_t arp_band;                    /* its band's (held, HOLD) */
     uint8_t lock_mode;                   /* (0.35) EDIT: LOCK mode: the white keys the steps on every page, the knobs
@@ -4176,8 +4177,14 @@ static void draw_terricons(int32_t dy, uint32_t now)
     cv_rect(0, base, 240, 1, C_LINE);
 }
 
+#ifdef PLAT_HOST
+#define LOGO_MS 0u                           /* (the simulator: the page at once, the tests' times as they were) */
+#else
+#define LOGO_MS 2200u                        /* (0.36.1) the logo held until then, ms since power-on */
+#endif
+
 /* (0.36) the splash at power-on (plat.h APP_SPLASH): the logo, five terricons in ink before a teal sun on paper,
- * Terykons under them. It is drawn before the settings and the theme are read: its own colours. Two bands of the
+ * TERYKONS under them, the version under those (0.36.1), kept until LOGO_MS (app_frame). It is drawn before the settings and the theme are read: its own colours. Two bands of the
  * canvas (144 rows at most each) */
 static void splash_heap(int16_t *px, int16_t *py, int32_t x, int32_t base, float h, int32_t half)
 {                                            /* a terricon's outline, still: draw_ridge's shape */
@@ -4223,6 +4230,11 @@ static void splash_band(int32_t dy)          /* (dy: the band's top row less the
     cv_text(120 - text_w(&FONT_L, "TERYKONS") / 2, 146 + dy, &FONT_L, "TERYKONS", ink);
     cv_text(120 - text_w(&FONT_XS, "SYNTHESIZER FOR THE M-VAVE FM-1") / 2, 184 + dy, &FONT_XS,
             "SYNTHESIZER FOR THE M-VAVE FM-1", RGB(150, 136, 118));
+    {                                        /* (0.36.1) the version */
+        const int32_t x = 120 - (text_w(&FONT_XS, "VERSION ") + text_w(&FONT_XS, APP_VERSION)) / 2;
+        cv_text(x, 206 + dy, &FONT_XS, "VERSION", RGB(186, 172, 152));
+        cv_text(x + text_w(&FONT_XS, "VERSION "), 206 + dy, &FONT_XS, APP_VERSION, ink);
+    }
 }
 
 void app_splash(void)
@@ -5510,7 +5522,9 @@ void app_ui_init(void)
     touch_on(1);                             /* velocity and pressure: the keys' readings on */
     palette_set(theme_palette());            /* (0.25.1) GLO's SCREEN: the theme chosen (the start set the app's) */
     pb.open = 0;                             /* (0.27) no presets' browser at the start */
-    lcd_fill(0, 0, 240, 240, C_BLACK);
+    ui.logo = plat_ms() < LOGO_MS;           /* (0.36.1) the logo kept a while; else the page at once */
+    if (!ui.logo)
+        lcd_fill(0, 0, 240, 240, C_BLACK);
     ui.redraw = 1;
     if (preset_import_failed) app_say("PRESET IMPORT FAILED", "REBOOT TO RETRY");
 }
@@ -5688,6 +5702,17 @@ void app_frame(void)
         arp_frame(now);
     if (ui.splash_until && now >= ui.splash_until) {
         ui.splash_until = 0;
+        ui.redraw = 1;
+    }
+    if (ui.logo) {                           /* (0.36.1) the logo at power-on: the FM-1 plays meanwhile, nothing drawn
+                                              * over it until LOGO_MS since it started, or a key, button or knob */
+        int touched = ui.keys || ui.btn;
+        for (uint32_t i = 0; i < NE; i++)
+            touched |= ui.turned_at[i] != 0u;
+        if (now < LOGO_MS && !touched)
+            return;
+        ui.logo = 0;
+        lcd_fill(0, 0, 240, 240, C_BLACK);
         ui.redraw = 1;
     }
     if (ui.redraw) {
