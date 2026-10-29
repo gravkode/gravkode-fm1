@@ -15,8 +15,9 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.36.2**: HOME from HOME's terricons shows TEMPO, SWING and LENGTH as knobs on a page of their
-own (TEMPO), HOME again the sound's pages. 0.36.1: the logo at power-on stays about two seconds, the version under it. 0.36: GRAV CODE is
+Current version: **0.37.0**: each synth track has its own envelope (ENV) and LFO (MOD), part of its sound: a user
+preset keeps them, and ATTACK, DECAY, RELEASE, LFO RATE and LFO DEPTH can be locked on a step. 0.36.2: HOME from HOME's
+terricons shows TEMPO, SWING and LENGTH as knobs on a page of their own (TEMPO), HOME again the sound's pages. 0.36.1: the logo at power-on stays about two seconds, the version under it. 0.36: GRAV CODE is
 Terykons now: its name on the screen, over USB and in the package
 (`terykons-0.36.0.fwsc`), and a logo at power-on, five terricons before a teal sun; settings, presets and patterns
 carry on as they were. 0.35: parameter locks: EDIT turns on LOCK mode, the white keys the selected track's steps
@@ -65,7 +66,8 @@ hold HOME and turn SELECT to jump.
   MIDI in and the sequencer's chords through it, its notes out over MIDI; saved with the sound.
 - **Polyphony:** up to four voices (POLY), or one with legato (MONO).
 - **Velocity** from the FM-1's keys (or a fixed one), pressure sent as polyphonic aftertouch.
-- **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
+- **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch on each synth track, saved with
+  its sound, lockable on the steps.
 - **Settings that stay** across a power cycle and a firmware update.
 - **MIDI** in over USB and TRS, out over USB; the FM-1 is also a **USB sound card**.
 - **Two-core voice rendering** and a **DEBUG page** showing average/peak load, worker timing, audio xruns and voice cuts.
@@ -82,8 +84,8 @@ hold HOME and turn SELECT to jump.
 | HOME | HOME (the terricons) | TEMPO (30 to 300 BPM) | SWING (50 to 75 %) | LENGTH (1 to 64 steps) |
 | HOME again | TEMPO (its knobs shown) | TEMPO | SWING | LENGTH |
 | HOME again | OSC | TIMBRE | MORPH | HARMONICS |
-| LFO | MOD | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
-| ENV | ENV | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
+| LFO | MOD (the synth track's) | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
+| ENV | ENV (the synth track's) | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
 | GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
 | GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: HOME's sky (OFF, DAY, NIGHT) | — |
 | FX | HALL | AMOUNT (into the reverb) | TIME (the tail) | TONE (dark to bright) |
@@ -152,7 +154,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.36.2.fwsc 0.36.2 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.37.0.fwsc 0.37.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -167,14 +169,14 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.36.2      # terykons/build/terykons-0.36.2.fwsc
+python3 tools/build.py terykons --release 0.37.0      # terykons/build/terykons-0.37.0.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)
 ```
 
 The tests (`terykons/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
-`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks),
+`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [terykons/README.md](terykons/README.md).

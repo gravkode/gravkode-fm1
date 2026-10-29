@@ -17,7 +17,7 @@ expect osc1 35
 expect osc2 35
 said PRESET SOFT FOLD
 shot preset-factory.png
-# A knob changes the sound: its preset kept, marked * (0.27; before, a custom sound); global ENV leaves it alone.
+# A knob changes the sound: its preset kept, marked * (0.27; before, a custom sound); ENV is the sound's too (0.37).
 turn K1 7
 wait 30
 expect preset 1
@@ -105,11 +105,13 @@ reboot
 wait 600
 expect wave 1
 expect preset_used0 1
-expect env0 20
+# (0.37: the factory sound browsed to brought its envelope as it comes; the user's brings its own back)
+expect env0 10
 turn ALGO -1
 turn PRESET -1
 wait 30
 expect preset 4
+expect env0 20
 expect osc0 27
 # Slot 64 on the fourth page, no octave change; overwriting a slot is explicit and stays within this bank.
 press SAVE
@@ -177,7 +179,8 @@ expect osc1 29
 expect shape0 38
 expect shape1 49
 expect shape2 5
-expect env0 20
+# (a drum track: no envelope of its own to read, 0.37)
+expect env0 0
 expect trk_engine0 0
 tap SAVE
 wait 300

@@ -22,9 +22,11 @@ static const preset_t *sound(uint32_t r) { return (const preset_t *)(plat_data(o
 static int committed(uint32_t r)
 {
     const log_head_t *h = head(r);
-    return h && h->magic == LOG_MAGIC && h->slot < PRESET_USERS && h->size == sizeof(preset_t) &&
+    return h && h->magic == LOG_MAGIC && h->slot < PRESET_USERS &&
+           (h->size == sizeof(preset_t) || h->size == PRESET_SIZE_036) &&   /* (0.37: or saved before, its LFO and
+                                                                             * envelope none: the record's rest erased) */
            h->hcrc == bank_crc32(h, offsetof(log_head_t, hcrc), 0) &&
-           h->crc == bank_crc32(sound(r), sizeof(preset_t), 0) && preset_valid(sound(r));
+           h->crc == bank_crc32(sound(r), h->size, 0) && preset_valid(sound(r));
 }
 static int erased(uint32_t r)
 {
@@ -145,12 +147,14 @@ int preset_store_import_021(preset_bank_t *b, const void *data, uint32_t size)
     /* Validate every occupied legacy slot before writing anything. */
     for (uint32_t s = 0; s < 64; s++) if (old->used[s / 32] >> (s % 32) & 1u) {
         preset_t p;
+        memset(&p, 0, sizeof p);
         memcpy(&p, &old->slot[s], sizeof(old_sound_t));
         grav_controls_init(&p.controls);
         if (!preset_valid(&p)) return 0;
     }
     for (uint32_t s = 0; s < 64; s++) if ((old->used[s / 32] >> (s % 32) & 1u) && !preset_used(b, s)) {
         preset_t p;
+        memset(&p, 0, sizeof p);
         memcpy(&p, &old->slot[s], sizeof(old_sound_t));
         grav_controls_init(&p.controls);
         if (!preset_put(b, s, &p) || preset_store_flush(b) < 0) return -1;

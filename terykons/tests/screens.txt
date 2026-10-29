@@ -329,7 +329,8 @@ shot screen-patterns.png
 release HOME
 tap PLAY
 wait 30
-# a drum track's two pages (HOME on D1, the kick): DRUM with TUNE +1.5, then SHAPE with DRIVE 20
+# a drum track's two pages (HOME on D1, the kick; the terricons, TEMPO, then DRUM, 0.36.2): DRUM with TUNE +1.5,
+# then SHAPE with DRIVE 20
 turn SELECT 4
 wait 30
 tap SEQ
@@ -338,6 +339,9 @@ tap HOME
 wait 30
 tap HOME
 wait 30
+tap HOME
+wait 30
+expect page 0
 turn K1 3
 wait 1600
 shot screen-drum.png

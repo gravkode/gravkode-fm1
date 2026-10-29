@@ -9,14 +9,23 @@ enum { PRESET_CAT_SYNTH, PRESET_CAT_BASS, PRESET_CAT_LEAD, PRESET_CAT_PAD, PRESE
 #define PRESET_USERS 64u
 #define PRESET_CUSTOM (-1)
 
-/* A sound, independent of track/voice allocation, ENV, LFO, FX and patterns. Drum and synth versions of an
+/* A sound, independent of track/voice allocation, FX and patterns; since 0.37 with its LFO and envelope (a synth
+ * track's MOD and ENV pages: mod_set PRESET_MOD; a sound saved before has none, and leaves the track's as they are). Drum and synth versions of an
  * engine have different controls: keep their presets separate. Names are at most ten ASCII characters. */
 typedef struct {
     uint8_t engine, osc[3], tune, shape[3];
     char name[11];
     uint8_t drum;
     grav_controls_t controls;
+    uint8_t mod_set;                     /* (0.37) PRESET_MOD: lfo[] and env[] are its (a sound saved before: 0xFF) */
+    uint8_t lfo[3];                      /* LFO RATE, LFO DEPTH, LFO DEST (0..100, as MOD's knobs) */
+    uint8_t env[3];                      /* ATTACK, DECAY, RELEASE (0..100) */
+    uint8_t mod_rsv;
 } preset_t;
+#define PRESET_MOD 0xA5u
+#define PRESET_SIZE_036 184u             /* a sound as 0.22..0.36 saved it: up to mod_set (no LFO, no envelope) */
+#define PRESET_LFO_DEFAULT {50, 0, 0}
+#define PRESET_ENV_DEFAULT {10, 50, 30}
 
 #define PRESET_LOG_RECORDS 120u
 #define PRESET_PENDING 8u

@@ -194,6 +194,14 @@ void synth_envelopes(synth_t *s, float attack, float decay, float sustain, float
         envelope_set(&s->voice[i].env, attack, decay, sustain, release, sample_rate);
 }
 
+void synth_track_envelopes(synth_t *s, uint32_t track, float attack, float decay, float sustain, float release,
+                           float sample_rate)
+{
+    for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++)
+        if (s->voice_track[i] == track)
+            envelope_set(&s->voice[i].env, attack, decay, sustain, release, sample_rate);
+}
+
 void synth_shed(synth_t *s)
 {
     synth_voice_t *oldest = 0;

@@ -47,6 +47,8 @@ enum { SEQ_LK_OSC0, SEQ_LK_OSC1, SEQ_LK_OSC2,   /* OSC's (a drum's DRUM page: TO
        SEQ_LK_TUNE,                              /* a drum's TUNE */
        SEQ_LK_SHAPE0, SEQ_LK_SHAPE1, SEQ_LK_SHAPE2,   /* a drum's SHAPE */
        SEQ_LK_VOL, SEQ_LK_SEND,                  /* the mixer's */
+       SEQ_LK_ATTACK, SEQ_LK_DECAY, SEQ_LK_RELEASE,   /* (0.37) a synth track's ENV */
+       SEQ_LK_LFO_RATE, SEQ_LK_LFO_DEPTH,        /* and its LFO */
        SEQ_LK_PARAMS };
 #define SEQ_LOCK_KEY(track, step, param) ((uint16_t)((uint32_t)(track) << 10 | (uint32_t)(step) << 4 | (uint32_t)(param)))
 typedef struct {

@@ -59,6 +59,9 @@ void synth_note_on(synth_t *s, int32_t note, uint32_t velocity);
 void synth_note_off(synth_t *s, int32_t note);
 void synth_panic(synth_t *s);
 void synth_envelopes(synth_t *s, float attack, float decay, float sustain, float release, float sample_rate);
+/* (0.37) a track's voices' envelope (each synth track its own) */
+void synth_track_envelopes(synth_t *s, uint32_t track, float attack, float decay, float sustain, float release,
+                           float sample_rate);
 void synth_shed(synth_t *s);             /* the render ran too long: the oldest voice sounding fades out (a synth
                                           * track's first, a drum's last) */
 uint32_t synth_voices_held(const synth_t *s);   /* voices whose note is held (the tests) */

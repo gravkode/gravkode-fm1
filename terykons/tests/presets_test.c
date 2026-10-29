@@ -1,9 +1,11 @@
 #include <assert.h>
 #include <limits.h>
 #include <stdio.h>
+#include <stddef.h>
 #include <string.h>
 #include "presets/presets.h"
 #include "presets/store.h"
+#include "seq/bank.h"
 #include "dsp/grav_plaits.h"
 
 static uint8_t flash[PRESET_LOG_HI - PRESET_LOG_LO], saved_flash[sizeof flash];
@@ -165,6 +167,33 @@ int main(void) {
     q = p; memset(q.name, 'A', 11); assert(!preset_valid(&q));
     q = p; q.name[0] = 1; assert(!preset_valid(&q));
     assert(!preset_get(&b, 0, 0, INT_MIN, &q));
-    puts("PASS: 120 factory sounds, 64 expanded slots, queue bounds, record cuts, compaction, wear, legacy import");
+    /* (0.37) a sound saved before (its 184 bytes, the record's rest erased: no LFO, no envelope) is read and valid,
+     * its LFO and envelope none; one saved now brings them back; out of range, refused */
+    memset(flash, 255, sizeof flash);
+    {
+        typedef struct { uint32_t magic; uint16_t slot, size; uint32_t seq, crc, hcrc; } head_t;
+        preset_t s;
+        uint8_t rec[256];
+        assert(preset_get(&b, 0, 0, 1, &s) && s.mod_set == PRESET_MOD);
+        head_t h = {0x50525332u, 5, PRESET_SIZE_036, 1, bank_crc32(&s, PRESET_SIZE_036, 0), 0};
+        h.hcrc = bank_crc32(&h, offsetof(head_t, hcrc), 0);
+        memset(rec, 255, sizeof rec);
+        memcpy(rec, &h, sizeof h);
+        memcpy(rec + sizeof h, &s, PRESET_SIZE_036);
+        assert(plat_data_write(PRESET_LOG_LO, rec, sizeof h + PRESET_SIZE_036) == 0);
+        preset_store_init(&b);
+        const preset_t *before = preset_user(&b, 5);
+        assert(before && before->mod_set != PRESET_MOD && !memcmp(before->osc, s.osc, 3) && presets_valid(&b));
+        p = s;
+        p.env[0] = 77;
+        p.lfo[1] = 33;
+        save(&b, 6, &p);
+        preset_store_init(&b);
+        assert(preset_user(&b, 6)->mod_set == PRESET_MOD && preset_user(&b, 6)->env[0] == 77 &&
+               preset_user(&b, 6)->lfo[1] == 33 && preset_user(&b, 5)->mod_set != PRESET_MOD);
+        q = p; q.env[2] = 101; assert(!preset_valid(&q));
+        q = p; q.drum = 1; assert(!preset_valid(&q));
+    }
+    puts("PASS: 120 factory sounds, 64 expanded slots, queue bounds, record cuts, compaction, wear, legacy import, LFO and envelope");
     return 0;
 }

@@ -15,8 +15,9 @@
 
 ---
 
-Поточна версія: **0.36.2**: HOME на сторінці териконів відкриває окрему сторінку TEMPO з ручками TEMPO, SWING і LENGTH,
-ще раз HOME — сторінки звуку. 0.36.1: логотип при ввімкненні тримається близько двох секунд, під ним версія прошивки. 0.36:
+Поточна версія: **0.37.0**: у кожної синтової доріжки своя обвідна (ENV) і свій LFO (MOD), вони частина її звуку:
+пресет користувача їх зберігає, а ATTACK, DECAY, RELEASE, LFO RATE і LFO DEPTH можна залочити на кроці. 0.36.2: HOME на
+сторінці териконів відкриває окрему сторінку TEMPO з ручками TEMPO, SWING і LENGTH, ще раз HOME — сторінки звуку. 0.36.1: логотип при ввімкненні тримається близько двох секунд, під ним версія прошивки. 0.36:
 GRAV CODE тепер називається Terykons: нова назва на екрані, по USB і в пакеті
 (`terykons-0.36.0.fwsc`), а при ввімкненні — логотип, п'ять териконів перед бірюзовим сонцем; налаштування, пресети й
 патерни лишаються такими, як були. 0.35: параметр-локи: EDIT вмикає режим LOCK, білі клавіші — кроки вибраної доріжки на будь-якій
@@ -65,7 +66,8 @@ SELECT перемикає їх швидко.
   через нього грають клавіші, MIDI-вхід і акорди секвенсора, його ноти йдуть по MIDI; зберігається разом зі звуком.
 - **Поліфонія:** до чотирьох голосів (POLY) або один із легато (MONO).
 - **Velocity** з клавіш FM-1 (або фіксована), тиск клавіш іде по MIDI як поліфонічний післядотик.
-- **Обвідна** (атака, спад, затухання) і **LFO** на TIMBRE, MORPH або висоту тону.
+- **Обвідна** (атака, спад, затухання) і **LFO** на TIMBRE, MORPH або висоту тону — свої в кожної синтової доріжки,
+  зберігаються з її звуком, локаються на кроках.
 - **Налаштування зберігаються** після вимкнення й оновлення прошивки.
 - **MIDI:** вхід по USB і TRS, вихід по USB; FM-1 працює і як **USB-звукова карта**.
 - **Розрахунок голосів на двох ядрах** і **сторінка DEBUG**: середнє й пікове навантаження, час обробки, пропуски
@@ -83,8 +85,8 @@ SELECT перемикає їх швидко.
 | HOME | HOME (терикони) | TEMPO (30–300 BPM) | SWING (50–75 %) | LENGTH (1–64 кроки) |
 | HOME ще раз | TEMPO (ці ручки на екрані) | TEMPO | SWING | LENGTH |
 | HOME ще раз | OSC | TIMBRE | MORPH | HARMONICS |
-| LFO | MOD | LFO RATE (0,05–20 Гц) | LFO DEPTH (глибина) | LFO DEST (TIMBRE, MORPH, PITCH) |
-| ENV | ENV | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
+| LFO | MOD (синтової доріжки) | LFO RATE (0,05–20 Гц) | LFO DEPTH (глибина) | LFO DEST (TIMBRE, MORPH, PITCH) |
+| ENV | ENV (синтової доріжки) | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
 | GLO | GLO | VOICES доріжки (OFF, MONO, 2, 3, 4; усього чотири) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
 | GLO ще раз | SCREEN | THEME: кольори екрана (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: небо HOME (OFF, DAY, NIGHT) | — |
 | FX | HALL | AMOUNT (скільки йде в реверб) | TIME (довжина хвоста) | TONE (від темного до яскравого) |
@@ -157,7 +159,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.36.2.fwsc 0.36.2 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.37.0.fwsc 0.37.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -172,14 +174,14 @@ Terykons збирається інструментом fm1-base `tools/build.py`
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.36.2      # terykons/build/terykons-0.36.2.fwsc
+python3 tools/build.py terykons --release 0.37.0      # terykons/build/terykons-0.37.0.fwsc
 python3 tools/build.py terykons --host                # симулятор для тестів:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)
 ```
 
 Тести (`terykons/tests/`): `basic.txt` (клавіші, октава, збереження, MIDI), `engines.txt` (усі рушії звучать),
-`voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор), `locks.txt` (параметр-локи),
+`voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор), `locks.txt` (параметр-локи), `envlfo.txt` (ENV і LFO кожної синтової доріжки),
 `seq.txt` (секвенсор), `rec.txt` (живий запис, метроном), `theme.txt` (кольори екрана й небо), `mixer.txt`
 (мікшер), `browser.txt` (терикони HOME, браузер пресетів), `playback.txt` (усі вісім доріжок грають, розподіл
 голосів VOICES), `tracks.txt` (синтові доріжки), `drums.txt` (барабанні доріжки), `patterns.txt` (патерни),

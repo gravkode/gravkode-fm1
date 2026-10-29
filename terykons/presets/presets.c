@@ -2,7 +2,8 @@
 #include "../dsp/grav_plaits.h"
 #include <string.h>
 
-_Static_assert(sizeof(preset_t) == 184, "expanded preset record layout");
+_Static_assert(sizeof(preset_t) == 192 && __builtin_offsetof(preset_t, mod_set) == PRESET_SIZE_036,
+               "expanded preset record layout (0.37: its LFO and envelope after 0.22's)");
 
 typedef struct { char name[PRESET_TITLE]; uint8_t osc[3]; } factory_t;   /* (0.27: names up to 16, the browser's) */
 #define F(n,a,b,c) {n,{a,b,c}}
@@ -50,6 +51,9 @@ int preset_valid(const preset_t *p)
         return 0;
     for (uint32_t i = 0; i < 3; i++)
         if (p->osc[i] > 100 || p->shape[i] > 100) return 0;
+    if (p->mod_set == PRESET_MOD)            /* (0.37) its LFO and envelope */
+        for (uint32_t i = 0; i < 3; i++)
+            if (p->drum || p->lfo[i] > 100 || p->env[i] > 100) return 0;
     for (uint32_t i = 0; i < sizeof p->name; i++) {
         if (!p->name[i]) return i != 0;
         if ((uint8_t)p->name[i] < 32 || (uint8_t)p->name[i] > 126) return 0;
@@ -95,6 +99,12 @@ int preset_get(const preset_bank_t *b, uint32_t e, int drum, int id, preset_t *p
         memcpy(p->osc, factory[e][id].osc, 3);
         memcpy(p->name, factory[e][id].name, sizeof p->name - 1u);   /* (a long one cut: preset_title has it whole) */
         p->name[sizeof p->name - 1u] = 0;
+        if (!drum) {                         /* (0.37) a factory sound: the LFO and the envelope as they come */
+            static const uint8_t lfo[3] = PRESET_LFO_DEFAULT, env[3] = PRESET_ENV_DEFAULT;
+            p->mod_set = PRESET_MOD;
+            memcpy(p->lfo, lfo, 3);
+            memcpy(p->env, env, 3);
+        }
         if (drum) {
             /* Dedicated drums expose these controls independently (synth-track drums retain Plaits' fold). */
             static const uint8_t shape[3][4][3] = {
@@ -155,7 +165,9 @@ int preset_match(const preset_bank_t *b, const preset_t *p)
         const int id = k < (int)PRESET_USERS ? k + (int)PRESET_FACTORY : k - (int)PRESET_USERS;
         if (preset_get(b, p->engine, p->drum, id, &q) && !memcmp(p->osc, q.osc, 3) &&
             !memcmp(&p->controls, &q.controls, sizeof p->controls) &&
-            (!p->drum || (p->tune == q.tune && !memcmp(p->shape, q.shape, 3)))) return id;
+            (!p->drum || (p->tune == q.tune && !memcmp(p->shape, q.shape, 3))) &&
+            (p->mod_set != PRESET_MOD || q.mod_set != PRESET_MOD ||   /* (0.37: one saved before: any LFO, envelope) */
+             (!memcmp(p->lfo, q.lfo, 3) && !memcmp(p->env, q.env, 3)))) return id;
     }
     return PRESET_CUSTOM;
 }

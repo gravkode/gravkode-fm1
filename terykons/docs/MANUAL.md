@@ -96,8 +96,8 @@ From the top:
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
 | HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
-| LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
-| ENV | The ENV page: ATTACK, DECAY, RELEASE |
+| LFO | The MOD page: the selected synth track's LFO RATE, LFO DEPTH, LFO DEST |
+| ENV | The ENV page: the selected synth track's ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
 | ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
@@ -183,7 +183,8 @@ the second):
 
 ![The MOD page: LFO RATE 50, LFO DEPTH 40, LFO DEST TIMBRE](img/screen-mod.png "The MOD page, the LFO's depth up")
 
-One sine LFO for all the voices, free-running (a note doesn't restart it):
+Each synth track's own LFO (0.37; before, one for all the voices): a sine, free-running (a note doesn't restart it).
+The page shows the selected track's:
 
 | Knob | Parameter | Range |
 | --- | --- | --- |
@@ -194,6 +195,11 @@ One sine LFO for all the voices, free-running (a note doesn't restart it):
 At full depth it sweeps TIMBRE or MORPH by half their range either side of the knob, or the pitch by 2 semitones
 either side. It starts at RATE 50, DEPTH 0 (off).
 
+**Part of the track's sound.** SAVE keeps each track's, a user preset holds it, and a factory preset brings it as it
+starts (RATE 50, DEPTH 0); a preset saved before 0.37 leaves the track's as it was, and settings from before 0.37 give
+each synth track the one LFO they had. LFO RATE and LFO DEPTH can be locked on a step (section 5), DEST not. A drum
+track has none: its MOD page reads THE LFO IS S1-S4'S, and a knob turned there LFO/ENV S1-S4 ONLY.
+
 DEST selects what the LFO changes; DEPTH sets how much it changes. Old saved numeric destinations keep
 their meaning (0–33 TIMBRE, 34–67 MORPH, 68–100 PITCH). On 6-OP FM, MORPH changes the DX patch's
 envelope timing, which may be subtle or inaudible once a patch has settled or decayed. TIMBRE and PITCH
@@ -203,7 +209,8 @@ are the useful destinations for continuous brightness or pitch modulation.
 
 ![The ENV page: ATTACK 10, DECAY 50, RELEASE 30](img/screen-env.png "The ENV page")
 
-Each voice's envelope, which shapes its level:
+Each synth track's envelope (0.37; before, one for all), which shapes the level of its voices. The page shows the
+selected track's:
 
 | Knob | Parameter | Range |
 | --- | --- | --- |
@@ -212,6 +219,10 @@ Each voice's envelope, which shapes its level:
 | K3 | RELEASE | 0 to 4 s, after the key is let go |
 
 It starts at ATTACK 10 (0.2 s), DECAY 50 (1 s) and RELEASE 30 (1.2 s).
+
+Like the LFO it is part of the track's sound (SAVE, a user preset; a factory preset brings these three), and all three
+can be locked on a step: a step's lock reaches the notes playing too, a long ATTACK on one step, a short RELEASE on
+another. A drum track has none: its drums decay by their own DECAY; its ENV page reads A DRUM ENVELOPES ITSELF.
 
 A repeated note restarts the attack from zero even if the previous release is still running. A short
 2 ms fade removes the old level before a nonzero attack. Changing RELEASE during a release updates
@@ -256,7 +267,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003602, version 0.36.2](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003700, version 0.37.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -338,7 +349,7 @@ Eight tracks play together. The four synth tracks, S1 to S4, each have their own
 (sections 6 and 8). The four drum tracks, D1 to D4, each play a drum of Plaits' (a kick, a snare or a hi-hat, in two
 models each) with six knobs of their own (section 4), in a voice of their own: they never take the synth tracks'
 four. Every track has its own steps
-and LENGTH, all at one TEMPO and SWING, through the one effect; the envelope and the LFO are the synth tracks' (a drum
+and LENGTH, all at one TEMPO and SWING, through the one effect; each synth track has its own envelope and LFO (0.37; a drum
 decays on its own, by its DECAY). SELECT picks the track the page, the keys and step mode are for; the keys play
 along with the sequencer. A track has 64 steps in four pages of 16, as many as its LENGTH (1 to 64): tracks of
 different lengths drift against each other and meet again (a polymeter). A step holds a note or a chord of up to
@@ -490,9 +501,10 @@ that plays or locks; a step that plays without locks brings the track's own knob
 - **A lock:** hold a step (or several) and turn a knob: each held step locks it, from its own lock or the track's
   value. While held, the step's locks are heard and the page shows them: a locked knob's name and value in the theme's
   colour, marked. Let go, the knobs show the track's own again.
-- **What can lock:** OSC's three knobs; a drum track's DRUM page (TUNE and its two knobs) and SHAPE; the mixer's VOL
-  and SEND (SEND locked on a step throws it into the effect). Elsewhere (ENV, MOD, the effect, the arp, the sound's
-  other pages) LOCK NOT ON THIS PAGE: those are not locked.
+- **What can lock:** OSC's three knobs; a synth track's ENV (ATTACK, DECAY, RELEASE) and MOD's LFO RATE and LFO DEPTH
+  (0.37); a drum track's DRUM page (TUNE and its two knobs) and SHAPE; the mixer's VOL and SEND (SEND locked on a step
+  throws it into the effect). Elsewhere (LFO DEST, the effect, the arp, the sound's other pages) LOCK NOT ON THIS PAGE:
+  those are not locked.
 - **A lock without a note:** hold a step that is off and lock it: it changes the sound as the song passes it, without
   a note (a pad's long chord moving under it).
 - **Recording the knobs:** in LOCK mode, recording live (REC while playing; REC shows HOME: open the knob's page), a
@@ -748,8 +760,8 @@ characters) and its kind: SYNTH, BASS, LEAD, PAD, PLUCK, KEYS, DRUM, FX, or USER
 
 **Sound presets (0.21).** ALGO chooses the engine; PRESET scrolls through its four factory starting points and
 user presets saved for the same engine and track kind. A sound preset stores its main engine knobs, all additional controls (the full edited FM patch when applicable),
-OUTPUT, and on a dedicated drum TUNE, DECAY, TONE and all SHAPE controls. Track assignment, VOICES, ENV, LFO, FX, tempo and
-patterns are outside the preset. Synth-track drums and dedicated drums have separate preset lists because their
+OUTPUT, and on a dedicated drum TUNE, DECAY, TONE and all SHAPE controls; a synth sound also its ARP (0.34) and its ENV
+and LFO (0.37). Track assignment, VOICES, FX, tempo and patterns are outside the preset. Synth-track drums and dedicated drums have separate preset lists because their
 controls differ. Factory starting points still need musical refinement by listening on the FM-1.
 
 Hold SAVE for 300 ms to open the 64-slot grid. OCT-/+ chooses one of four pages of sixteen; the sixteen white keys

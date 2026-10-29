@@ -73,8 +73,8 @@ wait 30
 said LOCKS CLEARED 3
 expect locks 2
 expect lock_mode 1
-# a knob with no lock (the MOD page) with a step held: not locked
-tap LFO
+# a knob with no lock (the effect's HALL page) with a step held: not locked
+tap FX
 wait 30
 key 0 down 100 0
 wait 30

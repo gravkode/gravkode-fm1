@@ -78,6 +78,9 @@ typedef struct {
     uint8_t mix_reserved[7];
     /* 0.27: the mixer's fader on each track (VOL, 0..100; its sound's own LEVEL, OUTPUT's, goes with its preset) */
     uint8_t vol[SYNTH_TRACKS];
+    /* 0.37: each synth track's LFO and envelope (mod[] and env[] above keep S1's, for the record's older readers) */
+    uint8_t trk_mod[SYNTH_S_TRACKS][3];
+    uint8_t trk_env[SYNTH_S_TRACKS][3];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to sky (a byte reserved then) */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
@@ -88,7 +91,9 @@ typedef struct {
 #define SET_SIZE_021 92
 #define SET_SIZE_025 1404                /* as 0.21..0.25 saved it: up to the mixer (every track sent whole, none muted) */
 #define SET_SIZE_026 1420                /* as 0.26 saved it: up to the faders (each at 100) */
-_Static_assert(sizeof(settings_t) == 1428 && SET_SIZE_026 == __builtin_offsetof(settings_t, vol) &&
+#define SET_SIZE_036 1428                /* as 0.27..0.36 saved it: up to the tracks' LFOs and envelopes (one for all) */
+_Static_assert(sizeof(settings_t) == 1452 && SET_SIZE_036 == __builtin_offsetof(settings_t, trk_mod) &&
+               SET_SIZE_026 == __builtin_offsetof(settings_t, vol) &&
                SET_SIZE_025 == __builtin_offsetof(settings_t, send) &&
                SET_SIZE_021 == __builtin_offsetof(settings_t, controls) && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
                SET_SIZE_013 == __builtin_offsetof(settings_t, trk_engine) &&
@@ -189,6 +194,14 @@ static volatile int32_t osc_params[SYNTH_TRACKS][3];
 static volatile int32_t drum_tune[SYNTH_D_TRACKS];          /* the drums' TUNE (50: the note; a half semitone each) */
 static volatile int32_t drum_shape[SYNTH_D_TRACKS][3];      /* and SHAPE's knobs (dsp/grav_drums.h), 0..100 */
 static volatile uint8_t track_sel;       /* the track selected (SELECT): the keys, MIDI in and the pages play it */
+/* (0.37) each synth track's LFO and envelope, part of its sound (its preset's): MOD's LFO RATE, LFO DEPTH, LFO DEST
+ * and ENV's ATTACK, DECAY, RELEASE, 0..100 (DEST a third of the knob each). Until 0.36 one of each for every track.
+ * The drum tracks have none: their drums envelope themselves */
+static volatile int32_t trk_mod[SYNTH_S_TRACKS][3];
+static volatile int32_t trk_env[SYNTH_S_TRACKS][3];
+static const uint8_t MOD_DEFAULT[3] = PRESET_LFO_DEFAULT, ENV_DEFAULT[3] = PRESET_ENV_DEFAULT;
+static lfo_t trk_lfo[SYNTH_S_TRACKS];
+static volatile int32_t no_param;            /* (MOD's and ENV's knobs on a drum track: nothing) */
 static preset_bank_t user_presets;
 static int8_t preset_id[SYNTH_TRACKS];
 static uint8_t preset_dirty, preset_write_req;
@@ -214,15 +227,18 @@ static void preset_capture(uint32_t t, preset_t *p)
         p->tune = (uint8_t)drum_tune[d];
         p->osc[2] = 0;
         for (uint32_t i = 0; i < 3; i++) p->shape[i] = (uint8_t)drum_shape[d][i];
+    } else {                                 /* (0.37) its LFO and envelope */
+        p->mod_set = PRESET_MOD;
+        for (uint32_t i = 0; i < 3; i++) {
+            p->lfo[i] = (uint8_t)trk_mod[t][i];
+            p->env[i] = (uint8_t)trk_env[t][i];
+        }
     }
 }
 
-/* Parameters for future modulation and envelope DSP. */
-static volatile int32_t mod_params[3] = {50, 0, 0};
 static const char *const LFO_DEST_NAME[3] = {"TIMBRE", "MORPH", "PITCH"};
 /* Keep the saved 0..100 representation compatible with 0.14.0 and earlier. */
 static uint32_t lfo_destination(int32_t value) { return (uint32_t)clamp(value / 34, 0, 2); }
-static volatile int32_t env_params[3] = {10, 50, 30};
 
 static const char *const PARAM_NAME[PAGE_N][3] = {
     {"TIMBRE", "MORPH", "HARMONICS"},
@@ -275,8 +291,11 @@ static int32_t locked(uint32_t t, uint32_t p, int32_t own)
 static int32_t lock_own(uint32_t t, uint32_t p)   /* a lockable knob's own value, the track's */
 {
     const uint32_t d = (t - SYNTH_S_TRACKS) % SYNTH_D_TRACKS;
+    const uint32_t s = t % SYNTH_S_TRACKS;
     return p <= SEQ_LK_OSC2 ? osc_params[t][p] : p == SEQ_LK_TUNE ? drum_tune[d] :
-           p <= SEQ_LK_SHAPE2 ? drum_shape[d][p - SEQ_LK_SHAPE0] : p == SEQ_LK_VOL ? set.vol[t] : set.send[t];
+           p <= SEQ_LK_SHAPE2 ? drum_shape[d][p - SEQ_LK_SHAPE0] : p == SEQ_LK_VOL ? set.vol[t] :
+           p == SEQ_LK_SEND ? set.send[t] : p <= SEQ_LK_RELEASE ? trk_env[s][p - SEQ_LK_ATTACK] :
+           trk_mod[s][p - SEQ_LK_LFO_RATE];   /* (0.37: a synth track's ENV, LFO) */
 }
 
 static int lock_param(uint32_t page, uint32_t index)   /* a page's knob: its lock (SEQ_LK_*), -1 if it has none */
@@ -288,6 +307,10 @@ static int lock_param(uint32_t page, uint32_t index)   /* a page's knob: its loc
         return (int)(SEQ_LK_SHAPE0 + index);
     if (page == PAGE_MIXER && index < 2u)
         return index ? SEQ_LK_SEND : SEQ_LK_VOL;
+    if (page == PAGE_ENV && !SYNTH_IS_DRUM(track_sel))   /* (0.37) a synth track's ATTACK, DECAY, RELEASE */
+        return (int)(SEQ_LK_ATTACK + index);
+    if (page == PAGE_MOD && !SYNTH_IS_DRUM(track_sel) && index < 2u)   /* and LFO RATE, LFO DEPTH */
+        return (int)(SEQ_LK_LFO_RATE + index);
     return -1;
 }
 
@@ -446,18 +469,6 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         a->mode = (uint8_t)arp_mode(t);
     }
 
-    float lfo_rate = 0.05f + (float)mod_params[0] * 0.1995f;
-    float lfo_depth = (float)mod_params[1] * 0.01f;
-    lfo_set(&synth.mod_lfo, lfo_rate, lfo_depth);
-
-    synth_envelopes(
-        &synth,
-        (float)env_params[0] * 0.02f,
-        (float)env_params[1] * 0.02f,
-        0.7f,
-        (float)env_params[2] * 0.04f,
-        44100.0f
-    );
 
     while (synth_event_queue_pop(&synth_queue, &event)) {
         switch (event.type) {
@@ -538,12 +549,24 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav_fx_params_t *fx)
 {
     grav_sound_t sound[SYNTH_TRACKS];
-    float lfo_value = lfo_process(&synth.mod_lfo);
-    uint32_t lfo_dest = lfo_destination(mod_params[2]);
-    float pitch_offset = (lfo_dest == 2) ? lfo_value * 2.0f : 0.0f;
 
-    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* each track's sound, the one LFO on the synth tracks */
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* each track's sound; (0.37) a synth track's own LFO and envelope,
+                                                     * its steps' locks over them (at each span: a lock heard from its
+                                                     * step's note on) */
         const int drum = SYNTH_IS_DRUM(t);
+        float lfo_value = 0.0f;
+        uint32_t lfo_dest = 3u;
+        if (!drum) {
+            lfo_set(&trk_lfo[t], 0.05f + (float)locked(t, SEQ_LK_LFO_RATE, trk_mod[t][0]) * 0.1995f,
+                    (float)locked(t, SEQ_LK_LFO_DEPTH, trk_mod[t][1]) * 0.01f);
+            lfo_value = lfo_process(&trk_lfo[t]);
+            lfo_dest = lfo_destination(trk_mod[t][2]);
+            synth_track_envelopes(&synth, t, (float)locked(t, SEQ_LK_ATTACK, trk_env[t][0]) * 0.02f,
+                                  (float)locked(t, SEQ_LK_DECAY, trk_env[t][1]) * 0.02f, 0.7f,
+                                  (float)locked(t, SEQ_LK_RELEASE, trk_env[t][2]) * 0.04f, 44100.0f);
+        } else                               /* (a drum's voice: its outer envelope as one came before) */
+            synth_track_envelopes(&synth, t, (float)ENV_DEFAULT[0] * 0.02f, (float)ENV_DEFAULT[1] * 0.02f, 0.7f,
+                                  (float)ENV_DEFAULT[2] * 0.04f, 44100.0f);
         const uint32_t d = (t - SYNTH_S_TRACKS) % SYNTH_D_TRACKS;   /* (0.35: each knob as its steps lock it) */
         float timbre = (float)locked(t, SEQ_LK_OSC0, osc_params[t][0]) * 0.01f;
         float morph = (float)locked(t, SEQ_LK_OSC1, osc_params[t][1]) * 0.01f;
@@ -557,7 +580,8 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
         if (morph > 1.0f) morph = 1.0f;
         sound[t].engine = *track_engine(t);
         sound[t].controls = &set.controls[t];
-        sound[t].pitch = drum ? (float)(locked(t, SEQ_LK_TUNE, drum_tune[d]) - 50) * 0.5f : pitch_offset;
+        sound[t].pitch = drum ? (float)(locked(t, SEQ_LK_TUNE, drum_tune[d]) - 50) * 0.5f :
+                         lfo_dest == 2u ? lfo_value * 2.0f : 0.0f;
         sound[t].timbre = timbre;            /* (a drum: TONE) */
         sound[t].morph = morph;              /* (a drum: DECAY) */
         sound[t].harmonics = (float)locked(t, SEQ_LK_OSC2, osc_params[t][2]) / 100.0f;
@@ -572,7 +596,8 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
 
     grav_engine_render_tracks(&grav_engine, lr, n, &synth, master_q12, sound, 0.0f, fx);
 
-    lfo_advance(&synth.mod_lfo, n);
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)
+        lfo_advance(&trk_lfo[t], n);
 }
 
 /* the render took over 90 % of its time (device/main_fm1.c, APP_OVERLOAD): the oldest voice sounding falls silent
@@ -652,6 +677,10 @@ static void settings_defaults(void)
     set.osc[0] = 65; set.osc[1] = 50; set.osc[2] = 75;
     set.mod[0] = 50; set.mod[1] = 0; set.mod[2] = 0;
     set.env[0] = 10; set.env[1] = 50; set.env[2] = 30;
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {   /* (0.37) */
+        memcpy(set.trk_mod[t], MOD_DEFAULT, 3);
+        memcpy(set.trk_env[t], ENV_DEFAULT, 3);
+    }
     set.voices = VOICES_DEFAULT;
     set.velocity_off = 0;
     set.sky = SKY_NIGHT;
@@ -680,10 +709,13 @@ static void settings_capture(void)
     set.engine_id = set.trk_engine[0];       /* (S1's, where older readers look) */
     for (uint32_t i = 0; i < 3; i++)
         set.osc[i] = set.trk_osc[0][i];
-    for (int i = 0; i < 3; ++i) {
-        set.mod[i] = (uint8_t)mod_params[i];
-        set.env[i] = (uint8_t)env_params[i];
-    }
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++)   /* (0.37) each track's; S1's where older readers look */
+        for (uint32_t i = 0; i < 3; i++) {
+            set.trk_mod[t][i] = (uint8_t)trk_mod[t][i];
+            set.trk_env[t][i] = (uint8_t)trk_env[t][i];
+        }
+    memcpy(set.mod, set.trk_mod[0], 3);
+    memcpy(set.env, set.trk_env[0], 3);
     for (int i = 0; i < FX_N; ++i)
         set.fx[i] = (uint8_t)fx_params[i];
     set.fx_quality = (uint8_t)fx_quality;
@@ -695,7 +727,8 @@ static void settings_capture(void)
 static int set_size_known(int n)
 {
     return n == SET_SIZE_012 || n == SET_SIZE_013 || n == SET_SIZE_016 || n == SET_SIZE_017 || n == SET_SIZE_018 ||
-           n == SET_SIZE_021 || n == SET_SIZE_025 || n == SET_SIZE_026 || n == (int)sizeof(settings_t);
+           n == SET_SIZE_021 || n == SET_SIZE_025 || n == SET_SIZE_026 || n == SET_SIZE_036 ||
+           n == (int)sizeof(settings_t);
 }
 
 /* a record an older version saved (loaded: its size): what it lacks at its defaults */
@@ -732,6 +765,11 @@ static void settings_upgrade(settings_t *s, int loaded)
     if (loaded <= SET_SIZE_026)              /* (before 0.27: no faders; each at 100) */
         for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
             s->vol[t] = 100;
+    if (loaded <= SET_SIZE_036)              /* (before 0.37: one LFO and envelope for all: each track takes them) */
+        for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {
+            memcpy(s->trk_mod[t], s->mod, 3);
+            memcpy(s->trk_env[t], s->env, 3);
+        }
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
     if (s->sky == 0 || s->sky > SKY_DAY)     /* (a byte reserved before 0.29; 0.29..0.30.1 kept DAY, their default, as
@@ -767,7 +805,8 @@ static int settings_valid(const settings_t *s, int loaded)
             return 0;
     for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {
         voices += s->trk_voices[t];
-        if (s->trk_engine[t] >= GRAV_ENGINE_COUNT || s->trk_voices[t] > 4u || !percent_ok(s->trk_osc[t], 3))
+        if (s->trk_engine[t] >= GRAV_ENGINE_COUNT || s->trk_voices[t] > 4u || !percent_ok(s->trk_osc[t], 3) ||
+            !percent_ok(s->trk_mod[t], 3) || !percent_ok(s->trk_env[t], 3))
             return 0;
     }
     return voices <= SYNTH_POLY_VOICES && percent_ok(s->osc, 3) && percent_ok(s->mod, 3) && percent_ok(s->env, 3) &&
@@ -818,9 +857,12 @@ void app_init(void)
             drum_shape[d][i] = set.drum_shape[d][i];
     }
 
-    for (int i = 0; i < 3; ++i) {
-        mod_params[i] = set.mod[i];
-        env_params[i] = set.env[i];
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {   /* (0.37) each track's LFO and envelope */
+        for (uint32_t i = 0; i < 3; i++) {
+            trk_mod[t][i] = set.trk_mod[t][i];
+            trk_env[t][i] = set.trk_env[t][i];
+        }
+        lfo_init(&trk_lfo[t], 44100.0f);
     }
     for (int i = 0; i < FX_N; ++i)
         fx_params[i] = set.fx[i];
@@ -993,6 +1035,17 @@ static const char *preset_label(uint32_t t)  /* a track's sound's name (0.27: wh
 
 /* a sound on track t: its engine (the render builds it anew in the track's voices, at the next block), its knobs and
  * controls; a drum track's TUNE and SHAPE too (shape: none on a synth track) */
+static void track_mod_set(uint32_t t, const uint8_t *lfo, const uint8_t *env)   /* (0.37) a synth track's LFO and
+                                                                                 * envelope */
+{
+    if (SYNTH_IS_DRUM(t))
+        return;
+    for (uint32_t i = 0; i < 3; i++) {
+        trk_mod[t][i] = lfo[i];
+        trk_env[t][i] = env[i];
+    }
+}
+
 static void track_sound_set(uint32_t t, uint32_t engine, const grav_controls_t *controls, const uint8_t *osc,
                             uint8_t tune, const uint8_t *shape)
 {
@@ -1018,6 +1071,8 @@ static void preset_apply(uint32_t t, uint32_t engine, int id)
     if (!preset_get(&user_presets, engine, SYNTH_IS_DRUM(t), id, &p))
         return;
     track_sound_set(t, engine, &p.controls, p.osc, p.tune, p.drum ? p.shape : 0);
+    if (!p.drum && p.mod_set == PRESET_MOD)   /* (0.37) its LFO and envelope (one saved before: the track's stay) */
+        track_mod_set(t, p.lfo, p.env);
     preset_id[t] = (int8_t)id;
     ui.preset_edited &= (uint8_t)~(1u << t);
     set_dirty = 1;
@@ -1038,7 +1093,7 @@ static struct {
     uint16_t n;
     int16_t sel;
     uint32_t until;
-    uint8_t engine, edited, osc[3], tune, shape[3];   /* the sound as it opened (OCT-) */
+    uint8_t engine, edited, osc[3], tune, shape[3], lfo[3], env[3];   /* the sound as it opened (OCT-) */
     int8_t id;
     grav_controls_t controls;
 } pb;
@@ -1076,6 +1131,10 @@ static void pb_open(void)
     pb.edited = ui.preset_edited >> t & 1u;
     pb.controls = set.controls[t];
     for (uint32_t i = 0; i < 3; i++) pb.osc[i] = (uint8_t)osc_params[t][i];
+    for (uint32_t i = 0; i < 3 && !drum; i++) {   /* (0.37) */
+        pb.lfo[i] = (uint8_t)trk_mod[t][i];
+        pb.env[i] = (uint8_t)trk_env[t][i];
+    }
     if (drum) {
         pb.tune = drum_tune[t - SYNTH_S_TRACKS];
         for (uint32_t i = 0; i < 3; i++) pb.shape[i] = drum_shape[t - SYNTH_S_TRACKS][i];
@@ -1113,6 +1172,7 @@ static void pb_cancel(void)                  /* OCT-: the sound as it was when t
 {
     const uint32_t t = pb.track;
     track_sound_set(t, pb.engine, &pb.controls, pb.osc, pb.tune, pb.shape);
+    track_mod_set(t, pb.lfo, pb.env);
     preset_id[t] = pb.id;
     ui.preset_edited = (uint8_t)((ui.preset_edited & ~(1u << t)) | (uint32_t)pb.edited << t);
     pb_close();
@@ -1562,10 +1622,10 @@ static volatile int32_t *param_of(uint32_t page, uint32_t index)
         return &osc_params[track_sel][index];
     if (page == PAGE_SHAPE)
         return &drum_shape[d][index % 3u];
-    if (page == PAGE_MOD)
-        return &mod_params[index];
+    if (page == PAGE_MOD)                    /* (0.37) the selected track's (a drum's: none) */
+        return SYNTH_IS_DRUM(track_sel) ? &no_param : &trk_mod[track_sel][index % 3u];
     if (page == PAGE_ENV)
-        return &env_params[index];
+        return SYNTH_IS_DRUM(track_sel) ? &no_param : &trk_env[track_sel][index % 3u];
     static const uint8_t FX_SLOT[3][3] = {{FX_HALL, FX_HALL_TIME, FX_TONE}, {FX_N, FX_DIFFUSE, FX_MOD},
                                           {FX_ECHO, FX_ECHO_TIME, FX_FEEDBACK}};
     const uint32_t slot = FX_SLOT[(page - PAGE_FX_HALL) % 3u][index % 3u];
@@ -3082,11 +3142,17 @@ static void select_turn(int32_t e)
 /* LFO's K3: where the LFO goes (TIMBRE, MORPH, PITCH), a third of the knob each */
 static void lfo_dest_turn(int32_t e)
 {
-    const uint32_t destination = (uint32_t)clamp((int32_t)lfo_destination(mod_params[2]) + e, 0, 2);
+    if (SYNTH_IS_DRUM(track_sel)) {          /* (0.37) */
+        app_say("LFO", "S1-S4 ONLY");
+        return;
+    }
+    volatile int32_t *dest = &trk_mod[track_sel][2];
+    const uint32_t destination = (uint32_t)clamp((int32_t)lfo_destination(*dest) + e, 0, 2);
     const int32_t value = (int32_t)destination * 34;
-    if (value != mod_params[2]) {
-        mod_params[2] = value;
+    if (value != *dest) {
+        *dest = value;
         set_dirty = 1;
+        ui.preset_edited |= (uint8_t)(1u << track_sel);   /* (0.37: the sound's) */
     }
     app_say("LFO DEST", LFO_DEST_NAME[destination]);
 }
@@ -3103,6 +3169,10 @@ static void controls_auto(uint32_t t)
 /* a page's knob, 0..100: OSC, SHAPE, LFO, ENV, the effect's (the sound's edits marked *, 0.27) */
 static void page_knob_turn(uint32_t index, int32_t e)
 {
+    if ((active_page == PAGE_MOD || active_page == PAGE_ENV) && SYNTH_IS_DRUM(track_sel)) {   /* (0.37) */
+        app_say(active_page == PAGE_MOD ? "LFO" : "ENV", "S1-S4 ONLY");
+        return;
+    }
     volatile int32_t *value = param_of(active_page, index);
     const int32_t previous = *value;
     char t[12];
@@ -3110,7 +3180,8 @@ static void page_knob_turn(uint32_t index, int32_t e)
                                                         : clamp_percent(previous + e);
     if (*value != previous) {
         set_dirty = 1;
-        if (active_page == PAGE_OSC || active_page == PAGE_SHAPE)
+        if (active_page == PAGE_OSC || active_page == PAGE_SHAPE || active_page == PAGE_MOD ||
+            active_page == PAGE_ENV)         /* (0.37: the LFO and the envelope the sound's too) */
             ui.preset_edited |= (uint8_t)(1u << track_sel);
         if (active_page == PAGE_OSC && index == 2 && grav_controls_fm(*track_engine(track_sel)))
             controls_auto(track_sel);
@@ -3284,7 +3355,7 @@ static int32_t param_frac(uint32_t i)   /* a page's knob's value, 0..25600 */
     if (active_page == PAGE_SOUND) {
         grav_control_info_t info;
         if (grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, i, &info)) max = info.max;
-    } else if (active_page == PAGE_MOD && i == 2) { v = (int32_t)lfo_destination(mod_params[2]); max = 2; }
+    } else if (active_page == PAGE_MOD && i == 2) { v = (int32_t)lfo_destination(*param_of(PAGE_MOD, 2)); max = 2; }
     else if (active_page == PAGE_FX_TAPE && i == 0) { v = fx_quality; max = GRAV_FX_QUALITIES - 1; }
     else if (active_page == PAGE_FX_ECHO && i == 1) max = GRAV_ECHO_TIMES - 1;
     else if (active_page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && i == 2) max = 1;
@@ -3414,6 +3485,11 @@ static void knob_own(uint32_t i, knob_t *k)
             text_cat(k->value, arp_hold(t) ? "ON" : "OFF");
             k->frac = arp_hold(t) ? 25600 : 0;
         }
+        return;
+    }
+    if ((active_page == PAGE_MOD || active_page == PAGE_ENV) && SYNTH_IS_DRUM(track_sel)) {   /* (0.37) none */
+        k->name = PARAM_NAME[active_page][i];
+        k->frac = KNOB_NONE;
         return;
     }
     if (active_page == PAGE_MIXER) {         /* the selected track's VOL (0.27) and SEND, the effect's RETURN */
@@ -3638,6 +3714,11 @@ static void draw_knobs(void)
         live_area(158, 22, 38, 20);
     }
     cv_text(8, 24, &FONT_XS, title, C_HI);
+    if ((active_page == PAGE_MOD || active_page == PAGE_ENV) && SYNTH_IS_DRUM(track_sel)) {   /* (0.37) */
+        const char *m = active_page == PAGE_MOD ? "THE LFO IS S1-S4'S" : "A DRUM ENVELOPES ITSELF";
+        cv_text(120 - text_w(&FONT_XS, m) / 2, 80, &FONT_XS, m, C_DIM);
+        return;
+    }
     draw_dials(knob_row(&h, &r), 7u, 0);
 }
 
@@ -5805,7 +5886,7 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         settings_capture();
         settings_t legacy = set;
         legacy.mod[2] = (uint8_t)clamp(atoi(a), 0, 100);
-        plat_store_save(OBJ_SETTINGS, &legacy, sizeof legacy);
+        plat_store_save(OBJ_SETTINGS, &legacy, SET_SIZE_036);   /* (as 0.36 saved it: one LFO for all, 0.37) */
         return 1;
     }
     if (!strcmp(cmd, "debug_overload")) {
@@ -5838,6 +5919,16 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         settings_capture();
         plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 :
                                             !strcmp(cmd, "save016") ? SET_SIZE_016 : !strcmp(cmd, "save018") ? SET_SIZE_018 : SET_SIZE_021);
+        return 1;
+    }
+    if (!strcmp(cmd, "save036")) {           /* (0.37) the settings as 0.36 saved them: one envelope for every track
+                                              * (ATTACK DECAY RELEASE), one LFO */
+        settings_capture();
+        settings_t legacy = set;
+        legacy.env[0] = (uint8_t)clamp(atoi(a), 0, 100);
+        legacy.env[1] = (uint8_t)clamp(atoi(b), 0, 100);
+        legacy.env[2] = (uint8_t)clamp(atoi(c), 0, 100);
+        plat_store_save(OBJ_SETTINGS, &legacy, SET_SIZE_036);
         return 1;
     }
     if (!strcmp(cmd, "save031")) {           /* (0.32) the settings as 0.31 saved them: Beads' knobs at rest, its
@@ -6065,7 +6156,7 @@ int app_expect(const char *what, int *got)
     else if (!strncmp(what, "step", 4))
         *got = TRK.step[atoi(what + 4) % SEQ_STEPS].on;
     else if (!strcmp(what, "lfo_dest"))
-        *got = (int)lfo_destination(mod_params[2]);
+        *got = (int)lfo_destination(*param_of(PAGE_MOD, 2));
     else if (!strcmp(what, "engine_ram"))    /* bytes of the selected track's (first) voice's RAM its engine took */
         *got = (int)grav_plaits_ram_used(synth.track[track_sel].first);
     else if (!strcmp(what, "voices"))        /* GLO VOICES, the selected track's: 0 OFF, 1 MONO, 2..4 POLY; a drum 1 */
@@ -6097,10 +6188,10 @@ int app_expect(const char *what, int *got)
     else if (!strncmp(what, "osc", 3)) {     /* oscN, modN, envN: parameter N (0..2) of a page, as the knobs left it */
         int i = atoi(what + 3) % 3;
         *got = osc_params[track_sel][i];
-    } else if (!strncmp(what, "mod", 3))
-        *got = mod_params[atoi(what + 3) % 3];
+    } else if (!strncmp(what, "mod", 3))     /* (0.37: the selected track's) */
+        *got = *param_of(PAGE_MOD, (uint32_t)atoi(what + 3) % 3u);
     else if (!strncmp(what, "env", 3))
-        *got = env_params[atoi(what + 3) % 3];
+        *got = *param_of(PAGE_ENV, (uint32_t)atoi(what + 3) % 3u);
     else
         return 0;
     return 1;
