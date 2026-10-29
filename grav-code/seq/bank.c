@@ -31,7 +31,9 @@ static const bank_head_t *head(uint32_t s) { return (const bank_head_t *)plat_da
 
 static int head_ok(const bank_head_t *h)
 {
-    return h->magic == BANK_MAGIC && h->pattern < BANK_PATTERNS && h->size == sizeof(seq_pattern_t) &&
+    return h->magic == BANK_MAGIC && h->pattern < BANK_PATTERNS &&
+           (h->size == sizeof(seq_pattern_t) || h->size == SEQ_PATTERN_V018) &&   /* (0.35: or as saved before its
+                                                                                  * locks: seq_load finds none) */
            h->hcrc == bank_crc32(h, offsetof(bank_head_t, hcrc), 0);
 }
 
@@ -57,7 +59,8 @@ void bank_init(bank_t *b)
     for (uint32_t s = 0; s < BANK_SLOTS; s++) {
         const bank_head_t *h = head(s);
         const uint8_t *data = (const uint8_t *)h + BANK_DATA;
-        if (!head_ok(h) || bank_crc32(data, h->size, 0) != h->crc || !seq_valid((const seq_pattern_t *)data)) {
+        if (!head_ok(h) || bank_crc32(data, h->size, 0) != h->crc || !seq_valid((const seq_pattern_t *)data) ||
+            (h->size == sizeof(seq_pattern_t) && !seq_locks_valid((const seq_pattern_t *)data))) {
             b->state[s] = erased(s) ? BANK_FREE : BANK_STALE;   /* (a save cut short: to erase) */
             continue;
         }

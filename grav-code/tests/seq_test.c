@@ -538,6 +538,57 @@ int main(void)
     }
     CHECK(count(SEQ_EV_ON) == 4, "arp on the clock in: 4 notes in 24 clocks, got %u", count(SEQ_EV_ON));
 
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats, a track's swing, count-in, the arp)\n");
+    /* (0.35) locks: set, read, kept sorted, a step's cleared, a track's cleared; the pool full */
+    {
+        static seq_pattern_t p;
+        uint8_t val[SEQ_LK_PARAMS];
+        seq_defaults(&p);
+        CHECK(seq_lock_set(&p, 3, 10, SEQ_LK_OSC2, 40) == 0 && seq_lock_set(&p, 0, 1, SEQ_LK_VOL, 90) == 0 &&
+              seq_lock_set(&p, 3, 10, SEQ_LK_OSC0, 5) == 0 && seq_lock_set(&p, 3, 10, SEQ_LK_OSC2, 41) == 0,
+              "locks set");
+        CHECK(p.nlocks == 3 && seq_locks_valid(&p), "locks kept sorted, one each: %u", p.nlocks);
+        CHECK(seq_lock_get(&p, 3, 10, SEQ_LK_OSC2) == 41 && seq_lock_get(&p, 3, 11, SEQ_LK_OSC2) == -1, "lock read");
+        CHECK(seq_lock_mask(&p, 3, 10, val) == (1u << SEQ_LK_OSC0 | 1u << SEQ_LK_OSC2) && val[SEQ_LK_OSC0] == 5,
+              "a step's locks");
+        seq_lock_set(&p, 3, 10, SEQ_LK_OSC0, -1);
+        CHECK(seq_lock_mask(&p, 3, 10, 0) == 1u << SEQ_LK_OSC2, "a lock removed");
+        seq_lock_set(&p, 3, 20, SEQ_LK_SEND, 0);
+        seq_lock_clear(&p, 3, 10);
+        CHECK(seq_lock_get(&p, 3, 10, SEQ_LK_OSC2) == -1 && seq_lock_get(&p, 3, 20, SEQ_LK_SEND) == 0, "a step's cleared");
+        seq_lock_clear(&p, 3, -1);
+        CHECK(p.nlocks == 1 && seq_lock_get(&p, 0, 1, SEQ_LK_VOL) == 90, "a track's cleared");
+        uint32_t n = 0;
+        for (uint32_t t = 0; t < SEQ_TRACKS; t++)
+            for (uint32_t st = 0; st < SEQ_STEPS; st++)
+                n += seq_lock_set(&p, t, st, SEQ_LK_OSC1, 50) == 0;
+        CHECK(n == SEQ_LOCKS - 1u && p.nlocks == SEQ_LOCKS && seq_lock_set(&p, 7, 63, SEQ_LK_SEND, 1) == -1,
+              "the pool full at %u", SEQ_LOCKS);
+        p.nlocks = 600;
+        CHECK(!seq_locks_valid(&p), "a pool past its size refused");
+    }
+    /* a step's locks reach the render before its notes (at its time); a step off with locks: its locks alone; a step
+     * playing without any: a lock event all the same (the track's knobs again) */
+    fresh(&s);
+    for (uint32_t i = 0; i < SEQ_PAGE; i++)
+        s.pat.track[0].step[i].on = 0;
+    s.pat.track[0].step[0].on = 1;
+    s.pat.track[0].step[2].on = 1;
+    seq_lock_set(&s.pat, 0, 0, SEQ_LK_OSC0, 20);
+    seq_lock_set(&s.pat, 0, 1, SEQ_LK_OSC0, 80);   /* (step 1 off: a lock without a note) */
+    s.want = SEQ_WANT_PLAY;
+    run(&s, 70);                         /* 3.25 steps */
+    CHECK(count(SEQ_EV_LOCK) == 3 && count(SEQ_EV_ON) == 2, "locks: 3 lock events (%u), 2 notes (%u)",
+          count(SEQ_EV_LOCK), count(SEQ_EV_ON));
+    for (uint32_t k = 0; k < 3; k++)
+        CHECK(find(SEQ_EV_LOCK, k) == grid(k * step), "lock event %u at %u", k, find(SEQ_EV_LOCK, k));
+    {
+        uint32_t i = 0;
+        while (i < nlog && log_[i].e.type != SEQ_EV_LOCK)
+            i++;
+        CHECK(i + 1u < nlog && log_[i + 1u].e.type == SEQ_EV_ON && log_[i].t == log_[i + 1u].t && log_[i].e.note == 0,
+              "a step's locks before its notes");
+    }
+
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats, a track's swing, count-in, the arp, locks)\n");
     return 0;
 }

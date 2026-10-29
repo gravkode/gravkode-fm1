@@ -369,3 +369,37 @@ key 7 up
 key 11 up
 key 14 up
 wait 30
+# (0.35) LOCK (EDIT), the arp off again, pattern 1 again: on the OSC page S1's step 3 held, INVERSION and CHORD locked on it (in the
+# theme's colour, marked), step 7 MORPH, step 6 (no note) INVERSION; the steps in the bottom band, the locked marked
+turn K1 -3
+wait 30
+turn K4 -1
+wait 600
+tap EDIT
+wait 30
+tap HOME
+wait 400
+key 4 down 100 0
+wait 30
+turn K1 -30
+turn K3 20
+wait 30
+key 4 up
+key 11 down 100 0
+wait 30
+turn K2 30
+wait 30
+key 11 up
+key 9 down 100 0
+wait 30
+turn K1 25
+wait 30
+key 9 up
+wait 30
+key 4 down 100 0
+wait 600
+shot screen-lock.png
+key 4 up
+wait 30
+tap EDIT
+wait 30

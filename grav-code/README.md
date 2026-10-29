@@ -7,11 +7,11 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | --- | --- |
 | `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
 | `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's terricons, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages: HALL, TAPE, ECHO, over a lake under the terricons, 0.33; ARP and ARP 2, the
-arpeggiator's, 0.34), the presets' browser, recording; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
+arpeggiator's, 0.34; LOCK mode on EDIT, the parameter locks, 0.35), the presets' browser, recording; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
 | `synth/` | The voices (`synth.c`: four shared out among the synth tracks S1..S4, each MONO with legato, POLY or none, and one for each drum track D1..D4; the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
 | `sound/` | Engine control/page metadata, native FM byte mapping and validation; AUTO follows the original macros |
 | `presets/` | Four factory starting points per engine; a 64-slot expanded preset log (184-byte sounds), indexed in flash with a bounded pending queue, CRC/commit and compaction tests |
-| `seq/` | The sequencer (`seq.c`): 64 steps, length, chords, tempo, swing, MIDI clock out and in, the next pattern in at the pattern's end; each block's events at their sample offsets, on a 24-sample grid (`app.c` renders between them); the synth tracks' arpeggiators on the song's ticks (0.34). The patterns' bank in the flash (`bank.c`): 16 patterns in 32 slots of 8 KiB, saved a page at a time into erased slots, the older copies erased when quiet |
+| `seq/` | The sequencer (`seq.c`): 64 steps, length, chords, tempo, swing, MIDI clock out and in, the next pattern in at the pattern's end; each block's events at their sample offsets, on a 24-sample grid (`app.c` renders between them); the synth tracks' arpeggiators on the song's ticks (0.34); a pattern's parameter locks, a pool of 512, and each step's lock event before its notes (0.35). The patterns' bank in the flash (`bank.c`): 16 patterns in 32 slots of 8 KiB, saved a page at a time into erased slots, the older copies erased when quiet |
 | `dsp/grav_engine.c` | The render: each voice through its engine and envelope, the mix through the effect, MASTER, the soft limiter, sleeping voices |
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), each voice its own (its track's; a drum voice's, in a small slot, one of the three drums), rendered 12 samples at a time |
 | `dsp/grav_drums.h` | The drum voices' drums (0.19): Plaits' drum models, the one chosen rendered, with the DRUM and SHAPE pages' knobs (the kick's PUNCH, SWEEP and DRIVE apart, where Plaits folds them onto HARMONICS) |
@@ -21,7 +21,7 @@ arpeggiator's, 0.34), the presets' browser, recording; the lights; the screen (`
 | `vendor/` | Plaits, Beads' reverb engine and tape, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
 | `words.tsv` | The screen reader's words |
-| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `arp.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
+| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `arp.txt`, `locks.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
 | `docs/` | The manual and its pictures (`docs/img/compose.py` makes the README's from them) |
 | `site/landing.md` | The site's front page |
 
@@ -64,13 +64,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.34.0    # grav-code/build/grav_code-0.34.0.fwsc, identity FM-1_73003400
+    python3 tools/build.py grav-code --release 0.35.0    # grav-code/build/grav_code-0.35.0.fwsc, identity FM-1_73003500
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.34.0.fwsc 0.34.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.35.0.fwsc 0.35.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.34.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.35.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

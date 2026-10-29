@@ -13,7 +13,10 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.34.0**: an arpeggiator on ARP, each synth track's, part of its sound: UP, DOWN, UP-DOWN,
+Current version: **0.35.0**: parameter locks: EDIT turns on LOCK mode, the white keys the selected track's steps
+on every page; hold a step and turn a knob (OSC's, a drum's DRUM and SHAPE, the mixer's VOL and SEND) to lock it on
+that step; a step off can lock alone, without a note; recording live, the knobs' moves are recorded as locks. 0.34:
+an arpeggiator on ARP, each synth track's, part of its sound: UP, DOWN, UP-DOWN,
 RANDOM, AS PLAYED or CHORD, at a note value in time with the song, over 1 to 4 octaves, with GATE and HOLD; the keys,
 MIDI in and the sequencer's chord steps play through it. 0.33: the effect's pages show what it does, a lake at night under HOME's terricons: each note
 sent into the effect drops a ring, ECHO's repeats follow it in time, HALL's tail ripples on; the knobs small, in the
@@ -50,7 +53,8 @@ hold HOME and turn SELECT to jump.
   with six knobs (TUNE, DECAY, TONE; the kick's PUNCH, SWEEP, DRIVE), in a voice of its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
   (polymeters), notes and chords with their velocity and length; sixteen patterns, switched at the pattern's end;
   the song's tempo, each pattern's swing; step recording, MIDI clock out and in (it follows one); each track's notes
-  on its MIDI channel (1–8).
+  on its MIDI channel (1–8); parameter locks on the steps (EDIT: LOCK mode), with or without a note, the knobs'
+  moves recorded live.
 - **An arpeggiator** on each synth track (ARP): six modes, a note value in time, 1–4 octaves, GATE and HOLD; the keys,
   MIDI in and the sequencer's chords through it, its notes out over MIDI; saved with the sound.
 - **Polyphony:** up to four voices (POLY), or one with legato (MONO).
@@ -85,7 +89,7 @@ hold HOME and turn SELECT to jump.
 
 SELECT picks the track (S1–S4, D1–D4) the keys, ALGO, PRESET, OSC, VOICES and the steps are for; ALGO picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
-stores the settings and pattern. Sound pages include the engine's extra controls and OUTPUT (tune, level, AUX mix);
+stores the settings and pattern, EDIT turns LOCK mode on and off (parameter locks). Sound pages include the engine's extra controls and OUTPUT (tune, level, AUX mix);
 PRESET browses four factory sounds and the user presets for this engine.
 Hold SAVE for the 64 user slots (four pages, OCT-/+); a white key saves or replaces that slot. A queued preset
 is written after stopping and releasing the notes; wait for PRESET SAVED before powering off. SEQ turns step mode on (the white keys are the steps; hold one and turn K1..K3 for its note,
@@ -141,7 +145,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.34.0.fwsc 0.34.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.35.0.fwsc 0.35.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -156,14 +160,14 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.34.0      # grav-code/build/grav_code-0.34.0.fwsc
+python3 tools/build.py grav-code --release 0.35.0      # grav-code/build/grav_code-0.35.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
 ```
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
-`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator),
+`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).

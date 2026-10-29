@@ -62,11 +62,97 @@ int seq_valid(const seq_pattern_t *p)
     return 1;
 }
 
+/* ------------------------------------------------------------------ the parameter locks (0.35) --- */
+_Static_assert(SEQ_PATTERN_V018 == 4140u, "the pattern before its locks, as 0.18..0.34 saved it");
+
+int seq_locks_valid(const seq_pattern_t *p)
+{
+    if (p->nlocks > SEQ_LOCKS)
+        return 0;
+    for (uint32_t i = 0; i < p->nlocks; i++) {
+        const uint32_t k = p->lock[i].key;
+        if ((k & 15u) >= SEQ_LK_PARAMS || (k >> 10) >= SEQ_TRACKS || p->lock[i].value > 100u ||
+            (i && k <= p->lock[i - 1u].key))
+            return 0;
+    }
+    return 1;
+}
+
+static uint32_t lock_at(const seq_pattern_t *p, uint16_t key)   /* the first lock at key or after it */
+{
+    uint32_t lo = 0, hi = p->nlocks;
+    while (lo < hi) {
+        const uint32_t mid = (lo + hi) / 2u;
+        if (p->lock[mid].key < key)
+            lo = mid + 1u;
+        else
+            hi = mid;
+    }
+    return lo;
+}
+
+int seq_lock_get(const seq_pattern_t *p, uint32_t track, uint32_t step, uint32_t param)
+{
+    const uint16_t key = SEQ_LOCK_KEY(track, step, param);
+    const uint32_t i = lock_at(p, key);
+    return i < p->nlocks && p->lock[i].key == key ? (int)p->lock[i].value : -1;
+}
+
+int seq_lock_set(seq_pattern_t *p, uint32_t track, uint32_t step, uint32_t param, int32_t value)
+{
+    if (track >= SEQ_TRACKS || step >= SEQ_STEPS || param >= SEQ_LK_PARAMS)
+        return -1;
+    const uint16_t key = SEQ_LOCK_KEY(track, step, param);
+    const uint32_t i = lock_at(p, key);
+    const int here = i < p->nlocks && p->lock[i].key == key;
+    if (value < 0) {                     /* removed */
+        if (here) {
+            memmove(&p->lock[i], &p->lock[i + 1u], (p->nlocks - i - 1u) * sizeof p->lock[0]);
+            p->nlocks--;
+        }
+        return 0;
+    }
+    if (!here) {
+        if (p->nlocks >= SEQ_LOCKS)
+            return -1;
+        memmove(&p->lock[i + 1u], &p->lock[i], (p->nlocks - i) * sizeof p->lock[0]);
+        p->nlocks++;
+        p->lock[i].key = key;
+        p->lock[i].rsv = 0;
+    }
+    p->lock[i].value = (uint8_t)(value > 100 ? 100 : value);
+    return 0;
+}
+
+void seq_lock_clear(seq_pattern_t *p, uint32_t track, int32_t step)
+{
+    const uint16_t lo = step < 0 ? SEQ_LOCK_KEY(track, 0, 0) : SEQ_LOCK_KEY(track, step, 0);
+    const uint32_t hi = step < 0 ? SEQ_LOCK_KEY(track + 1u, 0, 0) : SEQ_LOCK_KEY(track, step + 1, 0);
+    const uint32_t a = lock_at(p, lo);
+    uint32_t b = a;
+    while (b < p->nlocks && p->lock[b].key < hi)
+        b++;
+    memmove(&p->lock[a], &p->lock[b], (p->nlocks - b) * sizeof p->lock[0]);
+    p->nlocks = (uint16_t)(p->nlocks - (b - a));
+}
+
+uint32_t seq_lock_mask(const seq_pattern_t *p, uint32_t track, uint32_t step, uint8_t *val)
+{
+    uint32_t mask = 0;
+    for (uint32_t i = lock_at(p, SEQ_LOCK_KEY(track, step, 0));
+         i < p->nlocks && p->lock[i].key >> 4 == (track << 6 | step); i++) {
+        mask |= 1u << (p->lock[i].key & 15u);
+        if (val)
+            val[p->lock[i].key & 15u] = p->lock[i].value;
+    }
+    return mask;
+}
+
 /* the records lie in the pattern as saved: its head the synth tracks', its tail the drums' */
 _Static_assert(sizeof(seq_record_t) == __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]) &&
                __builtin_offsetof(seq_record_t, track) == __builtin_offsetof(seq_pattern_t, track) &&
                sizeof(seq_drum_record_t) ==
-                   sizeof(seq_pattern_t) - __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]) &&
+                   SEQ_PATTERN_V018 - __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]) &&
                __builtin_offsetof(seq_drum_record_t, magic) == __builtin_offsetof(seq_pattern_t, drum_magic) -
                                                                    __builtin_offsetof(seq_pattern_t, track[SEQ_S_TRACKS]),
                "a pattern's records, where they lie in it");
@@ -237,6 +323,8 @@ void seq_load(seq_t *s, const seq_pattern_t *src)
         memcpy(&s->pat, src, sizeof s->pat);
     else
         seq_defaults(&s->pat);
+    if (!seq_locks_valid(&s->pat))       /* (0.35: one saved before its locks: the flash erased past it, none) */
+        s->pat.nlocks = 0;
     steps_reset(s);
 }
 
@@ -245,6 +333,8 @@ static void play_step(seq_t *s, uint32_t track, uint32_t step, int32_t at_q8, in
                       uint32_t *ne, uint32_t max)
 {
     const seq_step_t *t = &s->pat.track[track].step[step];
+    put(ev, ne, max, at_q8, SEQ_EV_LOCK, (uint8_t)step, 0, (uint8_t)track);   /* (0.35) its locks, or none: the
+                                                                              * track's own knobs again */
     if (!t->on)
         return;
     if (seq_arp_on(s, track)) {          /* (0.34) its arp's: held for the step's length (its notes flash the track) */
@@ -341,8 +431,8 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
             if (here)
                 continue;
         }
-        if (!t->on || (s->mute & (1u << track)))   /* (muted: no note) */
-            continue;
+        if ((!t->on && !seq_lock_mask(&s->pat, track, (uint32_t)step, 0)) || (s->mute & (1u << track)))
+            continue;                    /* (muted: no note; 0.35: a step off with locks: its locks alone) */
         const int32_t late = swing_q8(s, track, count);
         const int32_t gate = (int32_t)t->len * st + swing_q8(s, track, count + t->len) - late - st / 8;
         if (late > 0) {                  /* swung: when its time comes (before the next step) */

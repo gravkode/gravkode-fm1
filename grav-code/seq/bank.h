@@ -23,7 +23,7 @@ enum { BANK_FREE, BANK_LIVE, BANK_STALE, BANK_HALF };   /* a slot: erased; a pat
 typedef struct {                         /* at a slot's start, written last */
     uint32_t magic;                      /* BANK_MAGIC */
     uint16_t pattern;                    /* 0..BANK_PATTERNS - 1 */
-    uint16_t size;                       /* sizeof(seq_pattern_t) */
+    uint16_t size;                       /* sizeof(seq_pattern_t); or SEQ_PATTERN_V018, saved before its locks */
     uint32_t seq;                        /* saves so far: the newest copy of a pattern wins */
     uint32_t crc;                        /* the pattern's (CRC-32) */
     uint32_t hcrc;                       /* the header's, up to here */

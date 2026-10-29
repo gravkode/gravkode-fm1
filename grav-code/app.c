@@ -252,6 +252,42 @@ static uint32_t arp_hold(uint32_t t) { return set.controls[t].arp[0] >> 5 & 1u; 
 static uint32_t arp_rate(uint32_t t) { return set.controls[t].arp[1] ? set.controls[t].arp[1] - 1u : ARP_RATE_16TH; }
 static uint32_t arp_gate(uint32_t t) { return set.controls[t].arp[2] ? set.controls[t].arp[2] : 50u; }
 
+/* (0.35) parameter locks: each track's knobs as its steps lock them (SEQ_EV_LOCK, in the audio interrupt: the step's
+ * locks, or none, until the track's next), and as the steps held in LOCK mode have them (the main loop: heard while
+ * held, over the others), over the track's own */
+static struct {
+    volatile uint16_t mask;              /* the knobs locked, a bit each (SEQ_LK_*) */
+    volatile uint8_t val[SEQ_LK_PARAMS];
+} lock_seq[SYNTH_TRACKS], lock_heard[SYNTH_TRACKS];
+
+static int32_t locked(uint32_t t, uint32_t p, int32_t own)
+{
+    if (lock_heard[t].mask >> p & 1u)
+        return lock_heard[t].val[p];
+    if (lock_seq[t].mask >> p & 1u)
+        return lock_seq[t].val[p];
+    return own;
+}
+
+static int32_t lock_own(uint32_t t, uint32_t p)   /* a lockable knob's own value, the track's */
+{
+    const uint32_t d = (t - SYNTH_S_TRACKS) % SYNTH_D_TRACKS;
+    return p <= SEQ_LK_OSC2 ? osc_params[t][p] : p == SEQ_LK_TUNE ? drum_tune[d] :
+           p <= SEQ_LK_SHAPE2 ? drum_shape[d][p - SEQ_LK_SHAPE0] : p == SEQ_LK_VOL ? set.vol[t] : set.send[t];
+}
+
+static int lock_param(uint32_t page, uint32_t index)   /* a page's knob: its lock (SEQ_LK_*), -1 if it has none */
+{
+    if (page == PAGE_OSC)                    /* (a drum's DRUM page: TUNE, then its knobs 1 and 0) */
+        return SYNTH_IS_DRUM(track_sel) ? (index == 0u ? SEQ_LK_TUNE : index == 1u ? SEQ_LK_OSC1 : SEQ_LK_OSC0)
+                                        : (int)(SEQ_LK_OSC0 + index);
+    if (page == PAGE_SHAPE && SYNTH_IS_DRUM(track_sel))
+        return (int)(SEQ_LK_SHAPE0 + index);
+    if (page == PAGE_MIXER && index < 2u)
+        return index ? SEQ_LK_SEND : SEQ_LK_VOL;
+    return -1;
+}
+
 static int32_t clamp_percent(int32_t value)
 {
     if (value < 0) return 0;
@@ -332,6 +368,15 @@ static void seq_apply(const seq_event_t *e)
             seq_midi_owed--;
         }
         break;
+    case SEQ_EV_LOCK: {                      /* (0.35) a step's locks (or none): the track's knobs until its next */
+        uint8_t v[SEQ_LK_PARAMS];
+        const uint32_t m = seq_lock_mask(&seq.pat, track, e->note, v);
+        for (uint32_t i = 0; i < SEQ_LK_PARAMS; i++)
+            if (m >> i & 1u)
+                lock_seq[track].val[i] = v[i];
+        lock_seq[track].mask = (uint16_t)m;
+        break;
+    }
     case SEQ_EV_CLOCK:
     case SEQ_EV_START:
     case SEQ_EV_STOP:
@@ -386,6 +431,9 @@ static void click_mix(int32_t *lr, uint32_t from, uint32_t to, uint32_t master_q
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     synth_event_t event;
+    if (!seq.playing)                        /* (0.35) stopped: the steps' locks gone, the tracks' own knobs */
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+            lock_seq[t].mask = 0;
     for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {   /* (0.34) the arps, as the tracks' sounds have them */
         seq_arp_t *a = &seq.arp[t];
         a->rate = ARP_TICKS[arp_rate(t) % GRAV_ECHO_TIMES];
@@ -493,8 +541,9 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
 
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* each track's sound, the one LFO on the synth tracks */
         const int drum = SYNTH_IS_DRUM(t);
-        float timbre = (float)osc_params[t][0] * 0.01f;
-        float morph = (float)osc_params[t][1] * 0.01f;
+        const uint32_t d = (t - SYNTH_S_TRACKS) % SYNTH_D_TRACKS;   /* (0.35: each knob as its steps lock it) */
+        float timbre = (float)locked(t, SEQ_LK_OSC0, osc_params[t][0]) * 0.01f;
+        float morph = (float)locked(t, SEQ_LK_OSC1, osc_params[t][1]) * 0.01f;
         if (lfo_dest == 0 && !drum)
             timbre += lfo_value * 0.5f;
         else if (lfo_dest == 1 && !drum)
@@ -505,14 +554,17 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
         if (morph > 1.0f) morph = 1.0f;
         sound[t].engine = *track_engine(t);
         sound[t].controls = &set.controls[t];
-        sound[t].pitch = drum ? (float)(drum_tune[t - SYNTH_S_TRACKS] - 50) * 0.5f : pitch_offset;
+        sound[t].pitch = drum ? (float)(locked(t, SEQ_LK_TUNE, drum_tune[d]) - 50) * 0.5f : pitch_offset;
         sound[t].timbre = timbre;            /* (a drum: TONE) */
         sound[t].morph = morph;              /* (a drum: DECAY) */
-        sound[t].harmonics = (float)osc_params[t][2] / 100.0f;
-        sound[t].send = (float)set.send[t] * 0.01f;   /* (0.26) the mixer's SEND */
-        sound[t].gain = (float)(set.vol[t] * set.vol[t]) * 0.0001f;   /* (0.27) its fader, squared (100: 1, exactly) */
+        sound[t].harmonics = (float)locked(t, SEQ_LK_OSC2, osc_params[t][2]) / 100.0f;
+        sound[t].send = (float)locked(t, SEQ_LK_SEND, set.send[t]) * 0.01f;   /* (0.26) the mixer's SEND */
+        {
+            const int32_t vol = locked(t, SEQ_LK_VOL, set.vol[t]);
+            sound[t].gain = (float)(vol * vol) * 0.0001f;   /* (0.27) its fader, squared (100: 1, exactly) */
+        }
         for (uint32_t i = 0; i < 3; i++)
-            sound[t].shape[i] = drum ? (float)drum_shape[t - SYNTH_S_TRACKS][i] * 0.01f : 0.0f;
+            sound[t].shape[i] = drum ? (float)locked(t, SEQ_LK_SHAPE0 + i, drum_shape[d][i]) * 0.01f : 0.0f;
     }
 
     grav_engine_render_tracks(&grav_engine, lr, n, &synth, master_q12, sound, 0.0f, fx);
@@ -885,6 +937,11 @@ static struct {
     uint32_t key_midi;                   /* (0.34) the keys whose notes went out over MIDI (not to an arp: its notes go) */
     uint32_t arp_sig, arp_at;            /* (0.34) the ARP page: what its ladder showed, when it last changed; */
     uint8_t arp_band;                    /* its band's (held, HOLD) */
+    uint8_t lock_mode;                   /* (0.35) EDIT: LOCK mode: the white keys the steps on every page, the knobs
+                                          * lock the ones held (recording live: the one playing) */
+    uint8_t edit_down, edit_used;        /* EDIT held; a step's locks cleared meanwhile (no mode change) */
+    uint16_t lock_held;                  /* the view page's steps held in LOCK mode, a bit each */
+    uint32_t key_lock;                   /* the keys pressed as LOCK's steps (let go as such) */
     uint32_t key_mix;                    /* (0.26) the keys pressed on the mixer (mutes, tracks: let go as such) */
     uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
     uint8_t sel_down;                    /* SEL held (let go: the mixer) */
@@ -1802,6 +1859,130 @@ static void step_say(uint32_t s)
     app_say(a, b);
 }
 
+/* (0.35) LOCK mode (EDIT): the white keys the steps of the view page (OCT- / OCT+ the others) on every page; a step
+ * held, the knobs that can lock (OSC's, a drum's DRUM and SHAPE, the mixer's VOL and SEND) lock it, its locks heard
+ * while it is held; recording live, they lock the step playing (the knobs' moves recorded). A step off can hold locks
+ * too: its locks alone, no note. EDIT held and a white key: that step's locks cleared */
+static uint32_t lock_first(void)            /* the first step held */
+{
+    return ui.view_page * SEQ_PAGE + (uint32_t)__builtin_ctz(ui.lock_held ? ui.lock_held : 1u);
+}
+
+static void lock_hear(void)                  /* the step held first: its locks heard (none held: the others again) */
+{
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        if (t != track_sel || !ui.lock_held)
+            lock_heard[t].mask = 0;
+    if (!ui.lock_held)
+        return;
+    uint8_t v[SEQ_LK_PARAMS];
+    const uint32_t m = seq_lock_mask(&seq.pat, track_sel, lock_first(), v);
+    for (uint32_t i = 0; i < SEQ_LK_PARAMS; i++)
+        if (m >> i & 1u)
+            lock_heard[track_sel].val[i] = v[i];
+    lock_heard[track_sel].mask = (uint16_t)m;
+}
+
+static void lock_mode_toggle(void)
+{
+    ui.lock_mode = !ui.lock_mode;
+    ui.lock_held = 0;
+    lock_hear();
+    app_say("LOCK", ui.lock_mode ? "ON" : "OFF");
+    ui.redraw = 1;
+}
+
+static void lock_clear_step(uint32_t s)
+{
+    char t[8];
+    if (!seq_lock_mask(&seq.pat, track_sel, s, 0))
+        return;
+    uint32_t f = plat_lock();
+    seq_lock_clear(&seq.pat, track_sel, (int32_t)s);
+    seq.edits++;
+    plat_unlock(f);
+    lock_hear();
+    int_text((int32_t)s + 1, t);
+    app_say("LOCKS CLEARED", t);
+    ui.redraw = 1;
+}
+
+static void lock_key(uint32_t i, int down)
+{
+    const uint32_t s = ui.view_page * SEQ_PAGE + i;
+    char t[16];
+    if (down) {
+        ui.lock_held |= (uint16_t)(1u << i);
+        if (active_page == PAGE_SEQ && ui.step_mode)   /* (step mode: its NOTE, VELOCITY, LENGTH on the knobs) */
+            ui.step_held = (int8_t)s;
+        int_text((int32_t)s + 1, t);
+        const uint32_t m = seq_lock_mask(&seq.pat, track_sel, s, 0);
+        if (m) {
+            char n[4];
+            int_text(__builtin_popcount(m), n);
+            text_cat(t, " LOCKS ");
+            text_cat(t, n);
+        }
+        app_say("STEP", t);
+    } else {
+        ui.lock_held &= (uint16_t)~(1u << i);
+        if (ui.step_held == (int8_t)s)
+            ui.step_held = -1;
+    }
+    lock_hear();
+    ui.redraw = 1;
+}
+
+/* a knob turned in LOCK mode: its lock on each step held (from its value there, or the track's own), or recording
+ * live on the step playing (heard at once) */
+static void lock_turn(uint32_t p, uint32_t index, int32_t e)
+{
+    const uint32_t t = track_sel;
+    const int32_t own = lock_own(t, p);
+    int32_t v = own, full = 0;
+    char a[24], b[16];
+    uint32_t f = plat_lock();
+    if (ui.lock_held) {
+        for (uint32_t i = 0; i < SEQ_PAGE; i++)
+            if (ui.lock_held >> i & 1u) {
+                const uint32_t s = ui.view_page * SEQ_PAGE + i;
+                const int cur = seq_lock_get(&seq.pat, t, s, p);
+                v = clamp((cur >= 0 ? cur : own) + e, 0, 100);
+                full |= seq_lock_set(&seq.pat, t, s, p, v) < 0;
+            }
+    } else {
+        const int32_t s = seq.step[t];
+        if (s < 0) {
+            plat_unlock(f);
+            return;
+        }
+        const int cur = seq_lock_get(&seq.pat, t, (uint32_t)s, p);
+        v = clamp((cur >= 0 ? cur : own) + e, 0, 100);
+        full = seq_lock_set(&seq.pat, t, (uint32_t)s, p, v) < 0;
+        lock_seq[t].val[p] = (uint8_t)v;     /* (heard now, as the step plays) */
+        lock_seq[t].mask |= (uint16_t)(1u << p);
+    }
+    seq.edits++;
+    plat_unlock(f);
+    lock_hear();
+    if (full) {
+        app_say("LOCKS", "FULL");
+        return;
+    }
+    a[0] = 0;
+    text_cat(a, "LOCK ");
+    if (active_page == PAGE_OSC || active_page == PAGE_SHAPE) {
+        text_cat(a, param_name(active_page, index));
+        param_text(active_page, index, v, b);
+    } else {                                 /* (the mixer's VOL, SEND) */
+        text_cat(a, PARAM_NAME[active_page][index]);
+        int_text(v, b);
+        if (index)
+            text_cat(b, "%");
+    }
+    app_say(a, b);
+}
+
 /* a white key in step mode: its step on (the last chord played) when pressed, off when let go if it was on and its
  * knobs were not turned; with SEQ held, the last step */
 static void step_key(uint32_t i, int down)
@@ -1835,6 +2016,7 @@ static void step_key(uint32_t i, int down)
             seq_step_t st = TRK.step[s];
             st.on = 0;
             step_write(s, &st);
+            lock_clear_step(s);              /* (0.35: a step taken off, its locks with it) */
             step_say(s);
         }
         ui.step_held = -1;
@@ -2019,6 +2201,8 @@ static void track_select(uint32_t t)
         track_sel = (uint8_t)t;
         ui.step_held = -1;
         ui.roll_lo = 0xFF;
+        ui.lock_held = 0;                    /* (0.35) */
+        lock_hear();
         if (IS_SOUND_PAGE(previous_page)) {
             uint32_t page = previous_page == PAGE_OUTPUT ? sound_pages() - 1u :
                             previous_page == PAGE_OSC || (!SYNTH_IS_DRUM(t) && previous_page == PAGE_SHAPE) ? 0u :
@@ -2233,6 +2417,7 @@ static void track_clear(void)
     uint32_t f = plat_lock();
     for (uint32_t i = 0; i < SEQ_STEPS; i++)
         TRK.step[i].on = 0;
+    seq_lock_clear(&seq.pat, track_sel, -1); /* (0.35: its locks too) */
     seq.skip[track_sel] = 0;
     seq.edits++;
     plat_unlock(f);
@@ -2271,9 +2456,10 @@ static void rec_follow(uint32_t now)
     rec_midi_on = (uint8_t)(ui.rec && seq.playing);
     if (ui.rec && seq.playing && ui.seq_down && now - ui.seq_at >= 150u) {
         const int32_t st = seq.step[track_sel];
-        if (st >= 0 && TRK.step[st].on) {
+        if (st >= 0 && (TRK.step[st].on || seq_lock_mask(&seq.pat, track_sel, (uint32_t)st, 0))) {
             uint32_t f = plat_lock();
             TRK.step[st].on = 0;
+            seq_lock_clear(&seq.pat, track_sel, st);   /* (0.35: its locks too) */
             seq.edits++;
             plat_unlock(f);
         }
@@ -2325,6 +2511,27 @@ static uint32_t save_sweep(uint32_t now)     /* the white keys SAVE's sweep ligh
     if (!ui.sweep_at || since >= SWEEP_MS * 16u + SWEEP_HOLD)
         return 0;
     return n < 16u ? n : 16u;
+}
+
+static void lock_lights(key_lights_t *l, uint32_t now)   /* (0.35) LOCK: a step held or locked lit, one on mid, the
+                                                           * rest dim; black 1..8 the tracks, the selected lit */
+{
+    for (uint32_t i = 0; i < SEQ_PAGE; i++) {
+        const uint32_t s = ui.view_page * SEQ_PAGE + i, bit = 1u << WHITE_KEYS[i];
+        if ((ui.lock_held >> i & 1u) || seq_lock_mask(&seq.pat, track_sel, s, 0))
+            l->lit |= bit;
+        else if (TRK.step[s].on && s < TRK.length)
+            l->mid |= bit;
+        else
+            l->dim |= bit;
+    }
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
+        const uint32_t bit = 1u << BLACK_KEYS[t];
+        if (t == track_sel || now - ui.hit_at[t] < 80u)
+            l->lit |= bit;
+        else
+            l->mid |= bit;
+    }
 }
 
 static void step_lights(key_lights_t *l, uint32_t now)   /* step mode: a step on lit, off within the length mid,
@@ -2412,6 +2619,8 @@ static void lights(uint32_t btn, uint32_t keys)
         lit |= 1u << B_FX;
     if (seq_arp_on(&seq, track_sel) && !IS_ARP_PAGE(active_page))   /* (0.34) the selected track's arp on */
         lit |= 1u << B_ARP;
+    if (ui.lock_mode)                        /* (0.35) LOCK mode */
+        lit |= 1u << B_EDIT;
     {
         const uint32_t b = 1u << page_button(active_page), period = page_period(active_page);
         if (now % period < period / 2u)
@@ -2431,12 +2640,14 @@ static void lights(uint32_t btn, uint32_t keys)
     } else if (seq.playing && now - ui.beat_at < (ui.beat_bar ? 120u : 60u))
         lit |= LED_PLAY_GREEN;               /* PLAY green on each beat, longer on the bar's first */
     key_lights_t k = {keys, 0, 0};
-    if (ui.preset_down || ui.home_down || ui.step_mode || active_page == PAGE_MIXER) {
+    if (ui.preset_down || ui.home_down || ui.lock_mode || ui.step_mode || active_page == PAGE_MIXER) {
         k.lit = k.mid = 0;
         if (ui.preset_down)
             slot_lights(&k);
         else if (ui.home_down)
             pattern_lights(&k, now);
+        else if (ui.lock_mode)
+            lock_lights(&k, now);
         else if (ui.step_mode)
             step_lights(&k, now);
         else
@@ -2504,7 +2715,7 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
  * let go as such, whatever the mode is by then; no pressure sent, no chord */
 static uint32_t keys_taken(void)
 {
-    return ui.key_preset | ui.key_pat | ui.key_mix | ui.key_step;
+    return ui.key_preset | ui.key_pat | ui.key_mix | ui.key_step | ui.key_lock;
 }
 
 /* a key pressed: SAVE held, a preset slot; HOME held, a pattern (1..16); the mixer, a mute (white 1..8) or a solo
@@ -2523,6 +2734,16 @@ static void key_down(uint32_t k)
         ui.home_used = 1;
         if (w >= 0)
             pattern_pick(w);
+    } else if (ui.edit_down && w >= 0) {     /* (0.35) EDIT held, a white key: that step's locks cleared */
+        ui.key_lock |= bit;
+        ui.edit_used = 1;
+        lock_clear_step(ui.view_page * SEQ_PAGE + (uint32_t)w);
+    } else if (ui.lock_mode) {               /* (0.35) LOCK: a step held (white), a track (black 1..8) */
+        ui.key_lock |= bit;
+        if (w >= 0)
+            lock_key((uint32_t)w, 1);
+        else if (b >= 0 && b < (int)SYNTH_TRACKS)
+            track_select((uint32_t)b);
     } else if (active_page == PAGE_MIXER) {   /* (the other keys silent) */
         ui.key_mix |= bit;
         if (w >= 0 && w < (int)SYNTH_TRACKS)
@@ -2565,7 +2786,12 @@ static void key_down(uint32_t k)
 static void key_up(uint32_t k)
 {
     const uint32_t bit = 1u << k;
-    if (ui.key_step & bit) {                 /* (a step: let go as one) */
+    if (ui.key_lock & bit) {                 /* (0.35) a LOCK step, or one cleared: let go as such */
+        const int w = key_index(WHITE_KEYS, 16, k);
+        ui.key_lock &= ~bit;
+        if (w >= 0 && ui.lock_held >> w & 1u)
+            lock_key((uint32_t)w, 0);
+    } else if (ui.key_step & bit) {          /* (a step: let go as one) */
         const int w = key_index(WHITE_KEYS, 16, k);
         ui.key_step &= ~bit;
         if (w >= 0)
@@ -2648,9 +2874,11 @@ static void octave_press(int32_t e)
     if (ui.preset_down) {
         ui.preset_page = (uint8_t)clamp((int32_t)ui.preset_page + e, 0, 3);
         ui.preset_used = ui.preset_shown = ui.redraw = 1;
-    } else if (ui.step_mode) {
+    } else if (ui.step_mode || ui.lock_mode) {   /* (0.35: LOCK's steps too) */
         char t[4];
         ui.view_page = (uint8_t)clamp((int32_t)ui.view_page + e, 0, SEQ_PAGES - 1);
+        ui.lock_held = 0;
+        lock_hear();
         int_text(ui.view_page + 1, t);
         app_say("PAGE", t);
     } else
@@ -2700,7 +2928,10 @@ static void button_press(uint32_t k)
         ui.seq_used = 0;
         ui.seq_at = plat_ms();
         break;
-    case B_EDIT:                             /* (0.32: free; FREEZE, the grains' recording held, went with them) */
+    case B_EDIT:                             /* (0.35) let go: LOCK mode on or off; held, a white key clears a step's
+                                              * locks (0.32..0.34 free; FREEZE until then) */
+        ui.edit_down = 1;
+        ui.edit_used = 0;
         break;
     case B_SEL:                              /* (let go: the mixer, from every page, 0.26.2) */
         ui.sel_down = 1;
@@ -2798,6 +3029,11 @@ static void buttons_let_go(uint32_t btn)
     }
     if (ui.seq_down && !(btn & 1u << B_SEQ))
         seq_let_go();
+    if (ui.edit_down && !(btn & 1u << B_EDIT)) {   /* (0.35) */
+        ui.edit_down = 0;
+        if (!ui.edit_used)
+            lock_mode_toggle();
+    }
     sel_follow(btn);
 }
 
@@ -2906,6 +3142,11 @@ static void encoder_turn(uint32_t k, int32_t e)
     ui.redraw = 1;
     if (knob && ui.step_held >= 0)
         step_turn(index, e);
+    else if (knob && ui.lock_mode && (ui.lock_held || (ui.rec && seq.playing)) &&
+             lock_param(active_page, index) >= 0)   /* (0.35) a lock: on the steps held, or the one playing */
+        lock_turn((uint32_t)lock_param(active_page, index), index, e);
+    else if (knob && ui.lock_mode && ui.lock_held)
+        app_say("LOCK", "NOT ON THIS PAGE");
     else if ((knob || k == EN_K4) && active_page == PAGE_DEBUG)
         debug_turn(index, e);
     else if (knob && active_page == PAGE_SEQ)
@@ -3097,10 +3338,11 @@ typedef struct {
     int32_t frac;
     uint8_t centred;
     uint8_t inherit;                     /* (SEQ's SWING) the pattern's, not the track's own: its value grey */
+    uint8_t locked;                      /* (0.35) LOCK mode: the value the step held locks it to */
     const char *hint;
 } knob_t;
 
-static void knob_get(uint32_t i, knob_t *k)
+static void knob_own(uint32_t i, knob_t *k)
 {
     k->hint = "";
     k->centred = 0;
@@ -3222,6 +3464,28 @@ static void knob_get(uint32_t i, knob_t *k)
     k->frac = v == GRAV_AUTO ? KNOB_AUTO : param_frac(i);
 }
 
+/* a knob as the page shows it: its own value; in LOCK mode with a step held, the step's lock of it (marked locked) */
+static void knob_get(uint32_t i, knob_t *k)
+{
+    knob_own(i, k);
+    k->locked = 0;
+    const int p = lock_param(active_page, i);
+    if (!ui.lock_mode || !ui.lock_held || p < 0 || k->frac < 0)
+        return;
+    const int v = seq_lock_get(&seq.pat, track_sel, lock_first(), (uint32_t)p);
+    if (v < 0)
+        return;
+    k->locked = 1;
+    k->frac = v * 256;
+    k->value[0] = 0;
+    if (active_page == PAGE_MIXER) {
+        int_text(v, k->value);
+        if (i)
+            text_cat(k->value, "%");
+    } else
+        param_text(active_page, i, v, k->value);
+}
+
 static int32_t dial_target(uint32_t i)
 {
     knob_t k;
@@ -3312,10 +3576,12 @@ static void draw_dials(int32_t y0, uint32_t mask, int32_t xoffset)
         const int32_t x = 40 + (int32_t)i * 80 - xoffset, y = y0 + cy0;
         const int hot = knob_since(i) < 450u;
         ui.dial_hot |= (uint8_t)(hot << i);
-        cv_text(x - text_w(&FONT_XS, k.name) / 2, y0, &FONT_XS, k.name, hot ? C_HI : C_GRAY);
+        cv_text(x - text_w(&FONT_XS, k.name) / 2, y0, &FONT_XS, k.name, hot || k.locked ? C_HI : C_GRAY);
+        if (k.locked)                        /* (0.35) locked: a mark before its name */
+            cv_rect(x - text_w(&FONT_XS, k.name) / 2 - 6, y0 + 5, 3, 3, C_HI);
         dial_face(x, y, r + knob_grow(i, full), &k, i, hot, 3, 5);
         const felucca_font_t *font = text_w(&FONT_S, k.value) <= 70 ? &FONT_S : &FONT_XS;
-        cv_text(x - text_w(font, k.value) / 2, y + r + 6, font, k.value, k.frac >= 0 ? C_WHITE : C_GRAY);
+        cv_text(x - text_w(font, k.value) / 2, y + r + 6, font, k.value, k.locked ? C_HI : k.frac >= 0 ? C_WHITE : C_GRAY);
         if (k.hint[0])
             cv_text(x - text_w(&FONT_T, k.hint) / 2, y + r + 24, &FONT_T, k.hint, C_DIM);
     }
@@ -3342,10 +3608,12 @@ static void draw_chips(int32_t y0, uint32_t mask, int32_t xoffset)
         const int hot = knob_since(i) < 450u;
         ui.dial_hot |= (uint8_t)(hot << i);
         dial_face(x, y, 10 + knob_grow(i, 2), &k, i, hot, 2, 4);
-        cv_text(x + 17, y0 + 2, &FONT_T, k.name, hot ? C_HI : C_GRAY);
+        cv_text(x + 17, y0 + 2, &FONT_T, k.name, hot || k.locked ? C_HI : C_GRAY);
+        if (k.locked)                        /* (0.35) locked: a mark after its name */
+            cv_rect(x + 17 + text_w(&FONT_T, k.name) + 3, y0 + 6, 3, 3, C_HI);
         const felucca_font_t *font = text_w(&FONT_S, k.value) <= 46 ? &FONT_S :
                                      text_w(&FONT_XS, k.value) <= 54 ? &FONT_XS : &FONT_T;   /* (CLEAN TAPE) */
-        cv_text(x + 17, y0 + (font == &FONT_T ? 18 : 16), font, k.value, k.inherit ? C_GRAY : C_WHITE);
+        cv_text(x + 17, y0 + (font == &FONT_T ? 18 : 16), font, k.value, k.locked ? C_HI : k.inherit ? C_GRAY : C_WHITE);
     }
 }
 
@@ -4263,7 +4531,9 @@ static void draw_grid(int32_t dy, uint32_t now)
             cv_rect(x, y, 12, CELL_H, c);
             if (st->on && st->n > 1u)        /* a chord: a notch */
                 cv_rect(x + 9, y, 3, 3, sel ? sel_lo : RGB(20, 20, 25));
-            if (sel && ui.step_held == (int8_t)s) {   /* the step held: framed */
+            if (seq_lock_mask(&seq.pat, t, s, 0))   /* (0.35) its locks: a mark at its foot */
+                cv_rect(x + 1, y + CELL_H - 3, 4, 2, sel ? C_WHITE : C_GRAY);
+            if (sel && (ui.step_held == (int8_t)s || (ui.lock_mode && (ui.lock_held >> i & 1u)))) {   /* held: framed */
                 cv_rect(x - 1, y - 1, 14, 1, C_WHITE);
                 cv_rect(x - 1, y + CELL_H, 14, 1, C_WHITE);
                 cv_rect(x - 1, y, 1, CELL_H, C_WHITE);
@@ -4907,6 +5177,24 @@ static void draw_home_band(void)
     cv_text(8, 16, text_w(&FONT_S, n) <= 186 ? &FONT_S : &FONT_XS, n, C_WHITE);
 }
 
+/* (0.35) LOCK's strip: the selected track's 16 steps on the white keys, a cell each: on in its colour, locked marked
+ * white, held white, past its length dark; the one playing lighter */
+static void draw_lock_strip(int32_t y)
+{
+    const uint16_t hue = TRACK_HUE[track_sel];
+    for (uint32_t i = 0; i < SEQ_PAGE; i++) {
+        const uint32_t s = ui.view_page * SEQ_PAGE + i;
+        const int32_t x = 8 + (int32_t)i * 10 + (int32_t)(i / 4u) * 2;
+        const int held = ui.lock_held >> i & 1u, locks = seq_lock_mask(&seq.pat, track_sel, s, 0) != 0;
+        uint16_t c = s >= TRK.length ? C_LINE : TRK.step[s].on ? mix565(C_BLACK, hue, 170) : RGB(30, 30, 38);
+        if (seq.playing && seq.step[track_sel] == (int32_t)s)
+            c = mix565(c, C_WHITE, 90);
+        cv_rect(x, y, 8, 8, held ? C_WHITE : c);
+        if (locks)
+            cv_rect(x + 2, y + 2, 4, 4, held ? C_BLACK : C_WHITE);
+    }
+}
+
 /* (0.26) the mixer's bottom band: its three knobs, small; under them how the keys act here, or a moment's message;
  * the load */
 static void draw_mixer_band(void)
@@ -4916,6 +5204,8 @@ static void draw_mixer_band(void)
     draw_chips(CHIP_Y, 7u, 0);
     if (band_message(t, 160))
         cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
+    else if (ui.lock_mode)                   /* (0.35) LOCK: the steps for the keys */
+        draw_lock_strip(y + 2);
     else
         cv_text(8, y + 2, &FONT_T, "WHITE 1-8 MUTE  BLACK 1-8 SOLO", C_GRAY);
     draw_cpu(178, y);
@@ -5117,7 +5407,11 @@ static void draw_bottom(void)
     else if (IS_ARP_PAGE(active_page))
         draw_arp_band();
     else {
-        draw_status(6);
+        if (ui.lock_mode) {                  /* (0.35) LOCK: the steps for the keys, in the page's state's place */
+            draw_lock_strip(4);
+            cv_text(184, 2, &FONT_XS, "LOCK", C_HI);
+        } else
+            draw_status(6);
         octave_text(t);
         cv_text(8, 23, &FONT_XS, "OCT", C_GRAY);
         cv_text(34, 23, &FONT_XS, t, C_HI);
@@ -5544,6 +5838,17 @@ int app_expect(const char *what, int *got)
         *got = (int)lake.echoes;
     else if (!strcmp(what, "lake_ripples"))
         *got = (int)lake.ripples;
+    else if (!strcmp(what, "lock_mode"))     /* (0.35) LOCK mode; the pattern's locks; the steps held; a step's lock
+                                              * (lk<step>_<param>, -1 none); a knob heard locked (lkon<param>, -1) */
+        *got = ui.lock_mode;
+    else if (!strcmp(what, "locks"))
+        *got = (int)seq.pat.nlocks;
+    else if (!strcmp(what, "lock_held"))
+        *got = (int)ui.lock_held;
+    else if (!strncmp(what, "lkon", 4))
+        *got = (int)locked(track_sel, (uint32_t)atoi(what + 4) % SEQ_LK_PARAMS, -1);
+    else if (!strncmp(what, "lk", 2) && strchr(what, '_'))
+        *got = seq_lock_get(&seq.pat, track_sel, (uint32_t)atoi(what + 2) - 1u, (uint32_t)atoi(strchr(what, '_') + 1));
     else if (!strncmp(what, "arp_", 4)) {    /* (0.34) the selected track's arp: its settings, notes held, played */
         const char *w = what + 4;
         *got = !strcmp(w, "mode") ? (int)arp_mode(track_sel) : !strcmp(w, "rate") ? (int)arp_rate(track_sel) :

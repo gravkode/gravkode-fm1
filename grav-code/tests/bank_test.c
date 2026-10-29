@@ -149,10 +149,53 @@ int main(void)
             }
     }
 
+    /* (0.35) a pattern with its locks, saved and read back whole; one as 0.18..0.34 saved it (no locks: its size the
+     * old one) taken, its steps as they were, no locks when loaded */
+    memset(flash, 0xFF, sizeof flash);
+    bank_init(&b);
+    seq_defaults(&p);
+    p.track[2].step[5].on = 1;
+    CHECK(seq_lock_set(&p, 2, 5, SEQ_LK_OSC1, 77) == 0 && seq_lock_set(&p, 6, 0, SEQ_LK_SEND, 10) == 0, "locks set");
+    save(&b, 4, &p);
+    bank_init(&b);
+    {
+        static seq_t s;
+        seq_init(&s);
+        seq_load(&s, bank_pattern(&b, 4));
+        CHECK(s.pat.nlocks == 2 && seq_lock_get(&s.pat, 2, 5, SEQ_LK_OSC1) == 77 &&
+              seq_lock_get(&s.pat, 6, 0, SEQ_LK_SEND) == 10, "the locks read back");
+    }
+    {
+        const uint32_t off = BANK_LO + 7u * BANK_SLOT, size = SEQ_PATTERN_V018;
+        seq_defaults(&q);
+        q.track[1].step[9].on = 1;
+        q.track[1].step[9].note[0] = 71;
+        for (uint32_t at = 0; at < size; at += BANK_PAGE)
+            CHECK(plat_data_write(off + BANK_DATA + at, (const uint8_t *)&q + at,
+                                  size - at < BANK_PAGE ? size - at : BANK_PAGE) == 0, "old pattern written");
+        bank_head_t h;
+        memset(&h, 0, sizeof h);
+        h.magic = BANK_MAGIC;
+        h.pattern = 9;
+        h.size = (uint16_t)size;
+        h.seq = 1000;
+        h.crc = bank_crc32(&q, size, 0);
+        h.hcrc = bank_crc32(&h, __builtin_offsetof(bank_head_t, hcrc), 0);
+        CHECK(plat_data_write(off, &h, sizeof h) == 0, "old header written");
+        bank_init(&b);
+        const seq_pattern_t *old = bank_pattern(&b, 9);
+        CHECK(old != 0 && old->track[1].step[9].on && old->track[1].step[9].note[0] == 71, "0.34's pattern taken");
+        static seq_t s;
+        seq_init(&s);
+        seq_load(&s, old);
+        CHECK(s.pat.nlocks == 0 && s.pat.track[1].step[9].note[0] == 71, "0.34's pattern loaded: no locks");
+        CHECK(bank_pattern(&b, 4) != 0, "the new one still there");
+    }
+
     if (fails) {
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: the patterns' bank (saves, newest copy, cut short, failed write, damage, wear, full)\n");
+    printf("PASS: the patterns' bank (saves, newest copy, cut short, failed write, damage, wear, full, locks, 0.34's patterns)\n");
     return 0;
 }

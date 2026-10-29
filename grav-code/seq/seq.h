@@ -40,6 +40,21 @@ typedef struct {
     seq_step_t step[SEQ_STEPS];
 } seq_track_t;
 
+/* (0.35) a parameter lock: a step's own value of one of its track's knobs (SEQ_LK_*), from the step until the track's
+ * next step that plays or locks; kept in its pattern's pool, sorted by key */
+#define SEQ_LOCKS 512u
+enum { SEQ_LK_OSC0, SEQ_LK_OSC1, SEQ_LK_OSC2,   /* OSC's (a drum's DRUM page: TONE, DECAY) */
+       SEQ_LK_TUNE,                              /* a drum's TUNE */
+       SEQ_LK_SHAPE0, SEQ_LK_SHAPE1, SEQ_LK_SHAPE2,   /* a drum's SHAPE */
+       SEQ_LK_VOL, SEQ_LK_SEND,                  /* the mixer's */
+       SEQ_LK_PARAMS };
+#define SEQ_LOCK_KEY(track, step, param) ((uint16_t)((uint32_t)(track) << 10 | (uint32_t)(step) << 4 | (uint32_t)(param)))
+typedef struct {
+    uint16_t key;                        /* SEQ_LOCK_KEY */
+    uint8_t value;                       /* 0..100 */
+    uint8_t rsv;
+} seq_lock_t;
+
 typedef struct {
     uint32_t magic;                      /* SEQ_MAGIC */
     uint16_t bpm;                        /* the tempo it was saved with (SEQ_BPM_MIN..MAX); since 0.18 the song's
@@ -49,7 +64,11 @@ typedef struct {
     uint8_t rsv;
     seq_track_t track[SEQ_TRACKS];
     uint32_t drum_magic;                 /* SEQ_MAGIC_DRUMS: the end of the drum tracks' record */
+    uint16_t nlocks;                     /* (0.35) its parameter locks; a pattern saved before has none */
+    uint16_t lock_rsv;
+    seq_lock_t lock[SEQ_LOCKS];
 } seq_pattern_t;
+#define SEQ_PATTERN_V018 __builtin_offsetof(seq_pattern_t, nlocks)   /* a pattern as 0.18..0.34 saved it */
 
 /* saved in two records (a store object holds 3840 bytes at most), each as it lies in the pattern (no copy to save):
  * its head, the synth tracks with the tempo (as 0.16 saved its whole pattern), and its tail, the drum tracks */
@@ -72,8 +91,9 @@ typedef struct {                         /* 0.15's record: one track */
     seq_step_t step[SEQ_STEPS];
 } seq_pattern_v1_t;
 
-/* a block's events, in the order to apply them: by offset, a note's end before a note's start at the same one */
-enum { SEQ_EV_OFF = 1, SEQ_EV_STOP, SEQ_EV_START, SEQ_EV_CLOCK, SEQ_EV_ON,
+/* a block's events, in the order to apply them: by offset, a note's end before a note's start at the same one (and a
+ * step's locks before its notes: SEQ_EV_LOCK, its step in note, 0.35) */
+enum { SEQ_EV_OFF = 1, SEQ_EV_STOP, SEQ_EV_START, SEQ_EV_CLOCK, SEQ_EV_LOCK, SEQ_EV_ON,
        SEQ_EV_BEAT };                    /* (0.24) a quarter note begins, while beats is set: the metronome's click
                                           * (note 1: the bar's first) */
 typedef struct {
@@ -188,7 +208,15 @@ int seq_has_steps(const seq_pattern_t *p);
 /* a pattern copied in to play (src: 0, an empty one), from its first step (the audio interrupt at a pattern's end;
  * the main loop, under plat_lock, while stopped) */
 void seq_load(seq_t *s, const seq_pattern_t *src);
-int seq_valid(const seq_pattern_t *p);   /* a loaded record that can be played */
+int seq_valid(const seq_pattern_t *p);   /* a loaded record that can be played (its steps: as 0.18 saved it) */
+int seq_locks_valid(const seq_pattern_t *p);   /* (0.35) its locks: sorted, each where a step can be */
+/* (0.35) the main loop, under plat_lock: a step's lock of param, its value (-1: none); set (value -1: removed; -1
+ * returned: the pool full); a step's locks gone (every step's of a track: step -1); the ones it has, a bit each,
+ * their values into val (SEQ_LK_PARAMS) */
+int seq_lock_get(const seq_pattern_t *p, uint32_t track, uint32_t step, uint32_t param);
+int seq_lock_set(seq_pattern_t *p, uint32_t track, uint32_t step, uint32_t param, int32_t value);
+void seq_lock_clear(seq_pattern_t *p, uint32_t track, int32_t step);
+uint32_t seq_lock_mask(const seq_pattern_t *p, uint32_t track, uint32_t step, uint8_t *val);
 /* 0.15's record, read into S1 of a pattern (the others empty); 0 if it is no such record */
 int seq_from_v1(const seq_pattern_v1_t *v1, seq_pattern_t *p);
 /* a pattern's two records, where they lie in it: OBJ_SEQ's (a seq_record_t) and OBJ_DRUMS' (a seq_drum_record_t) */

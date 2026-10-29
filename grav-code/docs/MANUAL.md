@@ -71,7 +71,8 @@ From the top:
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
   STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED, and CPU
-  (the engine is in the header). On the mixer, the effect's (0.33) and the arp's (0.34) pages the page's three knobs,
+  (the engine is in the header). In LOCK mode (0.35) the page's state is the 16 steps on the white keys and LOCK. On
+  the mixer, the effect's (0.33) and the arp's (0.34) pages the page's three knobs,
   small, and under them what the mixer's keys do, ECHO's time and whether the effect is on, or the notes the arp
   holds; and CPU. The keys are not drawn: the
   FM-1's own are under the screen.
@@ -95,7 +96,7 @@ From the top:
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
 | ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
-| EDIT | Free since 0.32 (until then FREEZE, the grains' recording held) |
+| EDIT | LOCK mode (0.35): tap, on or off; held with a white key, that step's locks cleared (section 5). Lit while on (0.32..0.34 free; FREEZE before) |
 | SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again (0.31): the selected track alone, a synth track's notes as a piano roll, a drum track's 64 steps; a third time: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
@@ -242,7 +243,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003400, version 0.34.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003500, version 0.35.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -387,7 +388,8 @@ since 0.29; the engine in the header, the bottom band one line of state since 0.
 (0.30.1: bigger, on down to the screen's foot), S1 to S4 then D1 to D4, named at the left, each
 in its track's colour, its terricon's on HOME (since 0.28), the selected one on a ground of its colour; the 16 steps
 of the page shown across (the white keys), in beats of four. A step on is lit in its track's colour, brighter the
-harder it plays (the selected track's brightest); a notch at its corner marks a chord; past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
+harder it plays (the selected track's brightest); a notch at its corner marks a chord, a mark at its foot its locks
+(0.35); past a track's LENGTH, a dot. Each track's step playing lights (tracks of different lengths drift apart), a
 note flashing white as it begins. A held step is framed in white. The pages are under the rows, as on HOME.
 
 | Do | What happens |
@@ -462,6 +464,32 @@ It is saved with the settings.
 **Clearing a track:** hold SEQ and press REC: the selected track's steps all go off (its length stays), playing or
 stopped. SEQ let go then does not switch step mode.
 
+### Parameter locks (EDIT, 0.35)
+
+![LOCK on the OSC page: S1's step 3 held, INVERSION 35 and CHORD 97 locked on it (in the theme's colour, marked), WAVE the track's own 50; in the bottom band the 16 steps on the white keys, the notes in S1's colour, steps 3, 6 and 7 marked as locked, step 3 held; LOCK; STEP 3 LOCKS 2](img/screen-lock.png "LOCK")
+
+A step can have its own value of a track's knobs: a parameter lock. It holds from the step until the track's next step
+that plays or locks; a step that plays without locks brings the track's own knobs back, and so does stopping.
+
+- **LOCK mode:** tap EDIT (lit while on). On every page the white keys are then the selected track's steps (OCT- and
+  OCT+ the other pages of 16), the black keys the tracks, as in step mode. A step locked or held is lit, one with a
+  note half lit. The bottom band shows the 16 steps (a note in the track's colour, a lock marked white) and LOCK.
+- **A lock:** hold a step (or several) and turn a knob: each held step locks it, from its own lock or the track's
+  value. While held, the step's locks are heard and the page shows them: a locked knob's name and value in the theme's
+  colour, marked. Let go, the knobs show the track's own again.
+- **What can lock:** OSC's three knobs; a drum track's DRUM page (TUNE and its two knobs) and SHAPE; the mixer's VOL
+  and SEND (SEND locked on a step throws it into the effect). Elsewhere (ENV, MOD, the effect, the arp, the sound's
+  other pages) LOCK NOT ON THIS PAGE: those are not locked.
+- **A lock without a note:** hold a step that is off and lock it: it changes the sound as the song passes it, without
+  a note (a pad's long chord moving under it).
+- **Recording the knobs:** in LOCK mode, recording live (REC while playing; REC shows HOME: open the knob's page), a
+  knob turned locks the step playing, heard at once: a move over several steps locks each of them.
+- **Clearing:** hold EDIT and press a step's white key: its locks go (LOCK mode stays as it was). A step taken off in
+  step mode loses its locks too; clearing a track (SEQ held, REC) clears its locks.
+
+In step mode a step with locks has a white mark at its foot. A pattern holds up to 512 locks, saved with it; patterns
+saved before 0.35 load as they were, with none.
+
 ### Playing (PLAY)
 
 PLAY starts from step 1; PLAY again stops, and every note it holds ends. PLAY's green LED flashes on each beat,
@@ -500,7 +528,7 @@ selected) and, while it plays, Start, 24 clocks a quarter note and Stop.
 A MIDI clock coming in (USB or TRS) leads it: Start, Continue and Stop start and stop it, its tempo shows on SEQ
 (MIDI CLOCK), swing still applies; half a second without a clock, the sequencer's own TEMPO takes over again.
 
-SAVE keeps the pattern playing too (section 9). The pattern 0.17 and before saved becomes pattern 1, with its
+SAVE keeps the pattern playing too, its locks with it (section 9). The pattern 0.17 and before saved becomes pattern 1, with its
 tempo (0.15's, of one track, as S1's; 0.16's with the drum tracks empty).
 
 ---
