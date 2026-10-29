@@ -63,11 +63,11 @@ expect shed 0
 shot debug.png
 tap HOME
 wait 30
-# Turn on reverb, keep it running through DEBUG and one/two-core switches. (FX MIX: FX's first page since 0.26.2)
+# Turn on reverb, keep it running through DEBUG and one/two-core switches. (HALL: FX's first page since 0.32)
 tap FX
 wait 30
-expect page 6
-turn K2 60
+expect page 4
+turn K1 60
 wait 30
 expect fx_on 1
 tap GLO
@@ -81,7 +81,7 @@ expect fx_core 0
 turn K1 1
 wait 200
 expect fx_on 1
-# two cores, the effect on: Beads on CPU1, the voices where there is room (all on CPU0 when Beads is heavy)
+# two cores, the effect on: on CPU1, the voices where there is room
 expect fx_core 1
 expect worker_jobs >0
 shot debug-fx.png

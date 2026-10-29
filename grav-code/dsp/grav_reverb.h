@@ -8,10 +8,10 @@
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be included in
 // all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -19,50 +19,54 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-// 
+//
 // See http://creativecommons.org/licenses/MIT/ for more information.
 //
 // -----------------------------------------------------------------------------
 //
-// Reverb.
+// Beads' reverb (beads/dsp/fx/reverb.h), on its own as GRAV CODE's HALL (0.32):
+// wet only (the dry goes round it), and its diffusion and its tail's modulation
+// set from outside (Beads fixes them). The topology, its delays and its LFOs are
+// Beads' own.
 
-#ifndef BEADS_DSP_FX_REVERB_H_
-#define BEADS_DSP_FX_REVERB_H_
+#ifndef GRAV_DSP_REVERB_H_
+#define GRAV_DSP_REVERB_H_
 
 #include "stmlib/stmlib.h"
 #include "stmlib/dsp/parameter_interpolator.h"
 
 #include "beads/dsp/fx/fx_engine.h"
 
-namespace beads {
+namespace grav {
 
 class Reverb {
  public:
   Reverb() { }
   ~Reverb() { }
-  
+
   void Init(uint16_t* buffer, float sample_rate) {
     engine_.Init(buffer);
-    Reset(sample_rate);
+    engine_.SetLFOFrequency(beads::LFO_1, 0.5f / sample_rate);
+    engine_.SetLFOFrequency(beads::LFO_2, 0.3f / sample_rate);
+    time_ = 0.5f;
+    lp_ = 0.6f;
+    diffusion_ = 0.625f;
+    mod_ = 1.0f;
+    Clear();
   }
-  
-  void Reset(float sample_rate) {
-    engine_.SetLFOFrequency(LFO_1, 0.5f / sample_rate);
-    engine_.SetLFOFrequency(LFO_2, 0.3f / sample_rate);
-    lp_ = 0.7f;
-    lp_1_ = 0.0f;
-    lp_2_ = 0.0f;
-    mix_ = 0.0f;
-    dry_ = 0.0f;
-    wet_ = 0.0f;
+
+  void Clear() {
+    engine_.Clear();
+    lp_1_ = lp_2_ = 0.0f;
     send_ = 0.0f;
   }
-  
-  void Process(FloatFrame* in_out, size_t size) {
-    // This is the Griesinger topology described in the Dattorro paper
-    // (4 AP diffusers on the input, then a loop of 2x 2AP+1Delay).
-    // Modulation is applied in the loop of the first diffuser AP for additional
-    // smearing; and to the two long delays for a slow shimmer/chorus effect.
+
+  // in: the mono send; its wet added to l and r. send: how much of in goes in
+  // (Beads' REVERB's share, its curve outside), interpolated over the block
+  void Process(const float* in, float* l, float* r, size_t size, float send) {
+    // The Griesinger topology described in the Dattorro paper (4 AP diffusers
+    // on the input, then a loop of 2x 2AP+1Delay). Modulation in the loop of
+    // the first diffuser AP smears it; on the two long delays, a slow shimmer.
     typedef E::Reserve<150,
       E::Reserve<214,
       E::Reserve<319,
@@ -85,44 +89,27 @@ class Reverb {
     E::DelayLine<Memory, 9> del2;
     E::Context c;
 
-    const float kap = 0.625f;
+    const float kap = diffusion_;
     const float klp = lp_;
-    const float krt = reverb_time_;
-
-    const float input_gain = 0.2f * (1.0f - 0.333f * reverb_time_);
+    const float krt = time_;
+    // the modulation's depths, Beads' at mod_ 1; the long delays read back from
+    // their ends so that the deepest still stays within each (an LFO: 0..1)
+    const float m1 = 80.0f * mod_, m2 = 50.0f * mod_, m3 = 40.0f * mod_;
+    const float input_gain = 0.2f * (1.0f - 0.333f * krt);
     const float output_gain = 0.4f / input_gain;
-    
-    // const float send_amount = 1.0f;
-    // const float wet = mix_ * (2.0f - mix_) * output_gain;
-    
-    const float send_amount_sqrt = mix_ * (2.0f - mix_);
-    const float send_amount = send_amount_sqrt * (2.0f - send_amount_sqrt);
-    const float wet = output_gain;
-    const float dry = (1.0f - mix_) * (1.0f + mix_);
-    
-    stmlib::ParameterInterpolator wet_modulation(&wet_, wet, size);
-    stmlib::ParameterInterpolator dry_modulation(&dry_, dry, size);
-    stmlib::ParameterInterpolator send_modulation(
-        &send_,
-        send_amount * input_gain,
-        size);
+    stmlib::ParameterInterpolator send_modulation(&send_, send * input_gain, size);
 
-    while (size--) {
-      const float dry_amount = dry_modulation.Next();
-      const float wet_amount = wet_modulation.Next();
+    for (size_t i = 0; i < size; ++i) {
       const float send_amount = send_modulation.Next();
-      
       float wet;
       float apout = 0.0f;
       engine_.Start(&c);
-      
-      // Smear AP1 inside the loop.
-      c.Interpolate(ap1, 10.0f, LFO_1, 80.0f, 1.0f);
+
+      c.Interpolate(ap1, 10.0f, beads::LFO_1, m1, 1.0f);
       c.Write(ap1, 100, 0.0f);
-      
-      c.Read(in_out->l + in_out->r, send_amount);
-      
-      // Diffuse through 4 allpasses.
+
+      c.Read(in[i] * 2.0f, send_amount);   // (Beads: left + right, a mono pair)
+
       c.Read(ap1 TAIL, kap);
       c.WriteAllPass(ap1, -kap);
       c.Read(ap2 TAIL, kap);
@@ -132,10 +119,9 @@ class Reverb {
       c.Read(ap4 TAIL, kap);
       c.WriteAllPass(ap4, -kap);
       c.Write(apout);
-      
-      // Main reverb loop.
+
       c.Load(apout);
-      c.Interpolate(del2, 6261.0f, LFO_2, 50.0f, krt);
+      c.Interpolate(del2, 6311.0f - m2, beads::LFO_2, m2, krt);
       c.Lp(lp_1_, klp);
       c.Read(dap1a TAIL, -kap);
       c.WriteAllPass(dap1a, kap);
@@ -143,11 +129,10 @@ class Reverb {
       c.WriteAllPass(dap1b, -kap);
       c.Write(del1, 1.0f);
       c.Write(wet);
-
-      in_out->l = in_out->l * dry_amount + wet * wet_amount;
+      l[i] += wet * output_gain;
 
       c.Load(apout);
-      c.Interpolate(del1, 4460.0f, LFO_1, 40.0f, krt);
+      c.Interpolate(del1, 4500.0f - m3, beads::LFO_1, m3, krt);
       c.Lp(lp_2_, klp);
       c.Read(dap2a TAIL, kap);
       c.WriteAllPass(dap2a, -kap);
@@ -155,45 +140,30 @@ class Reverb {
       c.WriteAllPass(dap2b, kap);
       c.Write(del2, 1.0f);
       c.Write(wet);
-      
-      in_out->r = in_out->r * dry_amount + wet * wet_amount;
-      ++in_out;
+      r[i] += wet * output_gain;
     }
   }
-  
-  inline void set_mix(float mix) {
-    mix_ = mix;
-  }
-  
-  inline void set_time(float reverb_time) {
-    reverb_time_ = reverb_time;
-  }
-  
-  inline void set_lp(float lp) {
-    lp_ = lp;
-  }
-  
-  inline void Clear() {
-    engine_.Clear();
-  }
-  
+
+  inline void set_time(float reverb_time) { time_ = reverb_time; }   // the loop's gain, under 1
+  inline void set_lp(float lp) { lp_ = lp; }                          // the loop's low pass: 1 open
+  inline void set_diffusion(float kap) { diffusion_ = kap; }         // the all-passes' gain (Beads: 0.625)
+  inline void set_mod(float mod) { mod_ = mod; }                      // 0 still, 1 Beads', 1.6 at most
+
  private:
-  typedef FxEngine<32768, FORMAT_16_BIT> E;
+  typedef beads::FxEngine<32768, beads::FORMAT_16_BIT> E;
   E engine_;
-  
-  float mix_;
-  float wet_;
-  float dry_;
+
   float send_;
-  float reverb_time_;
+  float time_;
   float lp_;
-  
+  float diffusion_;
+  float mod_;
   float lp_1_;
   float lp_2_;
-  
+
   DISALLOW_COPY_AND_ASSIGN(Reverb);
 };
 
-}  // namespace beads
+}  // namespace grav
 
-#endif  // BEADS_DSP_FX_REVERB_H_
+#endif  // GRAV_DSP_REVERB_H_

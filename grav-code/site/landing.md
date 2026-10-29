@@ -4,7 +4,8 @@ GRAV CODE turns the M-VAVE FM-1 into a synthesizer on all of Mutable Instruments
 analog, waveshaping, FM and 6-operator FM, grains, additive, wavetables, chords, speech, swarms, noise, particles,
 strings and modal resonators, drums, wave terrains, a string machine and chiptune, up to four voices at once (or
 one, MONO). The keys play it with velocity (or a fixed one); an envelope shapes it and an LFO moves its timbre,
-morph or pitch; Mutable Instruments Beads, its granular processor, delay, tape and reverb, is its effect; a sequencer
+morph or pitch; its effect is an echo in time with the tempo and Mutable Instruments Beads' reverb, in Beads' tape
+and digital colours; a sequencer
 of eight tracks, four synth tracks each its own engine and four drum tracks, 64 steps on the white keys and sixteen
 patterns, plays it, with swing and MIDI clock; the settings and the pattern save; MIDI goes out
 and comes in over USB and TRS. ALGO chooses the engine, PRESET its sound: four factory starting points per
@@ -28,7 +29,7 @@ Version {{VERSION}}. Installing is at your own risk; the installer can put M-VAV
 
 ## Credits and licences
 
-The sound engines are Mutable Instruments Plaits', the effect is Mutable Instruments Beads', and their library is
+The sound engines are Mutable Instruments Plaits', the reverb and tape colours Mutable Instruments Beads', and their library is
 stmlib, all by Emilie Gillet ([source](https://github.com/pichenettes/eurorack)), used under the MIT License:
 
 ```

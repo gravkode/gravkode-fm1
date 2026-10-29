@@ -60,12 +60,10 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
     grav_dual_core = dual;
     enabled = !offline;
     accept_job = !reject;
-    grav_beads_params_t fx = {};
-    fx.density = 0.8f; fx.time = 0.4f; fx.size = 0.35f; fx.shape = 0.6f; fx.pitch = 0.5f;
-    fx.feedback = 0.2f; fx.dry_wet = fx_on ? 0.35f : 0.0f;
-    fx.reverb = fx_on ? 0.6f : 0.0f;
+    grav_fx_params_t fx = {};            // (0.32) ECHO and HALL, each QUALITY in turn
+    fx.hall = fx_on ? 0.6f : 0.0f; fx.time = 0.5f; fx.tone = 0.55f; fx.diffuse = 0.7f; fx.mod = 0.6f;
+    fx.echo = fx_on ? 0.5f : 0.0f; fx.feedback = 0.5f; fx.echo_time = 3; fx.bpm = 140.0f;
     fx.quality = engine % GRAV_FX_QUALITIES;
-    fx.seed_auto = 1;
     std::vector<int32_t> result;
     for (unsigned b = 0; b < 40; ++b) {
         // Changes and steals occur while releases and reverb are still sounding.
@@ -82,7 +80,8 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
         }
         if (b == 25) synth_panic(&synth);
         if (toggle) grav_dual_core = b % 3 != 0;
-        fx.freeze = fx_on && b >= 20 && b < 24;
+        if (fx_on && b == 20) fx.hall = 0.0f, fx.echo = 0.0f;   // (the sends off: the tails ring on)
+        if (fx_on && b == 24) fx.hall = 0.6f, fx.echo = 0.5f;
         // 256 is not a multiple of Plaits' 12-sample FIFO; also exercise partial blocks.
         const unsigned n = b % 7 == 0 ? 37 : 256;
         int32_t output[512];
@@ -152,7 +151,7 @@ static std::vector<int32_t> six_op_audio(unsigned engine, float attack, float de
     grav_dual_core = 0;
     enabled = true;
     accept_job = true;
-    grav_beads_params_t fx = {};
+    grav_fx_params_t fx = {};
     synth_note_on(&synth, 60, 100);
     std::vector<int32_t> result;
     for (unsigned b = 0; b < 100; ++b) {
@@ -276,7 +275,7 @@ static bool shed_fade() {
             synth_envelopes(&synth, 0.0f, 0.0f, 0.7f, 2.0f, 44100.0f);
             grav_engine_init(&dsp);
             grav_dual_core = 0;
-            grav_beads_params_t fx = {};
+            grav_fx_params_t fx = {};
             synth_note_on(&synth, 60, 100);
             synth_shed(&synth);                        // alone: kept
             if (synth.shed_count) {
@@ -367,7 +366,7 @@ static bool preset_audio() {
         sound[t].morph = 0.05f;
     }
     synth_track_note_on(&synth, 4, 36, 100);
-    grav_beads_params_t fx = {};
+    grav_fx_params_t fx = {};
     for (unsigned b = 0; b < 1000; ++b) {
         if (b == 2) synth_track_note_off(&synth, 4, 36);
         int32_t out[512];

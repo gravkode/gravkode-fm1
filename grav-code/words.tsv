@@ -18,8 +18,7 @@ MOD	modulation
 ENV	envelope
 LFO DEST	L F O destination
 GLO	global settings
-FX GRAIN	effect, grain
-FX SHAPE	effect, shape
-FX MIX	effect, mix
-DRY/WET	dry wet
+HALL	effect, hall reverb
+TAPE	effect, tape
+ECHO	effect, echo
 SEQ	sequencer

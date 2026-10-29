@@ -18,9 +18,13 @@
 
 _Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
 
-/* the effect's knobs (FX: GRAIN, SHAPE, MIX; QUALITY apart), 0..100 */
-enum { FX_DENSITY, FX_TIME, FX_SIZE, FX_SHAPE, FX_PITCH, FX_FEEDBACK, FX_DRY_WET, FX_REVERB, FX_N };
-static const uint8_t FX_DEFAULT[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};   /* (DRY/WET and REVERB 0: off) */
+/* (0.32) the effect's knobs, 0..100: HALL's AMOUNT, TIME, TONE; TAPE's DIFFUSE, MOD (its QUALITY apart); ECHO's
+ * AMOUNT, TIME (a note value: 0..GRAV_ECHO_TIMES - 1, dsp/grav_fx.h), FEEDBACK. Until 0.31, Beads': DENSITY, TIME,
+ * SIZE, SHAPE, PITCH, FEEDBACK, DRY/WET, REVERB (fx_layout 0) */
+enum { FX_HALL, FX_HALL_TIME, FX_TONE, FX_DIFFUSE, FX_MOD, FX_ECHO, FX_ECHO_TIME, FX_FEEDBACK, FX_N };
+static const uint8_t FX_DEFAULT[FX_N] = {0, 40, 55, 70, 60, 0, 7, 35};   /* (both AMOUNTs 0: off; ECHO at 1/8.) */
+#define FX_LAYOUT 1u                         /* fx_layout: the knobs as 0.32 has them */
+#define FX_OLD_REVERB 7u                     /* (Beads' REVERB, as saved before: HALL's AMOUNT now) */
 
 #define SET_MAGIC 0x47525639u
 /* GLO's METRONOME: clicks while recording live; OFF; COUNT: and a bar's count-in when recording starts from a stop */
@@ -47,8 +51,9 @@ typedef struct {
     uint8_t sky;                         /* (0.29) GLO's SCREEN, K2: HOME's sky, SKY_*: NIGHT (1; 0 as saved before),
                                           * OFF (2), DAY (3) */
     uint8_t fx[FX_N];                    /* 0.13: the effect's knobs; in a record saved before (20 bytes): defaults */
-    uint8_t fx_quality;                  /* GRAV_FX_* (dsp/grav_beads.h) */
-    uint8_t fx_reserved[3];
+    uint8_t fx_quality;                  /* GRAV_FX_* (dsp/grav_fx.h) */
+    uint8_t fx_layout;                   /* (0.32) FX_LAYOUT; 0 (as saved before): Beads' knobs */
+    uint8_t fx_reserved[2];
     /* 0.16: the synth tracks' sounds (S1..S4): engine, OSC's three knobs, voices (0..4, together 4 at most). engine_id
      * and osc[] above keep S1's, for the record's older readers */
     uint8_t trk_engine[SYNTH_S_TRACKS];
@@ -112,10 +117,10 @@ enum {
     PAGE_MOD,
     PAGE_ENV,
     PAGE_GLO,                            /* the firmware and its global settings: VOICES, VELOCITY */
-    PAGE_FX_GRAIN,                       /* the effect (FX: MIX first since 0.26.2, again GRAIN, SHAPE): DENSITY, TIME,
-                                          * SIZE */
-    PAGE_FX_SHAPE,                       /* SHAPE, PITCH, FEEDBACK */
-    PAGE_FX_MIX,                         /* DRY/WET, REVERB, QUALITY */
+    PAGE_FX_HALL,                        /* (0.32) the effect (FX, again TAPE, again ECHO): the reverb's AMOUNT, TIME,
+                                          * TONE */
+    PAGE_FX_TAPE,                        /* QUALITY, DIFFUSE, MOD */
+    PAGE_FX_ECHO,                        /* the delay's AMOUNT, TIME, FEEDBACK */
     PAGE_DEBUG,                          /* GLO again: dual-core diagnostics */
     PAGE_SEQ,                            /* HOME: the sequence (HOME again: OSC, the sound) */
     PAGE_SHAPE,                          /* a drum track's: HOME after its DRUM page (OSC's): SHAPE's knobs */
@@ -125,14 +130,14 @@ enum {
     PAGE_MIXER,                          /* (0.26) SEL: the eight tracks' LEVEL, SEND, mutes; the effect's RETURN */
     PAGE_N
 };
-#define IS_FX_PAGE(p) ((p) >= PAGE_FX_GRAIN && (p) <= PAGE_FX_MIX)
+#define IS_FX_PAGE(p) ((p) >= PAGE_FX_HALL && (p) <= PAGE_FX_ECHO)
 #define IS_SOUND_PAGE(p) ((p) == PAGE_OSC || (p) == PAGE_SHAPE || (p) == PAGE_SOUND || (p) == PAGE_OUTPUT)
 
 static uint8_t active_page = PAGE_SEQ;
-static uint8_t fx_page = PAGE_FX_MIX;    /* the FX page shown last: FX goes back to it (0.26.2: FX MIX first) */
+static uint8_t fx_page = PAGE_FX_HALL;   /* the FX page shown last: FX goes back to it (0.32: HALL first) */
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
-static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "FX GRAIN", "FX SHAPE", "FX MIX", "DEBUG",
+static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "HALL", "TAPE", "ECHO", "DEBUG",
                                               "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER"};
 static const char *page_name(uint32_t page);
 
@@ -167,14 +172,9 @@ static seq_t seq;
 static uint8_t seq_midi_sent[SYNTH_TRACKS][16];   /* each track's notes whose note-on went out: note-offs owed */
 static uint32_t seq_midi_owed;
 
-/* the effect (Beads): its knobs (FX_*), QUALITY, and EDIT's and SEL's states; the audio interrupt reads them */
+/* the effect (0.32: HALL, TAPE, ECHO): its knobs (FX_*) and QUALITY; the audio interrupt reads them */
 static volatile int32_t fx_params[FX_N];
 static volatile int32_t fx_quality;      /* GRAV_FX_* */
-static volatile uint8_t fx_freeze;       /* EDIT: the recording held */
-static volatile uint8_t fx_seed;         /* SEL held */
-static volatile uint8_t fx_seed_auto = 1;   /* grains on their own (DENSITY's); SEL pressed: by hand, held 2 s: back */
-#define SEED_AUTO_MS 2000u
-#define SEED_HOLD_MS 400u                    /* (0.26.2) SEL held this long on an FX page: SEED (a tap: the mixer) */
 static const char *const QUALITY_NAME[GRAV_FX_QUALITIES] = {"DIGITAL", "VINTAGE", "CLEAN TAPE", "DIRTY TAPE"};
 
 /* Plaits' three knobs (OSC), each track's: 0..100% */
@@ -222,9 +222,9 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"LFO RATE", "LFO DEPTH", "LFO DEST"},
     {"ATTACK", "DECAY", "RELEASE"},
     {"VOICES", "VELOCITY", "METRONOME"},
-    {"DENSITY", "TIME", "SIZE"},
-    {"SHAPE", "PITCH", "FEEDBACK"},
-    {"DRY/WET", "REVERB", "QUALITY"},
+    {"AMOUNT", "TIME", "TONE"},
+    {"QUALITY", "DIFFUSE", "MOD"},
+    {"AMOUNT", "TIME", "FEEDBACK"},
     {"", "", ""},
     {"TEMPO", "SWING", "LENGTH"},
     {"PUNCH", "SWEEP", "DRIVE"},
@@ -322,7 +322,7 @@ static void seq_apply(const seq_event_t *e)
     }
 }
 
-static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav_beads_params_t *fx);
+static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav_fx_params_t *fx);
 
 /* (0.24) the metronome's click, while recording live (GLO's METRONOME): a sine of 1.6 kHz (the bar's first: 2.4 kHz,
  * louder) dying away over ~20 ms, 55 ms in all; made by a two-pole resonator, added after the effect and MASTER */
@@ -411,13 +411,12 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 
     midi_in();
 
-    grav_beads_params_t fx = {
-        (float)fx_params[FX_DENSITY] * 0.01f, (float)fx_params[FX_TIME] * 0.01f,
-        (float)fx_params[FX_SIZE] * 0.01f, (float)fx_params[FX_SHAPE] * 0.01f,
-        (float)fx_params[FX_PITCH] * 0.01f,
-        (float)fx_params[FX_FEEDBACK] * 0.01f, (float)fx_params[FX_DRY_WET] * 0.01f,
-        (float)fx_params[FX_REVERB] * 0.01f,
-        (uint8_t)fx_quality, fx_freeze, fx_seed, fx_seed_auto
+    const grav_fx_params_t fx = {
+        .hall = (float)fx_params[FX_HALL] * 0.01f, .time = (float)fx_params[FX_HALL_TIME] * 0.01f,
+        .tone = (float)fx_params[FX_TONE] * 0.01f, .diffuse = (float)fx_params[FX_DIFFUSE] * 0.01f,
+        .mod = (float)fx_params[FX_MOD] * 0.01f, .echo = (float)fx_params[FX_ECHO] * 0.01f,
+        .feedback = (float)fx_params[FX_FEEDBACK] * 0.01f, .echo_time = (uint8_t)fx_params[FX_ECHO_TIME],
+        .quality = (uint8_t)fx_quality, .bpm = (float)seq_bpm(&seq)
     };
 
     /* the sequencer's events in this block: the sound rendered in spans between them, each applied where it falls
@@ -452,7 +451,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 }
 
 /* n samples of the voices (their LFO, the effect, MASTER), from where the last span left them */
-static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav_beads_params_t *fx)
+static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav_fx_params_t *fx)
 {
     grav_sound_t sound[SYNTH_TRACKS];
     float lfo_value = lfo_process(&synth.mod_lfo);
@@ -544,7 +543,8 @@ static void fx_defaults(settings_t *s)   /* the effect's knobs at rest, off */
     for (int i = 0; i < FX_N; ++i)
         s->fx[i] = FX_DEFAULT[i];
     s->fx_quality = GRAV_FX_DIGITAL;
-    for (int i = 0; i < 3; ++i)
+    s->fx_layout = FX_LAYOUT;
+    for (int i = 0; i < 2; ++i)
         s->fx_reserved[i] = 0;
 }
 
@@ -617,6 +617,13 @@ static void settings_upgrade(settings_t *s, int loaded)
         for (uint32_t t = 0; t < SYNTH_TRACKS; t++) grav_controls_init(&s->controls[t]);
     if (loaded == SET_SIZE_012)              /* (before 0.13, before the effect: its knobs at rest) */
         fx_defaults(s);
+    if (s->fx_layout != FX_LAYOUT) {         /* (before 0.32, Beads' knobs: its REVERB HALL's AMOUNT, the rest at
+                                              * rest, QUALITY kept) */
+        const uint8_t reverb = s->fx[FX_OLD_REVERB], quality = s->fx_quality;
+        fx_defaults(s);
+        s->fx[FX_HALL] = reverb;
+        s->fx_quality = quality;
+    }
     if (loaded <= SET_SIZE_013)              /* (before 0.16, one sound: S1's, the other tracks their own) */
         track_defaults(s);
     if (loaded <= SET_SIZE_016)              /* (before 0.17: the drums' kit as it comes) */
@@ -676,8 +683,8 @@ static int settings_valid(const settings_t *s, int loaded)
             return 0;
     }
     return voices <= SYNTH_POLY_VOICES && percent_ok(s->osc, 3) && percent_ok(s->mod, 3) && percent_ok(s->env, 3) &&
-           percent_ok(s->fx, FX_N) && s->voices <= SYNTH_POLY_VOICES && s->velocity_off <= 1u &&
-           s->fx_quality < GRAV_FX_QUALITIES;
+           percent_ok(s->fx, FX_N) && s->fx[FX_ECHO_TIME] < GRAV_ECHO_TIMES && s->voices <= SYNTH_POLY_VOICES &&
+           s->velocity_off <= 1u && s->fx_quality < GRAV_FX_QUALITIES;
 }
 
 /* the settings saved (loaded: the record's size, 0 if none), into set if they are sound; 0.11's and 0.12's first
@@ -795,7 +802,6 @@ static struct {
     uint8_t note[NKEYS];                 /* the note each held key plays: the octave it was pressed in, so OCTAVE
                                           * while it is held changes the next notes, never this one's note-off */
     int32_t last_key;                    /* the key pressed last: its numbers in the header */
-    uint32_t seed_at;                    /* when SEL went down */
     int32_t turns[NE];                   /* detents since boot, per encoder */
     uint32_t turned_at[NE];              /* when each was last turned: it shows lit for a moment */
     uint32_t cpu, xruns, cpu_at;         /* the render's load (% of its time) and late renders, as last shown */
@@ -845,9 +851,7 @@ static struct {
     uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
     uint32_t key_mix;                    /* (0.26) the keys pressed on the mixer (mutes, tracks: let go as such) */
     uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
-    uint8_t seed_down;                   /* SEL held as SEED (on an FX page) */
-    uint8_t sel_down, sel_used;          /* SEL held; and as SEED meanwhile (let go: no mixer) */
-    uint32_t sel_at;                     /* SEL pressed, when */
+    uint8_t sel_down;                    /* SEL held (let go: the mixer) */
     uint16_t meter[SYNTH_TRACKS];        /* the mixer's meters, 0..256, falling back */
     float level[SYNTH_TRACKS];           /* (0.27) each track's level, followed: HOME's terricons (0.28; rings before) */
     uint8_t level_heard;                 /* (0.27.1) the tracks that sounded since a test last asked (a bit each) */
@@ -1465,12 +1469,15 @@ static volatile int32_t *param_of(uint32_t page, uint32_t index)
         return &mod_params[index];
     if (page == PAGE_ENV)
         return &env_params[index];
-    return &fx_params[(page - PAGE_FX_GRAIN) * 3u + index];
+    static const uint8_t FX_SLOT[3][3] = {{FX_HALL, FX_HALL_TIME, FX_TONE}, {FX_N, FX_DIFFUSE, FX_MOD},
+                                          {FX_ECHO, FX_ECHO_TIME, FX_FEEDBACK}};
+    const uint32_t slot = FX_SLOT[(page - PAGE_FX_HALL) % 3u][index % 3u];
+    return slot < FX_N ? &fx_params[slot] : &fx_quality;   /* (TAPE's K1: QUALITY) */
 }
 
 static int32_t param_value(uint32_t page, uint32_t index)
 {
-    if (page == PAGE_FX_MIX && index == 2) return fx_quality;
+    if (page == PAGE_FX_TAPE && index == 0) return fx_quality;
     if (page == PAGE_SOUND) {
         grav_control_info_t info;
         if (!grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &info)) return -1;
@@ -1498,8 +1505,7 @@ static int param_centred(uint32_t page, uint32_t index)
         return grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, index, &i) &&
                (i.kind == GC_SIGNED || i.kind == GC_FM_SIGNED);
     }
-    return (page == PAGE_FX_GRAIN && index == 0u) || (page == PAGE_FX_SHAPE && index == 1u) ||
-           (page == PAGE_OUTPUT && index == 0u && !SYNTH_IS_DRUM(track_sel)) ||
+    return (page == PAGE_OUTPUT && index == 0u && !SYNTH_IS_DRUM(track_sel)) ||
            (page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel));
 }
 
@@ -1589,9 +1595,11 @@ static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
             else if (i.kind == GC_FM && i.offset == 134) value++;
             int_text(value, t);
         }
-    } else if (page == PAGE_FX_MIX && index == 2) {
+    } else if (page == PAGE_FX_TAPE && index == 0) {
         static const char *const quality[] = {"DIGITAL","VINTAGE","CLEAN","DIRTY"};
-        t[0] = 0; text_cat(t, quality[value]);
+        t[0] = 0; text_cat(t, quality[value % GRAV_FX_QUALITIES]);
+    } else if (page == PAGE_FX_ECHO && index == 1) {   /* (0.32) ECHO's TIME: a note value */
+        t[0] = 0; text_cat(t, grav_echo_time_name((uint32_t)value));
     } else if (page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && index == 2) {
         t[0] = 0; text_cat(t, value ? "ON" : "OFF");
     } else if ((page == PAGE_OSC && index == 0u && SYNTH_IS_DRUM(track_sel)) ||
@@ -1604,14 +1612,6 @@ static void param_text(uint32_t page, uint32_t index, int32_t value, char *t)
     } else if (page == PAGE_MOD && index == 2u) {
         t[0] = 0;
         text_cat(t, LFO_DEST_NAME[lfo_destination(value)]);
-    } else if (page == PAGE_FX_SHAPE && index == 1u) {
-        float st = grav_beads_pitch((float)value * 0.01f);
-        int32_t s = (int32_t)(st + (st < 0.0f ? -0.5f : 0.5f));
-        if (s > 0) {
-            t[0] = '+';
-            int_text(s, t + 1);
-        } else
-            int_text(s, t);
     } else
         int_text(value, t);
 }
@@ -1646,7 +1646,7 @@ static void sound_param_turn(uint32_t index, int32_t e)
     app_say(param_name(active_page, index), t);
 }
 
-/* MIX's K3: QUALITY, from DIGITAL to DIRTY TAPE (Beads' media) */
+/* TAPE's K1: QUALITY, from DIGITAL to DIRTY TAPE (Beads' media) */
 static void quality_turn(int32_t e)
 {
     int32_t q = clamp(fx_quality + e, 0, GRAV_FX_QUALITIES - 1);
@@ -1657,9 +1657,9 @@ static void quality_turn(int32_t e)
     app_say("QUALITY", QUALITY_NAME[fx_quality]);
 }
 
-static int fx_wanted(void)               /* the effect on: DRY/WET or REVERB up, or frozen */
+static int fx_wanted(void)               /* the effect on: HALL's AMOUNT or ECHO's up */
 {
-    return fx_params[FX_DRY_WET] > 0 || fx_params[FX_REVERB] > 0 || fx_freeze;
+    return fx_params[FX_HALL] > 0 || fx_params[FX_ECHO] > 0;
 }
 
 /* ------------------------------------------------------------ sequencer UI --- */
@@ -2127,9 +2127,9 @@ static void mixer_turn(uint32_t index, int32_t e)
         int_text(set.send[track_sel], t);
         text_cat(t, "%");
     } else {
-        fx_params[FX_DRY_WET] = clamp_percent(fx_params[FX_DRY_WET] + e);
+        fx_params[FX_HALL] = clamp_percent(fx_params[FX_HALL] + e);   /* (0.32: HALL's AMOUNT; DRY/WET before) */
         set_dirty = 1;
-        int_text(fx_params[FX_DRY_WET], t);
+        int_text(fx_params[FX_HALL], t);
         text_cat(t, "%");
         app_say("RETURN", t);
         return;
@@ -2161,11 +2161,11 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
            page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL : B_FX;
 }
 
-/* its blink's period: the first of a button's pages slow, the next faster (FX: MIX, GRAIN, SHAPE) */
+/* its blink's period: the first of a button's pages slow, the next faster (FX: HALL, TAPE, ECHO) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_GRAIN ? 500u :
-           page == PAGE_FX_SHAPE || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
+    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_TAPE ? 500u :
+           page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
 }
 
 /* recording live follows the sequencer: once it stops (PLAY, a MIDI stop), no more; the metronome and MIDI in's
@@ -2313,20 +2313,16 @@ static void slot_lights(key_lights_t *l)   /* SAVE held: the page's preset slots
 }
 
 /* the lights: the buttons (the open page's blinking, PLAY green on the beat, red recording; SAVE with something
- * unsaved, EDIT frozen, SEQ in step mode, FX with the effect on, SEL with SEED on its own) and the keys */
+ * unsaved, SEQ in step mode, FX with the effect on) and the keys */
 static void lights(uint32_t btn, uint32_t keys)
 {
     const uint32_t now = plat_ms(), play = 1u << B_PLAY;
     rec_follow(now);
     seq_follow(now);
     uint32_t lit = (btn & ~play) | (set_dirty || preset_dirty || seq.edits != seq.saved ? 1u << B_SAVE : 0u) |
-                   (fx_freeze ? 1u << B_EDIT : 0u) | (ui.step_mode ? 1u << B_SEQ : 0u), mid = 0;
-    if (grav_beads_on()) {
-        if (!IS_FX_PAGE(active_page))
-            lit |= 1u << B_FX;
-        if (fx_seed_auto)
-            lit |= 1u << B_SEL;
-    }
+                   (ui.step_mode ? 1u << B_SEQ : 0u), mid = 0;
+    if (grav_fx_on() && !IS_FX_PAGE(active_page))
+        lit |= 1u << B_FX;
     {
         const uint32_t b = 1u << page_button(active_page), period = page_period(active_page);
         if (now % period < period / 2u)
@@ -2384,8 +2380,8 @@ static void lights(uint32_t btn, uint32_t keys)
 static void page_open(uint32_t k)            /* a page's button: its page (HOME, GLO, FX again: the next one) */
 {
     if (k == B_FX && IS_FX_PAGE(active_page))   /* FX again: the next of its pages */
-        fx_page = active_page == PAGE_FX_MIX ? PAGE_FX_GRAIN : active_page == PAGE_FX_GRAIN ? PAGE_FX_SHAPE :
-                  PAGE_FX_MIX;            /* (0.26.2: MIX, GRAIN, SHAPE) */
+        fx_page = active_page == PAGE_FX_HALL ? PAGE_FX_TAPE : active_page == PAGE_FX_TAPE ? PAGE_FX_ECHO :
+                  PAGE_FX_HALL;           /* (0.32: HALL, TAPE, ECHO) */
     if (k == B_HOME && ui.step_mode) {       /* from step mode (every track): HOME's own view, the one track */
         show_home();
         app_say("HOME", TRACK_NAME[track_sel]);
@@ -2604,14 +2600,10 @@ static void button_press(uint32_t k)
         ui.seq_used = 0;
         ui.seq_at = plat_ms();
         break;
-    case B_EDIT:                             /* FREEZE: the effect's recording held, or let go */
-        fx_freeze = !fx_freeze;
-        app_say("FREEZE", fx_freeze ? "ON" : "OFF");
+    case B_EDIT:                             /* (0.32: free; FREEZE, the grains' recording held, went with them) */
         break;
-    case B_SEL:                              /* (let go: the mixer, from every page, 0.26.2; held on an FX page, SEED) */
+    case B_SEL:                              /* (let go: the mixer, from every page, 0.26.2) */
         ui.sel_down = 1;
-        ui.sel_used = 0;
-        ui.sel_at = plat_ms();
         break;
     case B_OCTDN:
     case B_OCTUP:
@@ -2674,33 +2666,20 @@ static void seq_let_go(void)
     ui.redraw = 1;
 }
 
-/* SEL: let go, the mixer (again: back to the page it was opened on), unless it was held as SEED; held on an FX page,
- * SEED: grains by hand while it is held, and from then on (held 2 s more: on their own again) */
+/* SEL let go: the mixer (again: back to the page it was opened on). (Held on an FX page until 0.31: SEED, the grains
+ * by hand) */
 static void sel_follow(uint32_t btn)
 {
     if (ui.sel_down && !(btn & 1u << B_SEL)) {
         ui.sel_down = 0;
-        fx_seed = ui.seed_down = 0;
-        if (!ui.sel_used) {
-            if (active_page == PAGE_MIXER)
-                active_page = ui.mixer_from;
-            else {
-                ui.mixer_from = active_page;
-                active_page = PAGE_MIXER;
-            }
-            app_say("PAGE", page_name(active_page));
-            ui.redraw = 1;
+        if (active_page == PAGE_MIXER)
+            active_page = ui.mixer_from;
+        else {
+            ui.mixer_from = active_page;
+            active_page = PAGE_MIXER;
         }
-    } else if (ui.sel_down && !ui.seed_down && IS_FX_PAGE(active_page) && plat_ms() - ui.sel_at >= SEED_HOLD_MS) {
-        ui.sel_used = 1;
-        ui.seed_down = 1;
-        ui.seed_at = plat_ms();
-        fx_seed = 1;
-        app_say("SEED", fx_seed_auto ? "MANUAL" : "");
-        fx_seed_auto = 0;
-    } else if (ui.seed_down && !fx_seed_auto && plat_ms() - ui.seed_at >= SEED_AUTO_MS) {
-        fx_seed_auto = 1;
-        app_say("SEED", "AUTO");
+        app_say("PAGE", page_name(active_page));
+        ui.redraw = 1;
     }
 }
 
@@ -2786,7 +2765,8 @@ static void page_knob_turn(uint32_t index, int32_t e)
     volatile int32_t *value = param_of(active_page, index);
     const int32_t previous = *value;
     char t[12];
-    *value = clamp_percent(previous + e);
+    *value = active_page == PAGE_FX_ECHO && index == 1u ? clamp(previous + e, 0, GRAV_ECHO_TIMES - 1)   /* (0.32) */
+                                                        : clamp_percent(previous + e);
     if (*value != previous) {
         set_dirty = 1;
         if (active_page == PAGE_OSC || active_page == PAGE_SHAPE)
@@ -2841,7 +2821,7 @@ static void encoder_turn(uint32_t k, int32_t e)
             sky_turn(e);
     } else if (knob && active_page == PAGE_GLO)
         glo_turn(index, e);
-    else if (k == EN_K3 && active_page == PAGE_FX_MIX)
+    else if (k == EN_K1 && active_page == PAGE_FX_TAPE)
         quality_turn(e);
     else if (k == EN_K3 && active_page == PAGE_MOD)
         lfo_dest_turn(e);
@@ -2957,7 +2937,8 @@ static int32_t param_frac(uint32_t i)   /* a page's knob's value, 0..25600 */
         grav_control_info_t info;
         if (grav_control_info(*track_engine(track_sel), ui.sound_page[track_sel] - 1u, i, &info)) max = info.max;
     } else if (active_page == PAGE_MOD && i == 2) { v = (int32_t)lfo_destination(mod_params[2]); max = 2; }
-    else if (active_page == PAGE_FX_MIX && i == 2) { v = fx_quality; max = 3; }
+    else if (active_page == PAGE_FX_TAPE && i == 0) { v = fx_quality; max = GRAV_FX_QUALITIES - 1; }
+    else if (active_page == PAGE_FX_ECHO && i == 1) max = GRAV_ECHO_TIMES - 1;
     else if (active_page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && i == 2) max = 1;
     return clamp(v, 0, max) * 25600 / max;
 }
@@ -2981,8 +2962,8 @@ static const char *dial_hint(uint32_t i)
     if ((active_page == PAGE_OUTPUT && !SYNTH_IS_DRUM(track_sel) && i == 0) ||
         (active_page == PAGE_OSC && SYNTH_IS_DRUM(track_sel) && i == 0)) return "st";
     if ((active_page == PAGE_OUTPUT && SYNTH_IS_DRUM(track_sel) && i == 2) ||
-        (active_page == PAGE_MOD && i == 2) || (active_page == PAGE_FX_MIX && i == 2)) return "";
-    if (active_page == PAGE_FX_SHAPE && i == 1) return "st";
+        (active_page == PAGE_MOD && i == 2) || (active_page == PAGE_FX_TAPE && i == 0) ||
+        (active_page == PAGE_FX_ECHO && i == 1)) return "";
     return "%";
 }
 
@@ -3059,7 +3040,7 @@ static void knob_get(uint32_t i, knob_t *k)
         return;
     }
     if (active_page == PAGE_MIXER) {         /* the selected track's VOL (0.27) and SEND, the effect's RETURN */
-        const int32_t v = i == 0u ? set.vol[track_sel] : i == 1u ? set.send[track_sel] : fx_params[FX_DRY_WET];
+        const int32_t v = i == 0u ? set.vol[track_sel] : i == 1u ? set.send[track_sel] : fx_params[FX_HALL];
         k->name = PARAM_NAME[PAGE_MIXER][i];
         int_text(v, k->value);
         if (i)
@@ -4326,18 +4307,16 @@ static void draw_cpu(int32_t x, int32_t y)   /* the render's load; red once a re
     cv_text(x + 26, y, &FONT_XS, t, ui.xruns ? C_RED : C_HI);
 }
 
-/* the track's line, its top at y: the track and its engine; FREEZE, and MUTE or SOLO (0.26: muted, or another
- * soloed; 0.26.1: SOLO) */
+/* the track's line, its top at y: the track and its engine; MUTE or SOLO (0.26: muted, or another soloed; 0.26.1:
+ * SOLO) */
 static void draw_track_line(int32_t y)
 {
     cv_text(8, y, &FONT_S, TRACK_NAME[track_sel], C_WHITE);
     cv_text(30, y, &FONT_S, grav_engine_name(*track_engine(track_sel)), C_HI);
-    if (fx_freeze)
-        cell(172, y - 2, 60, "FREEZE", 1);
     if (seq.mute >> track_sel & 1u)
-        cv_text(fx_freeze ? 132 : 200, y + 2, &FONT_XS, "MUTE", C_RED);
+        cv_text(200, y + 2, &FONT_XS, "MUTE", C_RED);
     else if (ui.solo >> track_sel & 1u)
-        cv_text(fx_freeze ? 132 : 200, y + 2, &FONT_XS, "SOLO", C_HI);
+        cv_text(200, y + 2, &FONT_XS, "SOLO", C_HI);
 }
 
 /* SEQ's bottom band (step mode): the track's line (0.28: its knobs at the page's top); under it PLAY or STOP, REC and its step / STEP / a MIDI clock in,
@@ -4387,13 +4366,11 @@ static void draw_seq_band(void)
         }
         if (preset_dirty)
             cv_text(144, y + 2, &FONT_T, preset_write_req ? "PENDING" : "UNSAVED", C_HI);
-        else if (fx_freeze)
-            cv_text(144, y + 2, &FONT_T, "FREEZE", C_HI);
     }
     draw_cpu(178, y);
 }
 
-/* (0.27) HOME's bottom band: the selected track (TRK 03) and its engine, its state (MUTE, SOLO, FREEZE) and the load;
+/* (0.27) HOME's bottom band: the selected track (TRK 03) and its engine, its state (MUTE, SOLO) and the load;
  * its sound's name, large (a * once it is changed). A moment's message (TEMPO 120 ...) or the count-in in its place */
 static void draw_home_band(void)
 {
@@ -4406,8 +4383,7 @@ static void draw_home_band(void)
     cv_text(8, 1, &FONT_XS, t, C_GRAY);
     cv_text(60, 3, &FONT_T, grav_engine_name(*track_engine(tr)), C_DIM);
     const int silent = !SYNTH_IS_DRUM(tr) && !set.trk_voices[tr];   /* (0.27.1) VOICES OFF: it cannot sound */
-    const char *state = silent ? "NO VOICE" : seq.mute >> tr & 1u ? "MUTE" : ui.solo >> tr & 1u ? "SOLO"
-                      : fx_freeze ? "FREEZE" : "";
+    const char *state = silent ? "NO VOICE" : seq.mute >> tr & 1u ? "MUTE" : ui.solo >> tr & 1u ? "SOLO" : "";
     cv_text(186 - text_w(&FONT_XS, state), 1, &FONT_XS, state,   /* (ending clear of CPU) */
             silent || seq.mute >> tr & 1u ? C_RED : C_HI);
     {                                        /* CPU over the level, their edges in line (0.29.3) */
@@ -4453,15 +4429,20 @@ static void draw_mixer_band(void)
     draw_cpu(178, y);
 }
 
-/* the page's state, in the bottom band's first line: a sound page's HOME; the effect's SEED and whether it is on */
+/* the page's state, in the bottom band's first line: a sound page's HOME; the effect's ECHO and whether it is on */
 static void draw_status(int32_t y)
 {
     if (IS_SOUND_PAGE(active_page)) {
         cv_text(8, y + 2, &FONT_T, "HOME  NEXT PAGE", C_GRAY);
         cv_text(232 - text_w(&FONT_T, "HOLD HOME + SELECT  JUMP"), y + 2, &FONT_T, "HOLD HOME + SELECT  JUMP", C_DIM);
-    } else if (IS_FX_PAGE(active_page)) {
-        cv_text(8, y, &FONT_XS, "SEED", C_GRAY);
-        cv_text(42, y, &FONT_XS, fx_seed_auto ? "AUTO" : "MANUAL", C_WHITE);
+    } else if (IS_FX_PAGE(active_page)) {    /* (0.32) ECHO's TIME, its note value and in ms at the tempo */
+        char t[16];
+        const uint32_t i = (uint32_t)fx_params[FX_ECHO_TIME];
+        cv_text(8, y, &FONT_XS, "ECHO", C_GRAY);
+        cv_text(44, y, &FONT_XS, grav_echo_time_name(i), C_WHITE);
+        int_text((int32_t)(grav_echo_seconds(i, (float)seq_bpm(&seq)) * 1000.0f + 0.5f), t);
+        text_cat(t, " MS");
+        cv_text(44 + text_w(&FONT_XS, grav_echo_time_name(i)) + 8, y, &FONT_XS, t, C_GRAY);
         cv_text(178, y, &FONT_XS, "FX", C_GRAY);
         cv_text(198, y, &FONT_XS, fx_wanted() ? "ON" : "OFF", fx_wanted() ? C_HI : C_WHITE);
     }
@@ -4842,9 +4823,7 @@ void app_host_reboot(void)
     track_sel = 0;
     active_page = home_page = PAGE_SEQ;
     glo_page = PAGE_GLO;
-    fx_page = PAGE_FX_MIX;
-    fx_freeze = fx_seed = 0;
-    fx_seed_auto = 1;
+    fx_page = PAGE_FX_HALL;
     memset(seq_midi_sent, 0, sizeof seq_midi_sent);   /* (every track's) */
     seq_midi_owed = 0;
 }
@@ -4896,6 +4875,19 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         settings_capture();
         plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 :
                                             !strcmp(cmd, "save016") ? SET_SIZE_016 : !strcmp(cmd, "save018") ? SET_SIZE_018 : SET_SIZE_021);
+        return 1;
+    }
+    if (!strcmp(cmd, "save031")) {           /* (0.32) the settings as 0.31 saved them: Beads' knobs at rest, its
+                                              * REVERB at a and DRY/WET at b */
+        static const uint8_t BEADS[FX_N] = {75, 30, 65, 50, 50, 30, 0, 0};
+        settings_t s;
+        settings_capture();
+        s = set;
+        memcpy(s.fx, BEADS, sizeof BEADS);
+        s.fx[FX_OLD_REVERB] = (uint8_t)clamp(atoi(a), 0, 100);
+        s.fx[6] = (uint8_t)clamp(atoi(b), 0, 100);
+        s.fx_layout = 0;
+        plat_store_save(OBJ_SETTINGS, &s, sizeof s);
         return 1;
     }
     return 0;
@@ -5040,14 +5032,14 @@ int app_expect(const char *what, int *got)
         ui.level_heard = 0;
     } else if (!strcmp(what, "solo"))          /* (0.26.1) the tracks soloed */
         *got = ui.solo;
-    else if (!strcmp(what, "send"))          /* the selected track's SEND, LEVEL; the effect's RETURN (DRY/WET) */
+    else if (!strcmp(what, "send"))          /* the selected track's SEND, LEVEL; the effect's RETURN (HALL's AMOUNT) */
         *got = set.send[track_sel];
     else if (!strcmp(what, "level"))
         *got = set.controls[track_sel].level;
     else if (!strcmp(what, "vol"))           /* (0.27) the selected track's fader */
         *got = set.vol[track_sel];
     else if (!strcmp(what, "fx_return"))
-        *got = fx_params[FX_DRY_WET];
+        *got = fx_params[FX_HALL];
     else if (!strcmp(what, "meter"))         /* the selected track's meter, 0..256 */
         *got = ui.meter[track_sel];
     else if (!strcmp(what, "sky"))           /* (0.29) GLO's SCREEN: HOME's sky, SKY_* (1 NIGHT, 2 OFF, 3 DAY) */
@@ -5095,14 +5087,12 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "page"))          /* the page shown (PAGE_*: 4..6 the FX pages) */
         *got = active_page;
     else if (!strcmp(what, "fx_on"))         /* the effect running (not off) */
-        *got = grav_beads_on();
-    else if (!strcmp(what, "quality"))       /* FX MIX QUALITY: GRAV_FX_* */
+        *got = grav_fx_on();
+    else if (!strcmp(what, "quality"))       /* TAPE's QUALITY: GRAV_FX_* */
         *got = fx_quality;
-    else if (!strcmp(what, "freeze"))
-        *got = fx_freeze;
-    else if (!strcmp(what, "seed_auto"))
-        *got = fx_seed_auto;
-    else if (!strncmp(what, "fx", 2))        /* fxN: the effect's knob N (FX_*: 0 DENSITY .. 7 REVERB) */
+    else if (!strcmp(what, "fx_layout"))     /* (0.32) the settings' effect knobs: FX_LAYOUT */
+        *got = set.fx_layout;
+    else if (!strncmp(what, "fx", 2))        /* fxN: the effect's knob N (FX_*: 0 HALL .. 7 FEEDBACK) */
         *got = fx_params[atoi(what + 2) % FX_N];
     else if (!strcmp(what, "note"))
         *got = synth.note;

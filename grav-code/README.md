@@ -6,7 +6,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | File | What |
 | --- | --- |
 | `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
-| `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's terricons, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages), the presets' browser, recording, FREEZE and SEED; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
+| `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's terricons, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages: HALL, TAPE, ECHO), the presets' browser, recording; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
 | `synth/` | The voices (`synth.c`: four shared out among the synth tracks S1..S4, each MONO with legato, POLY or none, and one for each drum track D1..D4; the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
 | `sound/` | Engine control/page metadata, native FM byte mapping and validation; AUTO follows the original macros |
 | `presets/` | Four factory starting points per engine; a 64-slot expanded preset log (184-byte sounds), indexed in flash with a bounded pending queue, CRC/commit and compaction tests |
@@ -15,9 +15,9 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), each voice its own (its track's; a drum voice's, in a small slot, one of the three drums), rendered 12 samples at a time |
 | `dsp/grav_drums.h` | The drum voices' drums (0.19): Plaits' drum models, the one chosen rendered, with the DRUM and SHAPE pages' knobs (the kick's PUNCH, SWEEP and DRIVE apart, where Plaits folds them onto HARMONICS) |
 | `ui/icons.c` | The engines' icons (0.20), drawn by code from the time, the engine's knobs and its track's notes; one line on each engine (included by `app.c`) |
-| `dsp/grav_beads.cpp` | Beads' processor, the effect: built in place, run in mono 12 samples at a time, off (and free) at DRY/WET and REVERB 0, faded in and out |
+| `dsp/grav_fx.cpp` | The effect (0.32): ECHO, a delay in time with the tempo, and HALL, Beads' reverb (`dsp/grav_reverb.h`), coloured by TAPE's QUALITY (Beads' media); in mono, the sends in, the dry round it; off (and free) once nothing goes in and its tails have died |
 | `dsp/grav_libc.c` | The C library functions the FM-1's link lacks (`fabsf`, `sqrtf`, `abs`, `memmove`) |
-| `vendor/` | Plaits, Beads, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
+| `vendor/` | Plaits, Beads' reverb engine and tape, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
 | `words.tsv` | The screen reader's words |
 | `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
@@ -26,7 +26,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 
 ## Build, test, install
 
-Version 0.14 renders on both cores, with the DEBUG page (GLO three times since 0.25.1); since 0.14.1 Beads runs on the second core,
+Version 0.14 renders on both cores, with the DEBUG page (GLO three times since 0.25.1); since 0.14.1 the effect runs on the second core,
 a chunk behind the voices.
 K1 switches one/two-core processing; K2 clears peaks and counters. See
 [the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
@@ -63,13 +63,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.31.0    # grav-code/build/grav_code-0.31.0.fwsc, identity FM-1_73003100
+    python3 tools/build.py grav-code --release 0.32.0    # grav-code/build/grav_code-0.32.0.fwsc, identity FM-1_73003200
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.31.0.fwsc 0.31.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.32.0.fwsc 0.32.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.31.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.32.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 
@@ -79,8 +79,8 @@ Python with Pillow (the fonts).
   builds the engines in place (placement new). Constant tables are fine.
 - Plaits' engines run 12 samples at a time, always (the 6-op FM depends on it), through a FIFO per voice.
 - The engines' RAM and each synth voice's slot are in the pool (`.pool`, PLAT_POOL): about 98 KB for four voices.
-  Beads' delay (96 KiB) and reverb (64 KiB) are there too, its processor (25 KB) in `.bss`: the pool is 333 KB of
-  336, the RAM about 89 KiB of 96 (including the 8 KiB CPU1 stack, the eight voices' block buffers and the four drum
+  The effect's echo (96 KiB) and reverb (64 KiB) are there too (0.32; Beads' delay and reverb before, its 25 KB
+  processor in `.bss`): the pool is 333 KB of 336, the RAM about 67 KiB of 96 (including the 8 KiB CPU1 stack, the eight voices' block buffers and the four drum
   voices: their slots and 512 bytes of RAM each, in `.bss`).
 - Expanded user presets (0.22) use a 32 KiB log at `0xE5000..0xED000`, indexed in place.
   A sound is 184 bytes; each 256-byte record commits its CRC header last. Fifteen records per sector leave the
@@ -92,4 +92,4 @@ Python with Pillow (the fonts).
   (256 bytes) at a time with the interrupts off for each, into a slot erased beforehand; erasing (tens of ms with
   the sound stopped) waits until nothing has sounded for 3 s.
 - `-fdata-sections` (`fm1.toml`): each table its own section, so the link leaves out those nothing reads (Beads'
-  synth mode's 100 KB of wavetables).
+  synth mode's 100 KB of wavetables; 0.32 reads its sine alone).

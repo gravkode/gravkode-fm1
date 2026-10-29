@@ -36,22 +36,26 @@ shot screen-env.png
 tap GLO
 wait 400
 shot screen-glo.png
-# FX: the effect on, MIX (FX's first page since 0.26.2: DRY/WET up, VINTAGE), then GRAIN, frozen (FREEZE on every
-# page, EDIT lit)
+# FX (0.32): HALL on (AMOUNT 40, TIME 60, TONE 45), then TAPE (QUALITY VINTAGE; DIFFUSE, MOD as they come), then
+# ECHO on (AMOUNT 30 at 1/8., FEEDBACK 45)
 tap FX
 wait 30
 turn K1 40
-turn K2 25
-turn K3 1
+turn K2 20
+turn K3 -10
 wait 400
-shot screen-fx-mix.png
+shot screen-fx-hall.png
 tap FX
 wait 30
-tap EDIT
+turn K1 1
 wait 400
-shot screen-fx-grain.png
-tap EDIT
+shot screen-fx-tape.png
+tap FX
 wait 30
+turn K1 30
+turn K3 10
+wait 400
+shot screen-fx-echo.png
 tap HOME
 wait 30
 

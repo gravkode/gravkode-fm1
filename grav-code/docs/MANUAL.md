@@ -1,7 +1,7 @@
 # GRAV CODE
 
 GRAV CODE turns the M-VAVE FM-1 into a polyphonic synthesizer on all 24 sound engines of Mutable Instruments'
-Plaits, through the granular processor, delay and reverb of Mutable Instruments' Beads: up to four voices, each its
+Plaits, through an echo in time with the tempo and the reverb of Mutable Instruments' Beads: up to four voices, each its
 own engine, played from the keys with velocity or over MIDI, shaped by an envelope and moved by an LFO, and a
 sequencer of eight tracks of 64 steps, four synth tracks (each its own engine) and four drum tracks (Plaits' bass
 drums, snares and hi-hats, each with six knobs), in sixteen patterns, with swing and MIDI clock. Everything is on the FM-1's own panel and screen; the settings
@@ -59,18 +59,17 @@ From the top:
   (0.27); the battery: three bars, green when full, yellow, then red; a lightning bolt while the FM-1
   runs on USB power. The page you are on is the one whose button blinks (faster on its second and third pages).
   GRAV CODE starts on SEQ, the sequencer's page (section 5).
-- **The track selected** (S1 to S4, D1 to D4) and its engine, by its name; beside them FREEZE, lit, while the effect
-  is frozen. Turning SELECT shows the eight tracks for a moment, the selected one lit, each with its engine, its icon
-  (small) and its voices.
+- **The track selected** (S1 to S4, D1 to D4) and its engine, by its name. Turning SELECT shows the eight tracks for a
+  moment, the selected one lit, each with its engine, its icon (small) and its voices.
 - **The page's three parameters** as knobs, K1 to K3, on every page: a thin ring, ticks over its travel lit up to
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
   settles back. In step mode (SEQ) its knobs are small, at the page's top, above the tracks' steps (section 5).
-- **The bottom band:** the page's state (a sound page: how to change pages; FX: SEED and whether the effect is on; the mixer: what its keys do);
+- **The bottom band:** the page's state (a sound page: how to change pages; FX: ECHO's time and whether the effect is on; the mixer: what its keys do);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
-  STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED or FREEZE, and CPU
+  STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED, and CPU
   (the engine is in the header). The keys are not drawn: the FM-1's own are under the screen.
 
 ---
@@ -90,17 +89,17 @@ From the top:
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
-| FX | The effect's pages, again for the next: FX MIX (DRY/WET first, since 0.26.2), FX GRAIN, FX SHAPE. Lit while the effect runs |
-| EDIT | FREEZE: the effect's recording held, or let go. Lit while frozen |
-| SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on. Held on an FX page: SEED, grains by hand; held 2 s more, the grains on their own again (lit while they come on their own) |
+| FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
+| EDIT | Free since 0.32 (until then FREEZE, the grains' recording held) |
+| SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again (0.31): the selected track alone, a synth track's notes as a piano roll, a drum track's 64 steps; a third time: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording; playing: live recording (section 5). Held SEQ, then REC: the selected track cleared |
 | MASTER | The volume, glided: no step in the sound |
 | SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
-The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: GRAIN, SHAPE,
-MIX; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP is reserved for a later version.
+The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: HALL, TAPE,
+ECHO; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP is reserved for a later version.
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when GRAV CODE starts but its USB can't be reached.
@@ -212,7 +211,7 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ![The mixer playing: the eight tracks a strip each, S1 selected; each with its fader, its meter moving, its send bar, its M and S; LEVEL, SEND, RETURN below](img/screen-mixer.png "The mixer")
 
-SEL opens the mixer, from every page (SEL held on an FX page is SEED); SEL again goes back to the page it was
+SEL opens the mixer, from every page; SEL again goes back to the page it was
 opened on. Each track is a strip, S1 to S4 then D1 to D4:
 
 - **its name**, the selected track's in the theme's colour;
@@ -227,7 +226,7 @@ opened on. Each track is a strip, S1 to S4 then D1 to D4:
 | --- | --- |
 | K1 VOL | the selected track's fader, 0 to 100 (100: as before 0.27) |
 | K2 SEND | its share through the effect, 0 to 100 % (100 %: all of it, as before 0.26; 0: none, it stays dry) |
-| K3 RETURN | how much of the effect comes back: FX MIX's DRY/WET, the same knob |
+| K3 RETURN | how much goes into the reverb: HALL's AMOUNT, the same knob (0.32; FX MIX's DRY/WET before) |
 | White keys 1–8 | mute a track (S1 to D4): its steps start no notes and its notes sounding end; again: on. The keys are lit while their track plays, dim while it is muted |
 | Black keys 1–8 | solo a track (again: not); several at once. While any track is soloed, only the soloed ones sound, whatever their mutes; the mutes come back as they were once no track is. The keys are lit while their track is soloed. Solos are not saved |
 | SELECT | pick the track K1 and K2 are for |
@@ -238,7 +237,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003100, version 0.31.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003200, version 0.32.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -263,7 +262,7 @@ The splash at power-on keeps its teal: it is drawn before the settings are read.
 
 GLO once more opens DEBUG, the two cores' timings (section 11).
 
-### FX MIX, FX GRAIN, FX SHAPE (FX)
+### HALL, TAPE, ECHO (FX)
 
 The effect's three pages: section 7.
 
@@ -321,7 +320,7 @@ running down them. Each has its own height and place; where they overlap, the lo
   level, six segments in its colour, is at the right of the bottom band (0.29.1), under CPU, their edges in line.
 - **The scene is taller** (0.29.2): it goes on under the page, 28 rows more, so the heaps stand bigger, and HOME's
   bottom band is half as high, its sound's name smaller. SELECT picks another.
-- **The bottom band** (32 pixels high since 0.29.2): TRK 03 and its engine, MUTE / SOLO / FREEZE, CPU; its sound's name (a * once changed
+- **The bottom band** (32 pixels high since 0.29.2): TRK 03 and its engine, MUTE / SOLO, CPU; its sound's name (a * once changed
   after its preset). A moment's message (TEMPO 120, PATTERN ...) takes its place, and while counting in IN 4 .. 1.
 - **K1 TEMPO** (30 to 300 BPM, a step is a 16th; the song's), **K2 SWING** (the selected track's, 50 % straight to
   75 %; with SEQ held, the pattern's, every track's), **K3 LENGTH** (the selected track's, 1 to 64 steps), K4 the
@@ -535,81 +534,61 @@ the next.
 
 ## 7. The effect (FX)
 
-![The FX MIX page: DRY/WET 40, REVERB 25, QUALITY VINTAGE (the second of four); SEED AUTO, FX ON](img/screen-fx-mix.png "The FX MIX page")
+![The HALL page: AMOUNT 40, TIME 60, TONE 45; ECHO 1/8. 375 MS, FX ON in the bottom band](img/screen-fx-hall.png "HALL") ![The TAPE page: QUALITY VINTAGE, DIFFUSE 70, MOD 60](img/screen-fx-tape.png "TAPE") ![The ECHO page: AMOUNT 30, TIME 1/8., FEEDBACK 45](img/screen-fx-echo.png "ECHO")
 
-GRAV CODE's effect is Mutable Instruments Beads, its whole processor: a granular processor that plays grains of the
-voices' recent sound, a delay, Beads' tape and digital colours, and its reverb. All the voices go through it, then
-MASTER. It records in mono (twice Beads' time) and plays in stereo: the grains spread left and right.
+GRAV CODE's effect (0.32) is an echo in time with the tempo and the reverb of Mutable Instruments Beads, both
+coloured by Beads' media: digital, vintage or tape. The tracks go into it by their SEND (the mixer, section 4), in
+mono; what each does not send goes past it, dry. The echoes go on into the reverb; the reverb plays in stereo.
+Until 0.31 the effect was all of Beads (its grains, their delay, FREEZE and SEED); its reverb, its tape's wow and
+flutter and its 8-bit colour are what stay.
 
-FX shows its pages, and pressed again the next: FX MIX (DRY/WET, REVERB, QUALITY: first since 0.26.2), FX GRAIN,
-FX SHAPE, round. From another page, FX goes back
-to the one shown last.
+FX shows its pages, and pressed again the next: HALL, TAPE, ECHO, round. From another page, FX goes back to the one
+shown last. The bottom band shows ECHO's time as a note value and in milliseconds at the tempo, and whether the
+effect is on.
 
-**On and off:** with DRY/WET and REVERB both at 0, the effect is off and costs nothing (as it starts). Turn either up
-and it starts, fading in with its recording empty; FX is lit while it runs. Both back to 0, it fades out and stops.
+**On and off:** each AMOUNT is a send: how much goes into the reverb, or into the echo. With both at 0 nothing goes
+in; what is in the reverb and the echoes rings out, and once it has died away the effect is off and costs nothing
+(as it starts). FX is lit while it runs (on another page).
 
-### FX GRAIN
-
-![The FX GRAIN page, frozen: DENSITY 75 (from the middle), TIME 30, SIZE 65; FREEZE lit beside the engine](img/screen-fx-grain.png "The FX GRAIN page, frozen")
-
-| Knob | Parameter | What it does |
-| --- | --- | --- |
-| K1 | DENSITY | How many grains. 48 to 52 (the middle): none. Left of it, grains at a steady rate, faster towards 0 (up to 130 a second); right of it, grains at random moments, more towards 100 |
-| K2 | TIME | Where in the recording a grain starts: 0 the moment just past, 100 the oldest it holds |
-| K3 | SIZE | The grains' length. 0 to 33: played backwards, long to short; from 33: forwards, short (a few milliseconds) to long (seconds, as much as the recording holds); 100: the delay (below) |
-
-### FX SHAPE
+### HALL
 
 | Knob | Parameter | What it does |
 | --- | --- | --- |
-| K1 | SHAPE | Each grain's envelope: square-edged at 0, a smooth bell around the middle, a slower attack towards 100 |
-| K2 | PITCH | The grains' transposition, -24 to +24 semitones (shown in semitones). As on Beads, the knob rests a while on 0, 1, 3, 4, 7, 12 and 24, either way |
-| K3 | FEEDBACK | How much of the effect's sound goes back into its recording: repeats that build up, held in by Beads' limiter |
+| K1 | AMOUNT | How much goes into the reverb (Beads' REVERB curve); the mixer's RETURN is the same knob |
+| K2 | TIME | How long the tail lasts: a small room at 0, a long hall at 100 |
+| K3 | TONE | The tail's colour: dark at 0, bright at 100 |
 
-### FX MIX
+### TAPE
 
 | Knob | Parameter | What it does |
 | --- | --- | --- |
-| K1 | DRY/WET | The voices (0) against the effect (100) |
-| K2 | REVERB | Beads' reverb, its level and its length together |
-| K3 | QUALITY | How the recording is made: |
+| K1 | QUALITY | The echo's and the reverb's medium (below) |
+| K2 | DIFFUSE | How the reflections blur: distinct at 0, a smooth wash at 100 |
+| K3 | MOD | The tail's slow movement: still at 0, Beads' shimmer around 60, a chorus-like drift at 100 |
 
-| QUALITY | The recording | It holds |
+| QUALITY | The sound |
+| --- | --- |
+| DIGITAL | Clean |
+| VINTAGE | 12 bits: a little grit in the echoes and the reverb |
+| CLEAN TAPE | Saturated, a little wow and flutter; the echoes and the tail darker |
+| DIRTY TAPE | 8-bit μ-law, saturated, the full wow and flutter: hiss and wobble |
+
+QUALITY colours only the effect: the dry sound stays clean. Off DIGITAL the reverb is longer and darker, as on Beads.
+
+### ECHO
+
+| Knob | Parameter | What it does |
 | --- | --- | --- |
-| DIGITAL | 16-bit at 44.1 kHz: clean | 1.1 s |
-| VINTAGE | 12-bit: a little grit | 1.5 s |
-| CLEAN TAPE | 12-bit at half the rate: darker | 2.9 s |
-| DIRTY TAPE | 8-bit (μ-law) at half the rate, with wow and flutter: hiss and wobble | 4.4 s |
+| K1 | AMOUNT | How much goes into the echo |
+| K2 | TIME | The echo's time as a note value at the tempo: 1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2 (T a triplet, . dotted) |
+| K3 | FEEDBACK | How many repeats: one at 0, on and on near 100 (on the tapes a little over: the saturation holds them) |
 
-Changing QUALITY starts the recording afresh: the effect fades out and back in. The reverb is darker on all but
-DIGITAL, as on Beads.
+The echo follows the tempo (a MIDI clock in too). Its line holds 1.1 s: a time longer than that, at a slow tempo,
+is halved until it fits, still in time. Turning TIME glides to the new time, as a tape does, its pitch bending on the
+way. Its repeats darken as they go round, more on the tapes.
 
-The effect starts at DENSITY 75, TIME 30, SIZE 65, SHAPE 50, PITCH 0, FEEDBACK 30, DRY/WET 0, REVERB 0, DIGITAL: off,
-and ready to be turned up.
-
-### FREEZE (EDIT)
-
-EDIT freezes the recording: nothing new goes in, and the grains play what it holds, on and on, whatever the keys do.
-EDIT is lit and FREEZE shows beside the engine, on every page. EDIT again lets go. Frozen, the effect stays on even
-with DRY/WET and REVERB at 0, so that what it holds is kept.
-
-### SEED (SEL held on an FX page)
-
-Beads' SEED button: SEL held for 0.4 s while an FX page is open (a tap opens the mixer). At first the grains come
-on their own, at DENSITY's rate: AUTO, and SEL is lit while the effect runs. Hold SEL and they come by hand
-(MANUAL): grains at DENSITY's rate while it is held (with DENSITY at the middle, one each hold). Hold it for 2 s more
-and they come on their own again. The FX pages show
-which: SEED AUTO or SEED MANUAL.
-
-### The delay (SIZE at 100)
-
-SIZE turned to the end makes Beads a delay, crossfading over about a second. DENSITY then sets the delay time:
-longest at the middle (the whole recording), shorter either side, at the ends so short it rings at a pitch; FEEDBACK
-sets the repeats. In MANUAL, tap SEL in time: the delay follows the taps, and DENSITY picks a ratio of them. Frozen,
-it loops a slice of the recording: TIME picks which, SHAPE its envelope.
-
-> Beads ran at 48 kHz (32 kHz for its vintage sound, 24 kHz for its tapes); on the FM-1 every QUALITY records at
-> 44.1 kHz, the tapes at half of it, and the recording holds 96,000 bytes instead of Beads' 768,000: the times above.
+The effect starts with both AMOUNTs at 0 (off), TIME 40, TONE 55, DIGITAL, DIFFUSE 70, MOD 60, ECHO at 1/8. and
+FEEDBACK 35.
 
 ---
 
@@ -693,8 +672,8 @@ the other tracks start fresh, one voice each; settings saved by 0.16 load with t
 TUNE at the note and SHAPE as Plaits made the drum sound from its HARMONICS). Writing the
 settings stops the sound for a moment, so SAVE writes them only when they changed: save them while the sequencer is
 stopped. A pattern is written without a gap (section 5), and saved by itself when you leave it; edits to the one
-you are on that neither SAVE nor leaving it saved are lost at power-off. FREEZE and SEED's way are not kept: the effect starts
-unfrozen, its grains on their own. SAVE is lit while something has changed and isn't stored yet. A tap on SAVE
+you are on that neither SAVE nor leaving it saved are lost at power-off. Settings saved by 0.31 or before load
+with their REVERB as HALL's AMOUNT and the effect's other knobs at rest (0.32). SAVE is lit while something has changed and isn't stored yet. A tap on SAVE
 lights the white keys one after another, first to last, then all of them for a moment (0.31), whatever page is
 shown; SAVE FAILED lights none. A firmware update
 keeps them (settings saved by 0.12 load with the effect at rest).
@@ -725,12 +704,12 @@ GRAV CODE has no Bluetooth or WiFi.
 
 CPU (bottom right) is the smoothed share of each audio block's time used by rendering. GRAV CODE uses both of
 the FM-1's cores. With the effect off, the sounding Plaits voices are split between them. With the effect on,
-Beads (more than half a block's time by itself on the FM-1) runs on the second core, a 24-sample chunk behind the
-voices, while the first renders them; the voices go to whichever core has room. Nothing is added to the latency,
+it runs on the second core, a 24-sample chunk behind the voices, while the first renders them (0.32: its reverb and
+echo alone, about a quarter of what all of Beads took); the voices go to whichever core has room. Nothing is added to the latency,
 and the sound is the same on one core or two. GLO three times opens DEBUG (after GLO and SCREEN), where K1 selects one/two-core processing and K2
 resets peaks and counters. These debug choices are temporary.
 
-Off (DRY/WET and REVERB at 0, not frozen), Beads is bypassed and costs nothing. If a block takes over 90% of its
+Off (both AMOUNTs at 0, its tails died away), the effect is bypassed and costs nothing. If a block takes over 90% of its
 time, GRAV CODE takes a voice: a synth track's before a drum's; one let go first, else the oldest. It fades out over 3 ms, so there is no click, and
 the last voice sounding is never taken (nor MONO's one voice). The average CPU display can stay below 90% even when
 short peaks trigger protection. A released voice that is silent costs nothing.
@@ -753,11 +732,10 @@ PARTICLE thin); a drum or a 6-OP FM patch may simply have decayed.
 
 **A crackle:** see section 11.
 
-**The sound goes on after the keys are let go:** the effect: FREEZE (EDIT lit: press it), a long REVERB, or FEEDBACK
-building up. DRY/WET and REVERB at 0 turn it off.
+**The sound goes on after the keys are let go:** the effect: a long HALL TIME, or ECHO's FEEDBACK high. Both
+AMOUNTs at 0 stop anything new going in; what is in rings out.
 
-**The effect makes no grains:** DENSITY at the middle (48 to 52), or SEED is MANUAL (the FX pages say so): press SEL
-or hold it 2 s for AUTO. Or the recording holds nothing yet: play.
+**The effect does nothing:** both AMOUNTs at 0, or the track's SEND at 0 (the mixer, section 4).
 
 **The installer doesn't find the FM-1:** a data cable, other MIDI apps and browser tabs closed, Chrome or Edge.
 Started but out of reach over USB: hold REC while switching on (update mode), then install.
@@ -775,7 +753,7 @@ leads it (MIDI CLOCK on SEQ): start it from there.
 
 - GRAV CODE is built on **fm1-base** (Charles Vestal) and **felucca-bsp** (Leo Kuroshita, Hügelton Instruments),
   MPL-2.0.
-- Its sound engines are **Mutable Instruments Plaits**, its effect **Mutable Instruments Beads**, and their library
+- Its sound engines are **Mutable Instruments Plaits**, its reverb and tape colours **Mutable Instruments Beads**, and their library
   **stmlib**, by Émilie Gillet, under the MIT License; the notices are in the source
   (`grav-code/vendor/plaits/LICENSE`, `grav-code/vendor/beads/LICENSE`) and on the site's front page.
 - The fonts are Barlow (SIL Open Font License).

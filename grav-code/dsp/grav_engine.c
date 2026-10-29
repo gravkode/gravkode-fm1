@@ -37,7 +37,7 @@ volatile float grav_track_peak[SYNTH_TRACKS];
  * rows. No pointers in the uint32_t mailbox argument (also works on a 64-bit host). */
 static struct {
     synth_t *synth;
-    const grav_beads_params_t *fx;
+    const grav_fx_params_t *fx;
     uint32_t n, masks[2], live;          /* the voices each core renders; live: both (the mix) */
     grav_plaits_params_t p[SYNTH_VOICES_MAX];
     float peak[SYNTH_VOICES_MAX];
@@ -117,7 +117,7 @@ static void effect_chunk(uint32_t c)
         work.mix[base + j] = sample;
         past[j] = dry;
     }
-    grav_beads_process(work.fx, &work.mix[base], &work.fx_l[base], &work.fx_r[base], count);
+    grav_fx_process(work.fx, &work.mix[base], &work.fx_l[base], &work.fx_r[base], count);
     if (work.split)
         for (uint32_t j = 0; j < count; ++j) {
             work.fx_l[base + j] += past[j];
@@ -178,7 +178,7 @@ void grav_engine_init(grav_engine_t *e)
     grav_dual_core = 1;
     grav_debug_reset = 0;
     grav_plaits_init();
-    grav_beads_init();
+    grav_fx_init();
     e->gain = 0.0f;
     e->voice_cost = e->fx_cost = 0;
     for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++) {
@@ -212,7 +212,7 @@ void grav_engine_render(
     float morph,
     float harmonics,
     float pitch_offset,
-    const grav_beads_params_t *fx
+    const grav_fx_params_t *fx
 ) {
     grav_sound_t sound[SYNTH_TRACKS];
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {
@@ -236,7 +236,7 @@ static int is_six_op(uint32_t engine)
 
 void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_t *synth, uint32_t master_q12,
                                const grav_sound_t sound[SYNTH_TRACKS], float pitch_offset,
-                               const grav_beads_params_t *fx)
+                               const grav_fx_params_t *fx)
 {
     const float gain = (float)master_q12 / 4096.0f * GRAV_OUT_FULL;
     uint8_t six_op[SYNTH_VOICES_MAX];
@@ -261,7 +261,7 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
     dual = grav_dual_core && plat_cpu2_on();
 #endif
     /* the effect on CPU1 while it runs (or fades); off, it is a copy: CPU0's */
-    const uint32_t fx_core = dual && grav_beads_busy(fx) ? 1u : 0u;
+    const uint32_t fx_core = dual && grav_fx_busy(fx) ? 1u : 0u;
     /* the cores' work so far this block, by the last blocks' timings: the effect, then each voice to the core with
      * less (a tie: CPU0, CPU1 every other voice with the effect off) */
     int32_t load[2] = {0, fx_core ? e->fx_cost : 0};
@@ -387,7 +387,7 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
             sum += work.voice_ticks[v];
         e->voice_cost += ((int32_t)(sum / active) - e->voice_cost) / 4;
     }
-    if (grav_beads_on())
+    if (grav_fx_on())
         e->fx_cost += ((int32_t)work.fx_ticks - e->fx_cost) / 4;
 
     for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++) {

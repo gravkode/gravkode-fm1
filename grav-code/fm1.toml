@@ -24,7 +24,7 @@ o2 = [
     "presets/store.c",
     "sound/controls.c",
     "dsp/grav_plaits.cpp",
-    "dsp/grav_beads.cpp",
+    "dsp/grav_fx.cpp",                          # (0.32) the effect: ECHO, HALL (Beads' reverb), TAPE
     "vendor/stmlib/dsp/units.cc",
     "vendor/stmlib/utils/random.cc",
     "vendor/plaits/resources.cc",
@@ -34,8 +34,8 @@ o2 = [
     "vendor/plaits/dsp/fm/*.cc",
     "vendor/plaits/dsp/physical_modelling/*.cc",
     "vendor/plaits/dsp/speech/*.cc",
-    "vendor/beads/resources.cc",
-    "vendor/beads/dsp/*.cc",                    # Beads' processor (its synth mode is left out of vendor/)
+    "vendor/beads/resources.cc",               # (its sine, for the tape's wow and flutter)
+    "vendor/beads/dsp/mu_law.cc",               # Beads' reverb, tape and mu-law alone since 0.32 (vendor/beads)
 ]
 
 # TEST: stmlib's portable code instead of its ARM assembly; M_PI: newlib leaves it out in strict C++;
@@ -53,6 +53,6 @@ words = "words.tsv"
 tagline = "Hybrid DSP synthesizer for M-VAVE FM-1"
 repo = "https://github.com/gravkode/gravkode-fm1"
 licence = "MPL-2.0"
-credits = "Built on fm1-base. Sound engines: Mutable Instruments Plaits; effect: Mutable Instruments Beads; both by Émilie Gillet (MIT)."
+credits = "Built on fm1-base. Sound engines: Mutable Instruments Plaits; reverb and tape from Mutable Instruments Beads; both by Émilie Gillet (MIT)."
 
 vendored = ["vendor/"]

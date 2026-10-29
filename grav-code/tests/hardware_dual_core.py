@@ -53,25 +53,19 @@ def run(output, reverbs=(0, 60)):
         engine = current_engine()
         fm.run(["turn", "ALGO", str(order.index("PHASE DIST") - order.index(engine))])
         assert current_engine() == "PHASE DIST"
-        fm.run(["tap", "EDIT"])
-        messages = announcements()
-        if "FREEZE ON" in messages:
-            fm.run(["tap", "EDIT"])
-            assert "FREEZE OFF" in announcements()
-        elif "FREEZE OFF" not in messages:
-            raise RuntimeError("Could not confirm FREEZE state")
         for reverb in reverbs:
             fm.run(["listen", "tap", "HOME"])
-            # Walk to MIX using the page announcements; independent of the remembered FX page.
+            # Walk to HALL using the page announcements; independent of the remembered FX page.
             for _ in range(3):
                 fm.run(["tap", "FX"])
                 frames = fm.frames([0x7d, 0x53, 0x52], 0.15)
-                if any(b"PAGE FX MIX" in frame for frame in frames):
+                if any(b"PAGE HALL" in frame for frame in frames):
                     break
             else:
-                raise RuntimeError("Could not confirm FX MIX page")
-            fm.run(["turn", "K1", "-100", "turn", "K2", "-100", "turn", "K2", str(reverb),
-                    "turn", "K3", "-4"])
+                raise RuntimeError("Could not confirm HALL page")
+            # HALL's AMOUNT the reverb; TAPE's QUALITY DIGITAL; ECHO's AMOUNT 0 (0.32)
+            fm.run(["turn", "K1", "-100", "turn", "K1", str(reverb), "tap", "FX", "turn", "K1", "-4",
+                    "tap", "FX", "turn", "K1", "-100"])
             for voices in (2, 3, 4):
                 fm.run(["tap", "GLO", "turn", "K1", "-4", "turn", "K1", str(voices - 1), "tap", "REC"])
                 for mode in (1, 2):

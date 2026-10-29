@@ -62,18 +62,13 @@ def capture(path, device):
                      "PHASE DIST", "6-OP FM 1", "6-OP FM 2", "6-OP FM 3", "TERRAIN", "STRING MCH", "CHIPTUNE"]
             if engine not in order: raise RuntimeError(f"No engine name in reply: {description!r}")
             command("turn", "ALGO", str(order.index("6-OP FM 2") - order.index(engine)))
-        state = command("tap", "EDIT")
-        if "FREEZE ON" in state:
-            command("tap", "EDIT")
-        elif "FREEZE OFF" not in state:
-            raise RuntimeError("No FREEZE state announcement")
         command("tap", "HOME", "turn", "K1", "-100", "turn", "K1", "65",
                 "turn", "K2", "-100", "turn", "K2", "50", "turn", "K3", "-100", "turn", "K3", "75")
         for _ in range(3):
             text = command("tap", "FX")
-            if "PAGE FX MIX" in text: break
-        else: raise RuntimeError("No FX MIX page announcement")
-        command("turn", "K1", "-100", "turn", "K2", "-100")
+            if "PAGE HALL" in text: break
+        else: raise RuntimeError("No HALL page announcement")
+        command("turn", "K1", "-100", "tap", "FX", "tap", "FX", "turn", "K1", "-100")   # HALL's, ECHO's AMOUNT 0
         command("tap", "LFO", "turn", "K2", "-100")
         command("tap", "GLO", "turn", "K1", "-4", "master", "2048")
         command("tap", "ENV", "turn", "K1", "-100", "turn", "K2", "-100", "turn", "K3", "-100")
