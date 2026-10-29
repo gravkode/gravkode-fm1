@@ -13,9 +13,10 @@
 
 ---
 
-Поточна версія: **0.32.0**: ефект тепер — HALL (реверб Beads із TIME, TONE, DIFFUSE і MOD), TAPE (чотири середовища
-Beads, що його забарвлюють) і ECHO (затримка в темп); гранули Beads, FREEZE і SEED прибрано, а пам'ять, яку вони
-займали, звільнено. 0.31: SEQ ще раз показує лише вибрану доріжку: ноти синтезатора як піано-рол, 64 кроки барабана
+Поточна версія: **0.33.0**: сторінки ефекту показують, що він робить: нічне озеро під териконами HOME; кожна нота,
+послана в ефект, падає в нього колом, за нею в темп ідуть повтори ECHO, а хвіст HALL розходиться брижами; ручки
+маленькі, у нижній смузі. 0.32: ефект — HALL (реверб Beads із TIME, TONE, DIFFUSE і MOD), TAPE (чотири середовища
+Beads, що його забарвлюють) і ECHO (затримка в темп); гранули Beads, FREEZE і SEED прибрано. 0.31: SEQ ще раз показує лише вибрану доріжку: ноти синтезатора як піано-рол, 64 кроки барабана
 по сторінці в рядку; короткий SAVE запалює білі клавіші по черзі, від першої до останньої. 0.30.2: небо HOME за
 замовчуванням нічне, удень світло-блакитне. 0.30: у шапці назва рушія вибраної доріжки; сітка покрокового режиму
 більша, нижня смуга в один рядок. HOME — уся пісня одним поглядом: гряда з восьми териконів, по терикону на доріжку,
@@ -30,7 +31,7 @@ SELECT перемикає їх швидко.
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="Один такт у симуляторі: терикони HOME і сітка всіх восьми доріжок у покроковому режимі"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="Ручки сторінки звуку плавно доходять до значення, у симуляторі"></p>
 
-<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ ще раз, один такт у симуляторі: ноти S1 як піано-рол і кроки D1, по сторінці в рядку"></p>
+<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ ще раз, один такт у симуляторі: ноти S1 як піано-рол і кроки D1, по сторінці в рядку"> <img src="grav-code/docs/img/fx-lake.gif" width="240" alt="Сторінки ефекту під час гри, у симуляторі: терикони над озером, ноти падають у воду, кола повторів і хвоста"></p>
 
 ## Можливості
 
@@ -41,6 +42,7 @@ SELECT перемикає їх швидко.
   MORPH і HARMONICS, як на Plaits, і своя іконка, намальована кодом, яка рухається разом із ними.
 - **Ефект:** HALL — реверб Beads (AMOUNT, TIME, TONE, DIFFUSE, MOD); ECHO — затримка в темп (AMOUNT, тривалість
   ноти від 1/32 до 1/2, FEEDBACK); обидва забарвлює одне з чотирьох середовищ Beads (від цифрового до «брудної» стрічки).
+  Його сторінки показують його колами на озері під териконами.
 - **Секвенсор на вісім доріжок:** чотири синтові (S1–S4), у кожної свій рушій і звук, голоси (чотири на всіх:
   MONO, POLY або жодного), і чотири барабанні (D1–D4): кік, малий або хай-хет Plaits (по дві моделі) з шістьма
   ручками (TUNE, DECAY, TONE; у кіка PUNCH, SWEEP, DRIVE), у кожної свій голос. У кожної доріжки свої кроки — 64,
@@ -137,7 +139,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.32.0.fwsc 0.32.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.33.0.fwsc 0.33.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -152,7 +154,7 @@ GRAV CODE збирається інструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.32.0      # grav-code/build/grav_code-0.32.0.fwsc
+python3 tools/build.py grav-code --release 0.33.0      # grav-code/build/grav_code-0.33.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестів:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # емулятор у браузері (Emscripten)

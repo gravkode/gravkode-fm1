@@ -37,25 +37,22 @@ tap GLO
 wait 400
 shot screen-glo.png
 # FX (0.32): HALL on (AMOUNT 40, TIME 60, TONE 45), then TAPE (QUALITY VINTAGE; DIFFUSE, MOD as they come), then
-# ECHO on (AMOUNT 30 at 1/8., FEEDBACK 45)
+# ECHO on (AMOUNT 30 at 1/8., FEEDBACK 45). (0.33: their pages shot later, the pattern playing into the lake)
 tap FX
 wait 30
 turn K1 40
 turn K2 20
 turn K3 -10
 wait 400
-shot screen-fx-hall.png
 tap FX
 wait 30
 turn K1 1
 wait 400
-shot screen-fx-tape.png
 tap FX
 wait 30
 turn K1 30
 turn K3 10
 wait 400
-shot screen-fx-echo.png
 tap HOME
 wait 30
 
@@ -277,6 +274,19 @@ tap SEL
 wait 600
 shot screen-mixer.png
 tap SEL
+wait 30
+# (0.33) the effect's pages, still playing: the lake under the terricons, the pattern dropping into it, the echoes
+# following, the tail rippling. FX: ECHO (the page shown last), again HALL, again TAPE; then HOME
+tap FX
+wait 1400
+shot screen-fx-echo.png
+tap FX
+wait 1400
+shot screen-fx-hall.png
+tap FX
+wait 1400
+shot screen-fx-tape.png
+tap HOME
 wait 30
 # (0.27) the presets' browser over HOME, still playing: PRESET, then OCT- (the sound back as it was)
 turn PRESET 1

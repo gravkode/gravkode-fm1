@@ -64,13 +64,16 @@ From the top:
 - **The page's three parameters** as knobs, K1 to K3, on every page: a thin ring, ticks over its travel lit up to
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
-  settles back. In step mode (SEQ) its knobs are small, at the page's top, above the tracks' steps (section 5).
-- **The bottom band:** the page's state (a sound page: how to change pages; FX: ECHO's time and whether the effect is on; the mixer: what its keys do);
+  settles back. In step mode (SEQ) its knobs are small, at the page's top, above the tracks' steps (section 5); on
+  the mixer's and the effect's pages small too, in the bottom band (0.33).
+- **The bottom band:** the page's state (a sound page: how to change pages);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
   STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED, and CPU
-  (the engine is in the header). The keys are not drawn: the FM-1's own are under the screen.
+  (the engine is in the header). On the mixer and the effect's pages (0.33) the page's three knobs, small, and under
+  them what the mixer's keys do, or ECHO's time and whether the effect is on, and CPU. The keys are not drawn: the
+  FM-1's own are under the screen.
 
 ---
 
@@ -237,7 +240,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003200, version 0.32.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003300, version 0.33.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -264,7 +267,7 @@ GLO once more opens DEBUG, the two cores' timings (section 11).
 
 ### HALL, TAPE, ECHO (FX)
 
-The effect's three pages: section 7.
+The effect's three pages, a lake under the terricons showing what it does (0.33): section 7.
 
 ---
 
@@ -534,7 +537,7 @@ the next.
 
 ## 7. The effect (FX)
 
-![The HALL page: AMOUNT 40, TIME 60, TONE 45; ECHO 1/8. 375 MS, FX ON in the bottom band](img/screen-fx-hall.png "HALL") ![The TAPE page: QUALITY VINTAGE, DIFFUSE 70, MOD 60](img/screen-fx-tape.png "TAPE") ![The ECHO page: AMOUNT 30, TIME 1/8., FEEDBACK 45](img/screen-fx-echo.png "ECHO")
+![The HALL page while the pattern plays: the terricons over the lake, mirrored in it; a note's white ring in the middle, the tail's rings around it; AMOUNT 40, TIME 60, TONE 45, small, in the bottom band; ECHO 1/8. 375 MS, FX ON](img/screen-fx-hall.png "HALL") ![The TAPE page: the rings on every other row (VINTAGE); QUALITY VINTAGE, DIFFUSE 70, MOD 60](img/screen-fx-tape.png "TAPE") ![The ECHO page: the echoes' thicker rings, an eighth dotted apart; AMOUNT 30, TIME 1/8., FEEDBACK 45](img/screen-fx-echo.png "ECHO")
 
 GRAV CODE's effect (0.32) is an echo in time with the tempo and the reverb of Mutable Instruments Beads, both
 coloured by Beads' media: digital, vintage or tape. The tracks go into it by their SEND (the mixer, section 4), in
@@ -543,12 +546,32 @@ Until 0.31 the effect was all of Beads (its grains, their delay, FREEZE and SEED
 flutter and its 8-bit colour are what stay.
 
 FX shows its pages, and pressed again the next: HALL, TAPE, ECHO, round. From another page, FX goes back to the one
-shown last. The bottom band shows ECHO's time as a note value and in milliseconds at the tempo, and whether the
-effect is on.
+shown last. Their three knobs are small, in the bottom band (0.33, as the mixer's); under them ECHO's time as a note
+value and in milliseconds at the tempo, whether the effect is on, and CPU.
 
 **On and off:** each AMOUNT is a send: how much goes into the reverb, or into the echo. With both at 0 nothing goes
 in; what is in the reverb and the echoes rings out, and once it has died away the effect is off and costs nothing
 (as it starts). FX is lit while it runs (on another page).
+
+### The lake (0.33)
+
+![The lake while the pattern plays, in the simulator: HALL, then ECHO; the terricons moving with their tracks, the notes dropping into the water, the echoes following, the tail rippling](img/fx-lake.gif "The lake")
+
+The effect's pages show what it does: a lake at night under HOME's terricons (section 5), smaller, each track's in
+its colour, moving with its sound as on HOME, mirrored in the water (a track with no step a grey heap). What is on
+the water is the effect's:
+
+- **A drop:** a note going into the effect (its track's SEND above 0) falls into the water, a white ring as bright as
+  it is loud. A chord is one drop.
+- **The echoes:** ECHO's repeats follow it, TIME apart, thicker rings in the theme's colour, the first as strong as
+  AMOUNT sends, each next weaker by FEEDBACK.
+- **The tail:** HALL's reverb ripples on as long as it sounds, fainter rings, more of them as DIFFUSE is higher,
+  brighter as TONE is, carried further as TIME is longer.
+- **MOD** sways the rings, and the reflections while the water moves. **QUALITY** shows as the medium: VINTAGE's rings
+  on every other row, CLEAN TAPE's wavering, DIRTY TAPE's broken up over a grain.
+
+The page's own part is the brighter: the tail on HALL, the echoes on ECHO, both on TAPE. With nothing going in the
+water is still, and nothing is redrawn.
 
 ### HALL
 

@@ -104,6 +104,21 @@ static inline void cv_pset(int32_t x, int32_t y, uint16_t c)
         cv_px[(uint32_t)y * cv_w + (uint32_t)x] = swap16(c);
 }
 
+/* c over what is on the canvas, each channel the brighter of the two: light over light (a ring crossing a ring)
+ * adds up to the brighter, never darkens it */
+static inline void cv_glow(int32_t x, int32_t y, uint16_t c)
+{
+    y += cv_oy;
+    if ((uint32_t)x < cv_w && y >= cv_y0 && y < cv_y1) {
+        uint16_t *p = &cv_px[(uint32_t)y * cv_w + (uint32_t)x];
+        const uint32_t o = swap16(*p);
+        const uint32_t r = (c & 0xF800u) > (o & 0xF800u) ? c & 0xF800u : o & 0xF800u;
+        const uint32_t g = (c & 0x07E0u) > (o & 0x07E0u) ? c & 0x07E0u : o & 0x07E0u;
+        const uint32_t b = (c & 0x001Fu) > (o & 0x001Fu) ? c & 0x001Fu : o & 0x001Fu;
+        *p = swap16(r | g | b);
+    }
+}
+
 static void cv_rect(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
 {
     int32_t x1 = x + w, y1 = y + h + cv_oy, i;

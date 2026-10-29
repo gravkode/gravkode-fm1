@@ -13,9 +13,10 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.32.0**: the effect is HALL (Beads' reverb, with its TIME, TONE, DIFFUSE and MOD), TAPE (Beads'
-four media colouring it) and ECHO (a delay in time with the tempo); Beads' grains, FREEZE and SEED are gone, and the
-RAM they took is free. 0.31: SEQ pressed again shows the selected track alone: a synth track's notes as a piano
+Current version: **0.33.0**: the effect's pages show what it does, a lake at night under HOME's terricons: each note
+sent into the effect drops a ring, ECHO's repeats follow it in time, HALL's tail ripples on; the knobs small, in the
+bottom band. 0.32: the effect is HALL (Beads' reverb, with its TIME, TONE, DIFFUSE and MOD), TAPE (Beads' four media
+colouring it) and ECHO (a delay in time with the tempo); Beads' grains, FREEZE and SEED are gone. 0.31: SEQ pressed again shows the selected track alone: a synth track's notes as a piano
 roll, a drum track's 64 steps a page a row; a tap on SAVE lights the white keys first to last. 0.30.2: HOME's sky
 NIGHT as it comes, by day a light blue one. 0.30: the header names the selected track's engine; step mode's grid
 bigger, its bottom band one line. HOME is the song at a glance: a ridge of eight terricons, a track each,
@@ -30,7 +31,7 @@ hold HOME and turn SELECT to jump.
 
 <p align="center"><img src="grav-code/docs/img/seq-playing.gif" width="490" alt="One bar playing, in the simulator: HOME's terricons, and step mode's grid of all eight tracks"> <img src="grav-code/docs/img/sound-dials.gif" width="240" alt="The sound page's knobs easing to their values, in the simulator"></p>
 
-<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ again, one bar playing, in the simulator: S1's notes as a piano roll, and D1's steps a page a row"></p>
+<p align="center"><img src="grav-code/docs/img/seq-notes.gif" width="490" alt="SEQ again, one bar playing, in the simulator: S1's notes as a piano roll, and D1's steps a page a row"> <img src="grav-code/docs/img/fx-lake.gif" width="240" alt="The effect's pages playing, in the simulator: the terricons over the lake, the notes dropping in, the echoes and the tail's rings"></p>
 
 ## What it does
 
@@ -40,7 +41,8 @@ hold HOME and turn SELECT to jump.
   patches), wave terrains, a string machine and chiptune. Each with Plaits' own TIMBRE, MORPH and HARMONICS, and an
   icon of its own, drawn by code, that moves with them.
 - **An effect:** HALL, Beads' reverb (AMOUNT, TIME, TONE, DIFFUSE, MOD); ECHO, a delay in time with the tempo
-  (AMOUNT, a note value from 1/32 to 1/2, FEEDBACK); both coloured by Beads' four media (digital to dirty tape).
+  (AMOUNT, a note value from 1/32 to 1/2, FEEDBACK); both coloured by Beads' four media (digital to dirty tape). Its
+  pages show it as rings on a lake under the terricons.
 - **A sequencer of eight tracks:** four synth tracks (S1–S4), each its own engine and sound, voices (the four shared
   out: MONO, POLY or none), and four drum tracks (D1–D4), each a kick, snare or hi-hat of Plaits' (two models each)
   with six knobs (TUNE, DECAY, TONE; the kick's PUNCH, SWEEP, DRIVE), in a voice of its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
@@ -133,7 +135,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.32.0.fwsc 0.32.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.33.0.fwsc 0.33.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -148,14 +150,14 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.32.0      # grav-code/build/grav_code-0.32.0.fwsc
+python3 tools/build.py grav-code --release 0.33.0      # grav-code/build/grav_code-0.33.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
 ```
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
-`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, saving, older settings),
+`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).

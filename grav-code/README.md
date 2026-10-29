@@ -6,7 +6,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | File | What |
 | --- | --- |
 | `app.h` | The app's settings (name, block size, the store's objects, APP_OVERLOAD) and its half of the contract with the platform |
-| `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's terricons, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages: HALL, TAPE, ECHO), the presets' browser, recording; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
+| `app.c` | The app: the keys, buttons and knobs (`input`: a handler each), MIDI in and out; the pages (HOME's terricons, the sound's pages, SEQ, MOD, ENV, GLO, SCREEN, DEBUG, the mixer, the three FX pages: HALL, TAPE, ECHO, over a lake under the terricons, 0.33), the presets' browser, recording; the lights; the screen (`draw`: header, page, bottom band; `app_frame` redraws the least that shows a change); the settings (`settings_load`: older records brought up to date) and SAVE |
 | `synth/` | The voices (`synth.c`: four shared out among the synth tracks S1..S4, each MONO with legato, POLY or none, and one for each drum track D1..D4; the shedding), the envelope, the LFO, the event queue from the main loop to the audio interrupt |
 | `sound/` | Engine control/page metadata, native FM byte mapping and validation; AUTO follows the original macros |
 | `presets/` | Four factory starting points per engine; a 64-slot expanded preset log (184-byte sounds), indexed in flash with a bounded pending queue, CRC/commit and compaction tests |
@@ -15,7 +15,7 @@ the manual, [docs/MANUAL.md](docs/MANUAL.md).
 | `dsp/grav_plaits.cpp` | Plaits' 24 engines: their table (names, trigger modes, levels), each voice its own (its track's; a drum voice's, in a small slot, one of the three drums), rendered 12 samples at a time |
 | `dsp/grav_drums.h` | The drum voices' drums (0.19): Plaits' drum models, the one chosen rendered, with the DRUM and SHAPE pages' knobs (the kick's PUNCH, SWEEP and DRIVE apart, where Plaits folds them onto HARMONICS) |
 | `ui/icons.c` | The engines' icons (0.20), drawn by code from the time, the engine's knobs and its track's notes; one line on each engine (included by `app.c`) |
-| `dsp/grav_fx.cpp` | The effect (0.32): ECHO, a delay in time with the tempo, and HALL, Beads' reverb (`dsp/grav_reverb.h`), coloured by TAPE's QUALITY (Beads' media); in mono, the sends in, the dry round it; off (and free) once nothing goes in and its tails have died |
+| `dsp/grav_fx.cpp` | The effect (0.32): ECHO, a delay in time with the tempo, and HALL, Beads' reverb (`dsp/grav_reverb.h`), coloured by TAPE's QUALITY (Beads' media); in mono, the sends in, the dry round it; off (and free) once nothing goes in and its tails have died. It measures what is sent in and HALL's tail for the FX pages' lake (0.33) |
 | `dsp/grav_libc.c` | The C library functions the FM-1's link lacks (`fabsf`, `sqrtf`, `abs`, `memmove`) |
 | `vendor/` | Plaits, Beads' reverb engine and tape, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
@@ -63,13 +63,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py grav-code --release 0.32.0    # grav-code/build/grav_code-0.32.0.fwsc, identity FM-1_73003200
+    python3 tools/build.py grav-code --release 0.33.0    # grav-code/build/grav_code-0.33.0.fwsc, identity FM-1_73003300
     python3 tools/build.py grav-code --web
-    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.32.0.fwsc 0.32.0 grav-code/build/site
+    python3 tools/make_site.py grav-code grav-code/build/grav_code-0.33.0.fwsc 0.33.0 grav-code/build/site
 
 ## The pictures
 
-    python3 tools/build.py grav-code --host --release 0.32.0   # (so GLO shows the version and identity)
+    python3 tools/build.py grav-code --host --release 0.33.0   # (so GLO shows the version and identity)
     grav-code/build/host/grav_code_host grav-code/tests/screens.txt grav-code/docs/img
     python3 grav-code/docs/img/compose.py
 

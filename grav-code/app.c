@@ -3211,8 +3211,9 @@ static void draw_chips(int32_t y0, uint32_t mask, int32_t xoffset)
         ui.dial_hot |= (uint8_t)(hot << i);
         dial_face(x, y, 10 + knob_grow(i, 2), &k, i, hot, 2, 4);
         cv_text(x + 17, y0 + 2, &FONT_T, k.name, hot ? C_HI : C_GRAY);
-        const felucca_font_t *font = text_w(&FONT_S, k.value) <= 46 ? &FONT_S : &FONT_XS;
-        cv_text(x + 17, y0 + 16, font, k.value, k.inherit ? C_GRAY : C_WHITE);
+        const felucca_font_t *font = text_w(&FONT_S, k.value) <= 46 ? &FONT_S :
+                                     text_w(&FONT_XS, k.value) <= 54 ? &FONT_XS : &FONT_T;   /* (CLEAN TAPE) */
+        cv_text(x + 17, y0 + (font == &FONT_T ? 18 : 16), font, k.value, k.inherit ? C_GRAY : C_WHITE);
     }
 }
 
@@ -3279,8 +3280,9 @@ static int animate_dials(uint32_t now)
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
     if (active_page == PAGE_SEQ && !ui.step_mode)   /* (HOME's terricons: no knobs drawn) */
         return 0;
-    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER) {   /* (small: SEQ's at the page's top, 0.28; the
-                                                                   * mixer's in the bottom band) */
+    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER || IS_FX_PAGE(active_page)) {   /* (small: SEQ's at the
+                                                                   * page's top, 0.28; the mixer's and, 0.33, the
+                                                                   * effect's in the bottom band) */
         cv_begin(80, CHIP_H, C_BLACK);
         draw_chips(0, 1u << dial, (int32_t)dial * 80);
         cv_blit(dial * 80, active_page == PAGE_SEQ ? 36u : 180u + CHIP_Y);
@@ -3658,24 +3660,31 @@ static void draw_sky(int32_t base, int32_t dy, uint32_t now)
     }
 }
 
-/* HOME: the terricons. A track with no step on in its pattern has none; one silent (muted, or another soloed) is
- * grey and still; one quiet is its colour, dim and still; one sounding lives: its slopes bend with its sound (its
- * level, followed), in its engine's way (a kick a strong, quick bulge, and its peak jumps as it hits; a hi-hat small,
- * quick teeth; a pad slow waves). The selected track's is thicker, white at its core, a marker and its name over
- * its peak; its level at the top right */
-static void draw_terricons(int32_t dy, uint32_t now)
+/* the terricons' ridge on a ground line at base, each h_pct % of its height (TC_H) and half its foot half wide
+ * (HOME's: TC_HALF), from the furthest. A track with no step on in its pattern has none; one silent (muted, or another
+ * soloed) is grey and still; one quiet is its colour, dim and still; one sounding lives: its slopes bend with its
+ * sound (its level, followed), in its engine's way (a kick a strong, quick bulge, and its peak jumps as it hits; a
+ * hi-hat small, quick teeth; a pad slow waves). The selected track's is thicker, white at its core; on HOME a marker
+ * and its name over its peak. (0.33) Over the effect's lake (lake): a track with no step a grey heap, still; no
+ * marker; and each heap's reflection under the ground line, its outline mirrored, half as high, on every other row,
+ * dim, swayed sideways by sway px */
+static float LAKE_SIN[256];                  /* (the lake's) a turn in 256 steps */
+static void draw_ridge(int32_t base, int32_t h_pct, int32_t half, uint32_t now, int lake, float sway)
 {
-    const float time = (float)(now % 600000u) * 0.001f;
-    const int32_t base = TC_BASE + dy;
-    const int day = set.sky == SKY_DAY;
+    const float time = (float)(now % 600000u) * 0.001f, scale = (float)h_pct * 0.01f;
+    const int day = !lake && set.sky == SKY_DAY;
     const uint16_t earth = day ? RGB(18, 16, 22) : C_BLACK;   /* (the heaps' black, by day dark earth) */
     int16_t px[2 * TC_N + 1], py[2 * TC_N + 1];
-    draw_sky(base, dy, now);
+    for (uint32_t pass = 0; pass < (lake ? 2u : 1u); pass++)   /* (the lake's: the heaps, then their reflections,
+                                                                 * the feet's glow cut between) */
     for (uint32_t o = 0; o < SEQ_TRACKS; o++) {
         const uint32_t t = TC_ORDER[o];
-        if (!track_used(t))                  /* empty: no terricon */
+        const int used = track_used(t);
+        if (pass && !o)
+            cv_rect(0, base + 1, 240, 2, C_BLACK);
+        if (!used && !lake)                  /* empty: no terricon */
             continue;
-        const int muted = seq.mute >> t & 1u, sel = t == track_sel;
+        const int muted = !used || seq.mute >> t & 1u, sel = t == track_sel;
         const uint32_t look = track_look(*track_engine(t)), since = now - ui.hit_at[t];
         const int drum_hit = !muted && look <= LOOK_HAT && since < 400u;
         float amp = muted ? 0.0f : ui.level[t];
@@ -3683,8 +3692,8 @@ static void draw_terricons(int32_t dy, uint32_t now)
             amp += 0.6f * fm_expf(-(float)since / 90.0f);
         if (amp > 1.2f)
             amp = 1.2f;
-        const float h = (float)TC_H[t] * (drum_hit ? 1.0f + 0.18f * fm_expf(-(float)since / 120.0f) : 1.0f);
-        const float depth = 1.3f * TRACK_LOOK[look].depth * (0.55f + 0.45f * (float)TC_H[t] / 96.0f) * amp;
+        const float h = (float)TC_H[t] * scale * (drum_hit ? 1.0f + 0.18f * fm_expf(-(float)since / 120.0f) : 1.0f);
+        const float depth = 1.3f * scale * TRACK_LOOK[look].depth * (0.55f + 0.45f * (float)TC_H[t] / 96.0f) * amp;
         const float wsum = TRACK_LOOK[look].w[0] + TRACK_LOOK[look].w[1] + TRACK_LOOK[look].w[2];
         for (uint32_t i = 0; i <= 2u * TC_N; i++) {
             const float u = (float)i / (float)TC_N - 1.0f, au = u < 0.0f ? -u : u;   /* -1 .. 1, foot to foot */
@@ -3700,14 +3709,30 @@ static void draw_terricons(int32_t dy, uint32_t now)
                 y = (float)base - h * 0.88f;
             if (au > 0.55f && au < 0.7f && y > (float)base - h * 0.45f + 2.0f)   /* a terrace on each slope */
                 y = (float)base - h * 0.45f + 2.0f;
-            px[i] = (int16_t)(TC_X[t] + (int32_t)((float)TC_HALF * u + (u < 0.0f ? -0.5f : 0.5f)));
+            px[i] = (int16_t)(TC_X[t] + (int32_t)((float)half * u + (u < 0.0f ? -0.5f : 0.5f)));
             py[i] = (int16_t)(y - bend + 0.5f);
+        }
+        if (pass) {                          /* its reflection: the outline mirrored, half as high, every other row */
+            const uint16_t c = muted ? mix565(C_BLACK, C_DIM, 150) : mix565(C_BLACK, TRACK_HUE[t], sel ? 170 : 120);
+            for (uint32_t i = 0; i < 2u * TC_N; i++) {
+                const int32_t y0 = base + (base - py[i]) / 2, y1 = base + (base - py[i + 1u]) / 2;
+                const int32_t x0 = px[i], x1 = px[i + 1u];
+                const int32_t n = (x1 > x0 ? x1 - x0 : x0 - x1) + (y1 > y0 ? y1 - y0 : y0 - y1);
+                for (int32_t k = 0; k <= n; k++) {
+                    const int32_t y = y0 + (n ? (y1 - y0) * k / n : 0);
+                    if (y <= base || (y - base) & 1)
+                        continue;
+                    const float w = sway * LAKE_SIN[(uint32_t)(time * 81.5f + (float)y * 28.5f + (float)t * 40.0f) & 255u];
+                    cv_glow(x0 + (n ? (x1 - x0) * k / n : 0) + (int32_t)(w + (w < 0.0f ? -0.5f : 0.5f)), y, c);
+                }
+            }
+            continue;
         }
         ground_under(px, py, 2u * TC_N + 1u, base, earth);
         for (int32_t k = -2; k <= 2; k++)    /* gullies down its slopes */
             if (k) {
                 const uint32_t at = (uint32_t)((float)TC_N * (1.0f + 0.12f * (float)k) + 0.5f);
-                cv_line(px[at], py[at] + 3, TC_X[t] + (int32_t)(0.42f * (float)k * (float)TC_HALF), base - 1,
+                cv_line(px[at], py[at] + 3, TC_X[t] + (int32_t)(0.42f * (float)k * (float)half), base - 1,
                         mix565(earth, day ? RGB(120, 114, 108) : muted ? C_DIM : TRACK_HUE[t], 70));
             }
         if (muted)                           /* silent: grey, still */
@@ -3722,10 +3747,13 @@ static void draw_terricons(int32_t dy, uint32_t now)
             thick_line(px, py, 2u * TC_N + 1u, day ? mix565(earth, TRACK_HUE[t], 100 + (int32_t)(fm_minf(amp, 1.0f) * 70.0f))
                                                    : TRACK_HUE[t], 2);
         }
-        if (sel) {                           /* the selected track's: a white core; over its peak a marker, its name */
+        if (sel) {                           /* the selected track's: a white core; on HOME over its peak a marker,
+                                              * its name */
             const int32_t tx = px[TC_N], ty = py[TC_N];
             if (!muted)
                 thick_line(px, py, 2u * TC_N + 1u, day ? mix565(earth, C_WHITE, 170) : C_WHITE, 1);
+            if (lake)
+                continue;
             for (int32_t k = 0; k < 6; k++)  /* (a shadow under it first: readable over a cloud) */
                 cv_rect(tx - k + 1, ty - 4 - k, 2 * k + 1, 1, C_BLACK);
             for (int32_t k = 0; k < 6; k++)
@@ -3734,6 +3762,14 @@ static void draw_terricons(int32_t dy, uint32_t now)
             cv_text(tx - text_w(&FONT_T, TRACK_NAME[t]) / 2, ty - 24, &FONT_T, TRACK_NAME[t], C_WHITE);
         }
     }
+}
+
+/* HOME: the terricons, under the sky (draw_ridge), on the ground; the selected track's level at the top right */
+static void draw_terricons(int32_t dy, uint32_t now)
+{
+    const int32_t base = TC_BASE + dy;
+    draw_sky(base, dy, now);
+    draw_ridge(base, 100, TC_HALF, now, 0, 0.0f);
     cv_rect(0, base + 1, 240, 144, set.sky == SKY_DAY ? RGB(26, 24, 28) : C_BLACK);   /* the ground (the feet's glow
                                                                                      * cut) */
     cv_rect(0, base, 240, 1, C_LINE);
@@ -3747,6 +3783,237 @@ static void draw_level(int32_t x, int32_t y)
     const int32_t lv = (int32_t)(ui.level[track_sel] * 6.0f + 0.5f);
     for (int32_t k = 0; k < 6; k++)
         cv_rect(x + k * 7, y, 5, 8, k < lv ? TRACK_HUE[track_sel] : C_LINE);
+}
+
+/* (0.33) the effect's pages (HALL, TAPE, ECHO): a lake at night under HOME's terricons, smaller (draw_ridge), moving
+ * with their tracks as they do there, mirrored in it. What goes into the effect drops into the water, a white ring as strong as it is loud; ECHO's
+ * repeats follow it, TIME apart, rings of the theme's colour, each weaker by FEEDBACK; HALL's tail ripples on while
+ * it sounds, fainter rings, as many as DIFFUSE makes them, brighter as TONE is (darker and softer when not), carried
+ * further as TIME is longer. MOD sways the rings and, while the water moves, the terricons' reflections; QUALITY shows as
+ * the medium: VINTAGE's rings on a 2-pixel grid, CLEAN TAPE's wavering, DIRTY TAPE's broken up (2-pixel blocks 3
+ * apart) over a grain. The page's own part is the brighter: HALL's tail, ECHO's repeats (TAPE: both). The drops and
+ * the tail as the effect hears them (grav_fx_meters), the repeats from the drops: nothing sent, still water, nothing
+ * redrawn */
+#define LAKE_Y 24                            /* the scene's top in the page, its name over it: redrawn from here */
+#define LAKE_HORIZON 86                      /* the shore: the ridge's ground line */
+#define LAKE_H_PCT 48                        /* the terricons' height, HOME's in % */
+#define LAKE_HALF 32                         /* half a terricon's foot (HOME's 44) */
+#define LAKE_CY 116                          /* the rings' centre */
+#define LAKE_RINGS 96
+#define LAKE_TRAINS 8
+#define LAKE_SPEED 0.052f                    /* a ring's growth, px a ms */
+#define LAKE_LIFE 2850u                      /* ms: by then it has gone off the screen (150 px) */
+enum { RING_DROP = 1, RING_ECHO, RING_HALL };
+static struct {
+    uint32_t at[LAKE_RINGS];                 /* when each ring began */
+    uint8_t amp[LAKE_RINGS], kind[LAKE_RINGS];   /* its strength (255 the most), RING_* (0: none) */
+    uint8_t next;                            /* the slot the next one takes (the oldest's) */
+    uint8_t drop_slot;                       /* the last drop's: it grows while its onset rises */
+    struct {                                 /* a drop's echoes to come: */
+        uint32_t at;                         /* the drop's time */
+        float a, g;                          /* the first repeat's strength against the drop's, the next's against it */
+        uint8_t k, slot;                     /* the next repeat (1 the first); the drop's ring */
+    } train[LAKE_TRAINS];
+    uint8_t train_next;
+    float in, hall, ref;                     /* the levels followed; ref the drops' (the tail seen against it) */
+    uint32_t drop_at, ripple_at, heard;      /* the last drop, the tail's next ripple; the last frame */
+    uint32_t drops, echoes, ripples;         /* rings begun (the tests) */
+    uint8_t shown;                           /* the water was moving at the last frame drawn */
+} lake;
+
+static uint32_t lake_ring(uint32_t kind, float a, uint32_t at)
+{
+    const uint32_t i = lake.next;
+    lake.next = (uint8_t)((i + 1u) % LAKE_RINGS);
+    lake.at[i] = at;
+    lake.amp[i] = (uint8_t)(fm_minf(a, 1.0f) * 255.0f + 0.5f);
+    lake.kind[i] = (uint8_t)kind;
+    return i;
+}
+
+/* a drop: what is sent rises well over its slow follower (which takes ~80 ms to climb to it: a rise over a few frames
+ * is still one). Its ring grows while the level rises still, 40 ms at least and up to 200 (a chord's notes, a slow
+ * attack: one drop), the follower held up with it: the next drop only once it has fallen (over ~150 ms) and risen
+ * again. Its echoes set going: the first as ECHO's AMOUNT sends (its square, seen to the 0.25th), each next weaker
+ * by FEEDBACK's loop (a tape's a little over, as grav_fx.cpp; seen to the 0.35th) */
+static void lake_drop(float p, uint32_t now, float dt, int shown)
+{
+    const float a = p / (p + 0.03f);
+    if (now - lake.drop_at < 200u && (now - lake.drop_at < 40u || p >= lake.in)) {
+        if (lake.kind[lake.drop_slot] == RING_DROP && lake.at[lake.drop_slot] == lake.drop_at &&
+            a * 255.0f > (float)lake.amp[lake.drop_slot])
+            lake.amp[lake.drop_slot] = (uint8_t)(fm_minf(a, 1.0f) * 255.0f);
+        lake.in = fm_maxf(lake.in, p);
+    } else if (p > 0.003f && p > 1.5f * lake.in + 0.002f && now - lake.drop_at >= 60u) {
+        lake.drop_at = now;
+        lake.in = p;
+        if (shown) {
+            const float e = (float)fx_params[FX_ECHO] * 0.01f;
+            const float fb = (float)fx_params[FX_FEEDBACK] * (fx_quality >= GRAV_FX_CLEAN_TAPE ? 0.0104f : 0.0097f);
+            lake.drop_slot = (uint8_t)lake_ring(RING_DROP, a, now);
+            lake.drops++;
+            if (e > 0.0f) {
+                const uint32_t n = lake.train_next;
+                lake.train_next = (uint8_t)((n + 1u) % LAKE_TRAINS);
+                lake.train[n].at = now;
+                lake.train[n].a = fm_sqrtf(e);
+                lake.train[n].g = fb > 0.0f ? fm_powf(fm_minf(fb, 0.99f), 0.35f) : 0.0f;
+                lake.train[n].k = 1;
+                lake.train[n].slot = lake.drop_slot;
+            }
+        }
+    } else
+        lake.in = p > lake.in ? lake.in + (p - lake.in) * (1.0f - fm_expf(-dt / 80.0f)) : lake.in * fm_expf(-dt / 150.0f);
+}
+
+/* the drops' echoes come due: TIME apart (as the effect plays it: fitted to its line), each a ring from its own
+ * time; a train ends once its repeats are too faint to see */
+static void lake_echoes(uint32_t now, int shown)
+{
+    const float ms = grav_echo_heard((uint32_t)fx_params[FX_ECHO_TIME], (float)seq_bpm(&seq)) * 1000.0f;
+    for (uint32_t n = 0; n < LAKE_TRAINS; n++) {
+        if (lake.train[n].a <= 0.0f)
+            continue;
+        while (lake.train[n].k < 200u) {
+            const uint32_t due = lake.train[n].at + (uint32_t)((float)lake.train[n].k * ms + 0.5f);
+            if ((int32_t)(now - due) < 0)
+                break;
+            const uint32_t d = lake.train[n].slot;   /* (the drop's strength, once it has grown) */
+            const float drop = lake.kind[d] == RING_DROP && lake.at[d] == lake.train[n].at ? (float)lake.amp[d] / 255.0f : 0.5f;
+            const float a = fm_sqrtf(drop) * lake.train[n].a;
+            if (a < 0.04f || !shown) {
+                lake.train[n].a = 0.0f;
+                break;
+            }
+            if (now - due < LAKE_LIFE) {
+                lake_ring(RING_ECHO, a, due);
+                lake.echoes++;
+            }
+            lake.train[n].a *= lake.train[n].g;
+            lake.train[n].k++;
+        }
+    }
+}
+
+/* the effect's levels since the last frame (taken every frame, whatever the page: none left over): the drops, their
+ * echoes; HALL's tail a ripple every 1 / (2 + 6 DIFFUSE) s while it sounds, as strong as it is against the drops.
+ * Rings begin only on the effect's pages, nothing over them */
+static void lake_listen(uint32_t now)
+{
+    float in, hall;
+    grav_fx_meters(&in, &hall);
+    const float dt = (float)(now - lake.heard);
+    lake.heard = now;
+    const int shown = IS_FX_PAGE(active_page) && !list_open() && !ui.splash_until;
+    lake.ref = fm_maxf(in, lake.ref * fm_expf(-dt / 3000.0f));
+    lake_drop(in, now, dt, shown);
+    lake_echoes(now, shown);
+    lake.hall = fm_maxf(hall, lake.hall * fm_expf(-dt / 60.0f));
+    if ((int32_t)(now - lake.ripple_at) >= 0) {
+        lake.ripple_at = now + 1000u / (2u + 6u * (uint32_t)fx_params[FX_DIFFUSE] / 100u);
+        const float a = 0.6f * fm_sqrtf(fm_minf(lake.hall / fm_maxf(lake.ref, 0.02f), 1.0f));
+        if (shown && a >= 0.04f) {
+            lake_ring(RING_HALL, a, now);
+            lake.ripples++;
+        }
+    }
+}
+
+static int lake_moving(uint32_t now)         /* a ring still on the water */
+{
+    for (uint32_t i = 0; i < LAKE_RINGS; i++)
+        if (lake.kind[i] && now - lake.at[i] < LAKE_LIFE)
+            return 1;
+    return 0;
+}
+
+static int32_t lake_snap(float v, int32_t s)  /* to the medium's steps of s pixels */
+{
+    return s > 1 ? (int32_t)(v / (float)s + 0.5f) * s : (int32_t)(v + 0.5f);
+}
+
+/* the lake, its rows from LAKE_Y down to the page's foot (dy: the canvas's top row less the page's) */
+static void draw_lake(int32_t dy, uint32_t now)
+{
+    const float time = (float)(now % 600000u) * 0.001f;
+    const float mod = (float)fx_params[FX_MOD] * 0.01f, tone = (float)fx_params[FX_TONE] * 0.01f;
+    const float reach = 35.0f + 1.3f * (float)fx_params[FX_HALL_TIME];
+    const uint32_t q = (uint32_t)fx_quality;
+    const int32_t hy = LAKE_HORIZON + dy, cy = LAKE_CY + dy, step = q == GRAV_FX_VINTAGE ? 2 : q == GRAV_FX_DIRTY_TAPE ? 3 : 1;
+    const int32_t block = q == GRAV_FX_DIRTY_TAPE ? 2 : 1;
+    const float hall_k = active_page == PAGE_FX_HALL ? 1.0f : active_page == PAGE_FX_TAPE ? 0.8f : 0.4f;
+    const float echo_k = active_page == PAGE_FX_ECHO ? 1.0f : active_page == PAGE_FX_TAPE ? 0.85f : 0.55f;
+    const uint16_t hall_c = mix565(C_AMB, C_WHITE, (int32_t)(tone * 154.0f));
+    float stir = 0.0f;                       /* how much the water moves: its rings' strength */
+    for (uint32_t i = 0; i < LAKE_RINGS; i++)
+        if (lake.kind[i] && now - lake.at[i] < LAKE_LIFE)
+            stir += (float)lake.amp[i] * (1.0f / 255.0f) * fm_expf(-(float)(now - lake.at[i]) * (1.0f / 900.0f));
+    stir = fm_minf(stir, 1.0f);
+    if (!LAKE_SIN[64])
+        for (uint32_t i = 0; i < 256u; i++)
+            LAKE_SIN[i] = fm_sinf((float)i * (6.2831853f / 256.0f));
+    /* the ridge: HOME's terricons, smaller, moving as they do; their reflections, swaying with MOD while the water
+     * moves; the shore */
+    draw_ridge(hy, LAKE_H_PCT, LAKE_HALF, now, 1, mod * 2.5f * stir);
+    cv_rect(0, hy, 240, 1, C_LINE);
+    /* the rings, the newest first, up to a frame's points */
+    int32_t budget = 12000;
+    for (uint32_t n = 0; n < LAKE_RINGS && budget > 0; n++) {
+        const uint32_t i = (lake.next + LAKE_RINGS - 1u - n) % LAKE_RINGS, age = now - lake.at[i];
+        if (!lake.kind[i] || age >= LAKE_LIFE)
+            continue;
+        const float r = 2.0f + (float)age * LAKE_SPEED;
+        const int hall = lake.kind[i] == RING_HALL, echo = lake.kind[i] == RING_ECHO;   /* (the tail's fading as far
+                                                       * as TIME carries it; a drop's soon, near; an echo's further, a
+                                                       * row thicker) */
+        const float k = (float)lake.amp[i] * (1.0f / 255.0f) * fm_expf(-r / (hall ? reach : echo ? 110.0f : 70.0f)) *
+                        (hall ? hall_k : echo ? echo_k : 0.85f);
+        if (k < 0.03f)
+            continue;
+        const uint16_t base = lake.kind[i] == RING_DROP ? C_WHITE : lake.kind[i] == RING_ECHO ? C_HI : hall_c;
+        const uint16_t c = mix565(C_BLACK, base, (int32_t)(fm_minf(k, 1.0f) * 256.0f)), soft = mix565(C_BLACK, c, 128);
+        const uint32_t pts = r * 4.4f < 24.0f ? 24u : (uint32_t)(r * 4.4f);   /* (about its perimeter: whole) */
+        /* round it by turning a point: cos, sin a step at a time (and three times as fast, from its own phase, for
+         * MOD's sway of its radius) */
+        const float d = 6.2831853f / (float)pts, cd = fm_cosf(d), sd = fm_sinf(d), cd3 = fm_cosf(3.0f * d),
+                    sd3 = fm_sinf(3.0f * d), ph = time * 2.2f + (float)i * 0.37f;
+        float c1 = 1.0f, s1 = 0.0f, c3 = fm_cosf(ph), s3 = fm_sinf(ph);
+        budget -= (int32_t)pts * block * block;
+        for (uint32_t j = 0; j < pts; j++) {
+            const float w = r * (1.0f + 0.07f * mod * s3);
+            const float fx = 120.0f + w * c1;
+            float fy = (float)cy + 0.3f * w * s1;
+            if (q == GRAV_FX_CLEAN_TAPE)
+                fy += LAKE_SIN[(uint32_t)(time * 244.5f + fx * 2.04f) & 255u] * mod * 0.8f;
+            const int32_t x = lake_snap(fx, q == GRAV_FX_VINTAGE ? 1 : step), y = lake_snap(fy, step);
+            if (y > hy + 1) {
+                for (int32_t by = 0; by < block; by++)   /* (DIRTY TAPE: coarse pixels, broken up) */
+                    for (int32_t bx = 0; bx < block; bx++)
+                        cv_glow(x + bx, y + by, c);
+                if (echo)
+                    cv_glow(x, y + block, c);
+                else if (tone < 0.45f)       /* dark: softer, a row thicker */
+                    cv_glow(x, y + block, soft);
+            }
+            const float c1n = c1 * cd - s1 * sd, c3n = c3 * cd3 - s3 * sd3;
+            s1 = s1 * cd + c1 * sd;
+            c1 = c1n;
+            s3 = s3 * cd3 + c3 * sd3;
+            c3 = c3n;
+        }
+    }
+    if (q == GRAV_FX_DIRTY_TAPE && stir > 0.05f)   /* DIRTY TAPE's grain on the moving water */
+        for (uint32_t i = 0; i < 60u; i++) {
+            const uint32_t h = ic_hash(now * 131u + i * 977u);
+            cv_glow((int32_t)(h % 240u), hy + 2 + (int32_t)((h >> 8) % (uint32_t)(144 - LAKE_HORIZON - 2)), C_DIM);
+        }
+    cv_text(8, 24 + dy, &FONT_XS, page_name(active_page), C_HI);   /* (over the sky, as every page has it) */
+}
+
+/* the effect's page: the lake (its name in it) */
+static void draw_fx_page(void)
+{
+    draw_lake(0, plat_ms());
 }
 
 /* SEQ (step mode): every track's steps of the page shown, a row each, in the track's colour (its terricon's, 0.28):
@@ -4178,6 +4445,10 @@ static void draw_seq_grid(void)
         cv_begin(240, 144u - STRIP_Y, C_BLACK);
         draw_mixer_body(-STRIP_Y);
         cv_blit(0, 36 + STRIP_Y);
+    } else if (IS_FX_PAGE(active_page)) {    /* (0.33) the lake, under the page's name */
+        cv_begin(240, 144u - LAKE_Y, C_BLACK);
+        draw_lake(-LAKE_Y, plat_ms());
+        cv_blit(0, 36 + LAKE_Y);
     } else {                                 /* (step mode: under its knobs, and on into the page's foot) */
         cv_begin(240, 144u - SEQ_STRIP_Y, C_BLACK);
         draw_seq_body(-SEQ_STRIP_Y);
@@ -4429,23 +4700,35 @@ static void draw_mixer_band(void)
     draw_cpu(178, y);
 }
 
-/* the page's state, in the bottom band's first line: a sound page's HOME; the effect's ECHO and whether it is on */
+/* the page's state, in the bottom band's first line: a sound page's HOME */
 static void draw_status(int32_t y)
 {
     if (IS_SOUND_PAGE(active_page)) {
         cv_text(8, y + 2, &FONT_T, "HOME  NEXT PAGE", C_GRAY);
         cv_text(232 - text_w(&FONT_T, "HOLD HOME + SELECT  JUMP"), y + 2, &FONT_T, "HOLD HOME + SELECT  JUMP", C_DIM);
-    } else if (IS_FX_PAGE(active_page)) {    /* (0.32) ECHO's TIME, its note value and in ms at the tempo */
-        char t[16];
+    }
+}
+
+/* (0.33) the effect's bottom band: its three knobs, small (as the mixer's); under them ECHO's TIME, its note value
+ * and in ms at the tempo (0.32), or a moment's message; whether the effect is on; the load */
+static void draw_fx_band(void)
+{
+    char t[48];
+    const int32_t y = 43;
+    draw_chips(CHIP_Y, 7u, 0);
+    if (band_message(t, 116))
+        cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
+    else {
         const uint32_t i = (uint32_t)fx_params[FX_ECHO_TIME];
         cv_text(8, y, &FONT_XS, "ECHO", C_GRAY);
         cv_text(44, y, &FONT_XS, grav_echo_time_name(i), C_WHITE);
         int_text((int32_t)(grav_echo_seconds(i, (float)seq_bpm(&seq)) * 1000.0f + 0.5f), t);
         text_cat(t, " MS");
         cv_text(44 + text_w(&FONT_XS, grav_echo_time_name(i)) + 8, y, &FONT_XS, t, C_GRAY);
-        cv_text(178, y, &FONT_XS, "FX", C_GRAY);
-        cv_text(198, y, &FONT_XS, fx_wanted() ? "ON" : "OFF", fx_wanted() ? C_HI : C_WHITE);
     }
+    cv_text(128, y, &FONT_XS, "FX", C_GRAY);
+    cv_text(146, y, &FONT_XS, fx_wanted() ? "ON" : "OFF", fx_wanted() ? C_HI : C_WHITE);
+    draw_cpu(178, y);
 }
 
 /* the header's battery: a rounded 26x14 body and its terminal; three levels (none invented between), a bolt on USB
@@ -4522,6 +4805,8 @@ static void draw_page(void)
         draw_seq();
     else if (active_page == PAGE_MIXER)
         draw_mixer_body(0);
+    else if (IS_FX_PAGE(active_page))        /* (0.33) the lake; its knobs small, in the bottom band */
+        draw_fx_page();
     else
         draw_knobs();
     if (ui.splash_until)
@@ -4579,6 +4864,8 @@ static void draw_bottom(void)
         draw_seq_band();
     else if (active_page == PAGE_MIXER)
         draw_mixer_band();
+    else if (IS_FX_PAGE(active_page))
+        draw_fx_band();
     else {
         draw_status(6);
         octave_text(t);
@@ -4736,6 +5023,18 @@ static void mixer_frame(uint32_t now)
         ui.grid_at = now;                    /* (still: the next fall from now) */
 }
 
+/* (0.33) the effect's pages: the lake redrawn while its water or its terricons move (~30 times a second, 10 while
+ * the sound is busy), once more as all stills; not under a list */
+static void fx_frame(uint32_t now)
+{
+    if (now - ui.grid_at < frame_ms() || list_open() || ui.splash_until)
+        return;
+    const int moving = levels_update(now) | lake_moving(now);
+    if (moving || lake.shown)
+        ui.redraw_grid = 1;
+    lake.shown = (uint8_t)moving;
+}
+
 /* a frame: the input, the patterns, the presets, the screen reader; then whatever changed drawn, the least that
  * shows it: everything, SEQ's or the mixer's strip, a knob's tile, or a live icon's area */
 void app_frame(void)
@@ -4752,10 +5051,13 @@ void app_frame(void)
     presets_poll();
     speak();
     frame_changes(now, pct);
+    lake_listen(now);                        /* (0.33: the effect's levels, every frame) */
     if (active_page == PAGE_SEQ)
         seq_frame(now);
     else if (active_page == PAGE_MIXER)
         mixer_frame(now);
+    else if (IS_FX_PAGE(active_page))
+        fx_frame(now);
     if (ui.splash_until && now >= ui.splash_until) {
         ui.splash_until = 0;
         ui.redraw = 1;
@@ -4961,6 +5263,14 @@ int app_expect(const char *what, int *got)
         *got = (int)ui.grid_frames;
     else if (!strcmp(what, "grid_since"))
         *got = (int)(plat_ms() - ui.grid_alone_at);
+    else if (!strcmp(what, "lake_drops"))     /* (0.33) the lake's rings begun: drops, echoes, the tail's ripples */
+        *got = (int)lake.drops;
+    else if (!strcmp(what, "lake_echoes"))
+        *got = (int)lake.echoes;
+    else if (!strcmp(what, "lake_ripples"))
+        *got = (int)lake.ripples;
+    else if (!strcmp(what, "lake_moving"))
+        *got = lake_moving(plat_ms());
     else if (!strncmp(what, "param", 5))
         *got = (int)param_value(active_page, (uint32_t)atoi(what + 5) % 3u);
     else if (!strcmp(what, "fm_custom"))

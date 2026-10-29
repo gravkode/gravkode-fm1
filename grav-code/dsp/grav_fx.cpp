@@ -54,6 +54,7 @@ int32_t echo_write;                       // the line's next sample
 float echo_delay;                         // the echoes' delay in samples, gliding to TIME's (a tape's pitch bend)
 float echo_lp, echo_hp;                   // the loop's low pass and its DC blocker
 float echo_send, hall_send;               // the sends, smoothed
+volatile float meter_in, meter_hall;      // (0.33) for the screen: the loudest since its last take
 
 // ECHO's TIME: note values in quarter notes, and on the screen
 const float kEchoBeats[GRAV_ECHO_TIMES] = {
@@ -107,6 +108,20 @@ extern "C" void grav_fx_init(void) {
   echo_delay = 0.0f;
 }
 
+extern "C" float grav_echo_heard(uint32_t i, float bpm) {
+  float seconds = grav_echo_seconds(i, bpm);
+  while (seconds * kSampleRate > float(kEchoSize - 4)) {
+    seconds *= 0.5f;
+  }
+  return seconds;
+}
+
+extern "C" void grav_fx_meters(float* in, float* hall) {
+  *in = meter_in;
+  *hall = meter_hall;
+  meter_in = meter_hall = 0.0f;
+}
+
 extern "C" int grav_fx_on(void) {
   return running;
 }
@@ -118,8 +133,13 @@ extern "C" int grav_fx_busy(const grav_fx_params_t* p) {
 extern "C" void grav_fx_process(const grav_fx_params_t* p, const float* in, float* l, float* r, uint32_t n) {
   const bool on = p->hall > 0.0f || p->echo > 0.0f;
   if (!running && !on) {
+    float sent = 0.0f;
     for (uint32_t i = 0; i < n; ++i) {
       l[i] = r[i] = in[i];
+      sent = std::max(sent, fabsf(in[i]));
+    }
+    if (sent > meter_in) {
+      meter_in = sent;
     }
     return;
   }
@@ -144,10 +164,7 @@ extern "C" void grav_fx_process(const grav_fx_params_t* p, const float* in, floa
 
   // ECHO: its time fitted to the line (halved until it fits: still in time), its send squared, the loop's gain under
   // 1 (a tape's a little over: its saturation holds it), its low pass darker as the media wear
-  float target = grav_echo_seconds(p->echo_time, p->bpm) * kSampleRate;
-  while (target > float(kEchoSize - 4)) {
-    target *= 0.5f;
-  }
+  const float target = grav_echo_heard(p->echo_time, p->bpm) * kSampleRate;
   if (echo_delay <= 0.0f) {
     echo_delay = target;
   }
@@ -161,7 +178,7 @@ extern "C" void grav_fx_process(const grav_fx_params_t* p, const float* in, floa
   stmlib::Random::Seed(random_state);
   tape->set_amount(quality == GRAV_FX_DIRTY_TAPE ? 1.0f : 0.35f);
 
-  float peak = 0.0f;
+  float peak = 0.0f, sent = 0.0f, tail = 0.0f;
   for (uint32_t base = 0; base < n; base += kChunk) {
     const size_t size = std::min(size_t(n - base), kChunk);
     float to_hall[kChunk];
@@ -190,12 +207,14 @@ extern "C" void grav_fx_process(const grav_fx_params_t* p, const float* in, floa
       // into HALL: the send and the echoes, through the media
       to_hall[i] = clean ? x + echo : media(x + echo, quality);
       wet[i].l = wet[i].r = echo;
+      sent = std::max(sent, fabsf(x));
     }
     float hall_l[kChunk] = { 0.0f }, hall_r[kChunk] = { 0.0f };
     reverb->Process(to_hall, hall_l, hall_r, size, hall_send);
     for (size_t i = 0; i < size; ++i) {
       wet[i].l += hall_l[i];
       wet[i].r += hall_r[i];
+      tail = std::max(tail, std::max(fabsf(hall_l[i]), fabsf(hall_r[i])));
     }
     if (tape_on) {
       tape->Process(wet, size);
@@ -210,6 +229,12 @@ extern "C" void grav_fx_process(const grav_fx_params_t* p, const float* in, floa
   }
   random_state = stmlib::Random::state();
   stmlib::Random::Seed(previous_random);
+  if (sent > meter_in) {
+    meter_in = sent;
+  }
+  if (tail > meter_hall) {
+    meter_hall = tail;
+  }
 
   // nothing sent, and the tails died away: off (the next start clears the lines)
   if (!on && peak < kQuietPeak) {

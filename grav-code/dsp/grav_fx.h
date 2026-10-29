@@ -30,6 +30,10 @@ int grav_fx_on(void);                    /* running (not off) */
 int grav_fx_busy(const grav_fx_params_t *p);   /* running, or to start with p: the render's choice of core */
 const char *grav_echo_time_name(uint32_t i);   /* ECHO's TIME on the screen: 1/8, 1/8T, 1/8. ... */
 float grav_echo_seconds(uint32_t i, float bpm);   /* ECHO's TIME at a tempo, before it is fitted to the line */
+float grav_echo_heard(uint32_t i, float bpm);     /* (0.33) and as it is heard: halved until it fits the line */
+/* (0.33) the screen's lake: the loudest sample since the last take of what was sent in and of HALL's tail; taking
+ * them sets them to 0. Measured as the effect runs (off: what is sent in alone), on either core */
+void grav_fx_meters(float *in, float *hall);
 
 #ifdef __cplusplus
 }

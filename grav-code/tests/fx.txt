@@ -1,6 +1,7 @@
 # FX (0.32): the effect, HALL (Beads' reverb: AMOUNT, TIME, TONE), TAPE (QUALITY, DIFFUSE, MOD) and ECHO (a delay in
 # time with the tempo: AMOUNT, TIME, FEEDBACK); off by itself once nothing goes in and its tails have died; kept by
-# SAVE. A record saved by 0.31 (Beads' knobs) loads with its REVERB as HALL's AMOUNT, the rest at rest; one saved by
+# SAVE. Its pages' lake (0.33): what is sent drops a ring, ECHO's repeats follow it, HALL's tail ripples; still water
+# once all has died away, and nothing redrawn. A record saved by 0.31 (Beads' knobs) loads with its REVERB as HALL's AMOUNT, the rest at rest; one saved by
 # 0.12 with the effect at rest. tools/build.py grav-code --host, then
 #   grav-code/build/host/grav_code_host grav-code/tests/fx.txt grav-code/build/host
 wait 600
@@ -11,6 +12,12 @@ expect fx5 0
 expect fx6 7
 expect quality 0
 expect fx_layout 1
+# (0.33) off the effect's pages a note drops nothing into the lake
+midi 90 3C 64
+wait 200
+midi 80 3C 00
+wait 600
+expect lake_drops 0
 # FX: HALL, then TAPE, ECHO and HALL again; from HOME, FX goes back to the FX page shown last
 tap FX
 wait 30
@@ -43,6 +50,10 @@ peakreset
 wait 300
 expect peak_db_max -170
 expect fx_on 0
+# (the lake: the note sent dropped in, the effect off: no tail, no echoes)
+expect lake_drops 1
+expect lake_ripples 0
+expect lake_echoes 0
 # HALL: AMOUNT up: on; a note rings on after its release
 tap FX
 wait 30
@@ -61,6 +72,10 @@ wait 1300
 peakreset
 wait 300
 expect peak_db_min -60
+# (the lake: one more drop, and the tail's ripples)
+expect lake_drops 2
+expect lake_ripples >3
+expect lake_echoes 0
 # TIME, TONE
 turn K2 10
 wait 30
@@ -74,6 +89,10 @@ wait 30
 expect fx_on 1
 wait 9000
 expect fx_on 0
+# (the lake still, and its strip no longer redrawn)
+expect lake_moving 0
+wait 1000
+expect grid_since >900
 # ECHO: TIME a note value (1/8. as it comes), from a 32nd to a half, and no further
 tap FX
 wait 30
@@ -109,6 +128,9 @@ wait 800
 peakreset
 wait 300
 expect peak_db_min -60
+# (the lake: the drop's repeats, 1/8 apart: five by now)
+expect lake_drops 3
+expect lake_echoes >3
 turn K1 -50
 wait 30
 # QUALITY (TAPE's K1): DIGITAL to DIRTY TAPE, and no further; DIFFUSE, MOD
