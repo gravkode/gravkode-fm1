@@ -176,6 +176,10 @@ tap GLO
 wait 30
 tap GLO
 wait 30
+said PAGE MIDI
+expect page 17
+tap GLO
+wait 30
 said PAGE SCREEN
 expect page 12
 tap GLO

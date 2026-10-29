@@ -58,9 +58,33 @@ wait 400
 tap HOME
 wait 30
 
-# SCREEN (GLO again, 0.25.1): THEME, every palette's swatch under it, the one shown framed
+# MIDI (GLO again, 0.39): every track's channel, S1 on 1 to D4 on 8 but D1 on 10 and S4 OFF; IN CHANNELS, CLOCK
+# IN+OUT (no note in: the bottom band's MIDI IN would stay in the later shots)
 tap GLO
 wait 30
+tap GLO
+wait 30
+turn SELECT 3
+wait 30
+turn K1 -4
+turn SELECT 1
+wait 30
+turn K1 5
+turn SELECT -4
+wait 30
+turn K2 1
+wait 1600
+shot screen-midi.png
+turn SELECT 3
+wait 30
+turn K1 4
+turn SELECT 1
+wait 30
+turn K1 -5
+turn SELECT -4
+wait 30
+turn K2 -1
+# SCREEN (GLO again, 0.25.1): THEME, every palette's swatch under it, the one shown framed
 tap GLO
 wait 1400
 shot screen-theme.png

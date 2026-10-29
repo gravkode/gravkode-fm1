@@ -98,7 +98,7 @@ From the top:
 | HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: the selected synth track's LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: the selected synth track's ATTACK, DECAY, RELEASE |
-| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
+| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again MIDI (0.39: the tracks' channels, IN, CLOCK); again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
 | ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
 | EDIT | LOCK mode (0.35): tap, on or off; held with a white key, that step's locks cleared (section 5). Lit while on (0.32..0.34 free; FREEZE before) |
@@ -110,7 +110,7 @@ From the top:
 | SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: HALL, TAPE,
-ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, DEBUG).
+ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, MIDI, SCREEN, DEBUG).
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when Terykons starts but its USB can't be reached.
@@ -274,7 +274,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003800, version 0.38.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003900, version 0.39.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -287,6 +287,25 @@ The firmware and its global settings:
 Above the knobs, how the four voices are shared out: S1..S4 each its number (OFF in red, the selected track's
 lit) and FREE, those no track has. Under them, the package's identity (the installer's) and the firmware's version.
 Section 8 has more on VOICES and VELOCITY, section 5 on the metronome.
+
+### MIDI (GLO again, 0.39)
+
+![GLO's MIDI page: every track's channel above the knobs (S1 on 1, S4 OFF, D1 on 10), S1's CHANNEL 1, IN CHANNELS, CLOCK IN+OUT; under them what IN does](img/screen-midi.png "The MIDI page")
+
+GLO again opens MIDI, how Terykons talks to other gear (section 10):
+
+| Knob | Setting | Values |
+| --- | --- | --- |
+| K1 | CHANNEL | The selected track's MIDI channel (SELECT picks the track): OFF (left), 1 to 16. At first S1 to S4 on 1 to 4, D1 to D4 on 5 to 8, as before 0.39. OFF: the track sends no MIDI (it still plays), and IN CHANNELS gives it none |
+| K2 | IN | SELECTED (left, as it comes): a note in on any channel plays the selected track. CHANNELS (right): a note in on a track's channel plays that track (on several, all of them); on a channel no track has, the selected one |
+| K3 | CLOCK | OFF, IN, OUT, IN+OUT (right, as it comes): whether the clock (with Start, Continue and Stop) is followed from MIDI in, sent out while the song plays by its own tempo, both, or neither |
+
+Above the knobs every track with its channel (the selected one lit, OFF a red dash); under them what IN does just
+now. A note out keeps its channel: the note-off goes where its note-on went, the channel changed meanwhile or not; a
+note in held goes to the tracks it started on, IN or the selected track changed meanwhile or not. CLOCK OUT turned
+off while the song plays by its own tempo sends a Stop; CLOCK IN turned off while it follows a clock stops it. All
+three are saved with the settings (SAVE); settings from before 0.39 keep MIDI as it was.
+
 GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
 AMBER (Terykons' until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown under the knobs as
 a swatch of its two colours, the one shown framed. K2 SKY (0.29) picks HOME's sky: OFF (black, as before), DAY (a
@@ -804,16 +823,18 @@ keeps them (settings saved by 0.12 load with the effect at rest).
 
 ## 10. MIDI and USB audio
 
-**MIDI in,** over USB and the TRS jack, any channel: notes play the selected track (a drum track too), with their
-velocity; a program change 0 to 15 picks pattern 1 to 16 (section 5). The last message
-shows at the bottom of the screen.
+**MIDI in,** over USB and the TRS jack: notes play the selected track (a drum track too), with their velocity, from
+any channel; or, with GLO's MIDI page's IN at CHANNELS (0.39), each track the notes on its channel (section 4). A
+program change 0 to 15, on any channel, picks pattern 1 to 16 (section 5). Recording live records the notes that play
+the selected track. The last message shows at the bottom of the screen. CC, pitch bend and aftertouch in are not
+used.
 
-**MIDI out,** over USB, on each track's channel (S1 to S4 on 1 to 4, D1 to D4 on 5 to 8): the keys' notes (the
-selected track's),
-their velocity and their pressure (polyphonic aftertouch), and the sequencer's notes; while it plays, MIDI Start,
-clock (24 a quarter note) and Stop.
+**MIDI out,** over USB (the FM-1 has no MIDI out jack), on each track's channel (GLO's MIDI page; at first S1 to S4 on
+1 to 4, D1 to D4 on 5 to 8; OFF: none): the keys' notes (the selected track's), their velocity and their pressure
+(polyphonic aftertouch), the arp's notes, and the sequencer's notes; while it plays by its own tempo, MIDI Start,
+clock (24 a quarter note) and Stop (CLOCK OUT). No MIDI thru, no CC out.
 
-**MIDI clock in** (USB or TRS) leads the sequencer: section 5.
+**MIDI clock in** (USB or TRS, CLOCK IN) leads the sequencer: section 5.
 
 **USB audio:** the FM-1 is also a USB sound card: a computer can record Terykons, and play its own sound through
 the FM-1's speaker and headphones, at MASTER.

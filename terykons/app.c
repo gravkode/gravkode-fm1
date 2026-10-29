@@ -29,6 +29,9 @@ static const uint8_t FX_DEFAULT[FX_N] = {0, 40, 55, 70, 60, 0, 7, 35};   /* (bot
 #define SET_MAGIC 0x47525639u
 /* GLO's METRONOME: clicks while recording live; OFF; COUNT: and a bar's count-in when recording starts from a stop */
 enum { METRO_REC, METRO_OFF, METRO_COUNT };
+enum { MIDI_IN_SELECTED, MIDI_IN_CHANNELS };   /* (0.39) GLO's MIDI, IN: any channel the track selected; or a track's
+                                                * channel that track (the others the one selected) */
+enum { CLOCK_OFF, CLOCK_IN, CLOCK_OUT, CLOCK_BOTH };   /* and CLOCK (with Start, Continue, Stop): in the knob's order */
 /* (0.28) GLO's SCREEN, K2 SKY: HOME's sky. DAY (as it comes) a blue one, its sun flaring at each kick, clouds drifting
  * at the tempo; NIGHT a moon, stars twinkling at each hi-hat; OFF black, as before */
 enum { SKY_NIGHT = 1, SKY_OFF = 2, SKY_DAY = 3 };   /* (0.30.2: NIGHT as it comes; 0, as saved before, is NIGHT) */
@@ -81,6 +84,12 @@ typedef struct {
     /* 0.37: each synth track's LFO and envelope (mod[] and env[] above keep S1's, for the record's older readers) */
     uint8_t trk_mod[SYNTH_S_TRACKS][3];
     uint8_t trk_env[SYNTH_S_TRACKS][3];
+    /* 0.39: MIDI (GLO's MIDI page): each track's channel (1..16; 0 OFF: no MIDI out, none in by channel), IN
+     * (MIDI_IN_*), CLOCK (CLOCK_*) */
+    uint8_t midi_ch[SYNTH_TRACKS];
+    uint8_t midi_in;
+    uint8_t midi_clock;
+    uint8_t midi_reserved[2];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to sky (a byte reserved then) */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
@@ -92,7 +101,9 @@ typedef struct {
 #define SET_SIZE_025 1404                /* as 0.21..0.25 saved it: up to the mixer (every track sent whole, none muted) */
 #define SET_SIZE_026 1420                /* as 0.26 saved it: up to the faders (each at 100) */
 #define SET_SIZE_036 1428                /* as 0.27..0.36 saved it: up to the tracks' LFOs and envelopes (one for all) */
-_Static_assert(sizeof(settings_t) == 1452 && SET_SIZE_036 == __builtin_offsetof(settings_t, trk_mod) &&
+#define SET_SIZE_037 1452                /* as 0.37..0.38 saved it: up to MIDI's (channels 1..8, any in, clock both) */
+_Static_assert(sizeof(settings_t) == 1464 && SET_SIZE_037 == __builtin_offsetof(settings_t, midi_ch) &&
+               SET_SIZE_036 == __builtin_offsetof(settings_t, trk_mod) &&
                SET_SIZE_026 == __builtin_offsetof(settings_t, vol) &&
                SET_SIZE_025 == __builtin_offsetof(settings_t, send) &&
                SET_SIZE_021 == __builtin_offsetof(settings_t, controls) && SET_SIZE_018 == __builtin_offsetof(settings_t, drum_tune) && SET_SIZE_012 == __builtin_offsetof(settings_t, fx) &&
@@ -139,6 +150,7 @@ enum {
     PAGE_ARP_2,                          /* ARP again: GATE, HOLD */
     PAGE_TEMPO,                          /* (0.36.2) HOME again (from HOME's terricons): TEMPO, SWING, LENGTH; again
                                           * the sound's pages */
+    PAGE_MIDI,                           /* (0.39) GLO again: the selected track's CHANNEL, IN, CLOCK; again SCREEN */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_HALL && (p) <= PAGE_FX_ECHO)
@@ -152,7 +164,7 @@ static uint8_t glo_page = PAGE_GLO;
 static uint8_t arp_page = PAGE_ARP;      /* (0.34) the ARP page shown last */
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "HALL", "TAPE", "ECHO", "DEBUG",
                                               "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER", "ARP",
-                                              "ARP 2", "TEMPO"};
+                                              "ARP 2", "TEMPO", "MIDI"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -184,6 +196,8 @@ static grav_engine_t grav_engine;
 static seq_t seq;
 #define TRK (seq.pat.track[track_sel])  /* the selected track's steps and length */
 static uint8_t seq_midi_sent[SYNTH_TRACKS][16];   /* each track's notes whose note-on went out: note-offs owed */
+static uint8_t seq_midi_ch[SYNTH_TRACKS] = {0, 1, 2, 3, 4, 5, 6, 7};   /* (0.39) the channel they went out on (0xFF:
+                                                                         * none, the track OFF) */
 static uint32_t seq_midi_owed;
 
 /* the effect (0.32: HALL, TAPE, ECHO): its knobs (FX_*) and QUALITY; the audio interrupt reads them */
@@ -257,8 +271,11 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     [PAGE_MIXER] = {"VOL", "SEND", "RETURN"},
     [PAGE_ARP] = {"MODE", "RATE", "OCTAVES"},
     [PAGE_ARP_2] = {"GATE", "HOLD", ""},
-    [PAGE_TEMPO] = {"TEMPO", "SWING", "LENGTH"}
+    [PAGE_TEMPO] = {"TEMPO", "SWING", "LENGTH"},
+    [PAGE_MIDI] = {"CHANNEL", "IN", "CLOCK"}
 };
+static const char *const MIDI_IN_NAME[2] = {"SELECTED", "CHANNELS"};
+static const char *const CLOCK_NAME[4] = {"OFF", "IN", "OUT", "IN+OUT"};
 
 /* (0.34) the arpeggiator: a synth track's, its settings its sound's (grav_controls_t.arp; 0 as sounds were before:
  * off). arp[0]: MODE (bits 0..2, SEQ_ARP_*), OCTAVES - 1 (bits 3..4), HOLD (bit 5); arp[1]: RATE, ECHO's note
@@ -339,59 +356,149 @@ static void rec_midi_put(uint32_t note, uint32_t vel)   /* audio interrupt */
     rec_midi_head++;
 }
 
+/* (0.39) GLO's MIDI: a track's channel (0..15; -1 OFF), and whether the clock goes out or is followed */
+static int midi_out_ch(uint32_t track)
+{
+    const uint32_t c = set.midi_ch[track % SYNTH_TRACKS];
+    return c ? (int)c - 1 : -1;
+}
+
+static int clock_out(void) { return set.midi_clock == CLOCK_OUT || set.midi_clock == CLOCK_BOTH; }
+static int clock_in(void) { return set.midi_clock == CLOCK_IN || set.midi_clock == CLOCK_BOTH; }
+
+/* the tracks a note in on channel ch plays (a bit each): IN SELECTED, the one selected; CHANNELS, every track on ch,
+ * or (none on it) the one selected */
+static uint32_t midi_in_tracks(uint32_t ch)
+{
+    uint32_t to = 0;
+    if (set.midi_in == MIDI_IN_CHANNELS)
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+            if (set.midi_ch[t] == ch + 1u)
+                to |= 1u << t;
+    return to ? to : 1u << track_sel;
+}
+
+/* the notes in held (audio interrupt): where each went, so its note-off goes there too, whatever IN, a channel or the
+ * track selected became meanwhile; bit 8 of to (MIDI_HELD_REC): recorded (into the track selected then) */
+#define MIDI_HELD_N 32u
+#define MIDI_HELD_REC (1u << SYNTH_TRACKS)
+static uint8_t midi_held_ch[MIDI_HELD_N], midi_held_note[MIDI_HELD_N];
+static uint16_t midi_held_to[MIDI_HELD_N];
+
+static void midi_held_put(uint32_t ch, uint32_t note, uint32_t to)
+{
+    uint32_t free = MIDI_HELD_N;
+    for (uint32_t i = 0; i < MIDI_HELD_N; i++) {
+        if (midi_held_to[i] && midi_held_ch[i] == ch && midi_held_note[i] == note) {   /* (again: one note-off for both) */
+            midi_held_to[i] |= (uint16_t)to;
+            return;
+        }
+        if (!midi_held_to[i] && free == MIDI_HELD_N)
+            free = i;
+    }
+    if (free < MIDI_HELD_N) {                /* (full: its note-off goes as a note would go then) */
+        midi_held_ch[free] = (uint8_t)ch;
+        midi_held_note[free] = (uint8_t)note;
+        midi_held_to[free] = (uint16_t)to;
+    }
+}
+
+static uint32_t midi_held_take(uint32_t ch, uint32_t note)
+{
+    for (uint32_t i = 0; i < MIDI_HELD_N; i++)
+        if (midi_held_to[i] && midi_held_ch[i] == ch && midi_held_note[i] == note) {
+            const uint32_t to = midi_held_to[i];
+            midi_held_to[i] = 0;
+            return to;
+        }
+    const uint32_t to = midi_in_tracks(ch);
+    return to | (to >> track_sel & 1u ? MIDI_HELD_REC : 0u);
+}
+
 static void midi_in(void)                    /* audio interrupt: the packets that came in */
 {
     uint32_t pkt;
     int port;
     while (plat_midi_in(&pkt, &port)) {
-        uint32_t st = (pkt >> 8) & 0xFFu, d1 = (pkt >> 16) & 0x7Fu, d2 = pkt >> 24;
+        uint32_t st = (pkt >> 8) & 0xFFu, d1 = (pkt >> 16) & 0x7Fu, d2 = pkt >> 24, ch = st & 0x0Fu;
         if (st != 0xF8u && st != 0xFEu) {    /* (clock and active sensing would flood the screen) */
             midi_last = pkt;
             midi_last_port = (uint32_t)port;
             midi_count++;
         }
-        if ((st & 0xF0u) == 0x90u && d2) {      /* (any channel: the track selected, or its arp; recording live:
-                                                 * recorded) */
+        if ((st & 0xF0u) == 0x90u && d2) {   /* the tracks IN gives it (or their arps); recording live: recorded, if
+                                              * the track selected plays it */
+            const uint32_t to = midi_in_tracks(ch), rec = to >> track_sel & 1u;
             synth_audio_mute = 0u;
-            if (!seq_arp_note(&seq, track_sel, (uint8_t)d1, (uint8_t)d2))
-                synth_track_note_on(&synth, track_sel, (int32_t)d1, d2);
-            rec_midi_put(d1, d2);
+            for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+                if (to >> t & 1u && !seq_arp_note(&seq, t, (uint8_t)d1, (uint8_t)d2))
+                    synth_track_note_on(&synth, t, (int32_t)d1, d2);
+            midi_held_put(ch, d1, to | (rec ? MIDI_HELD_REC : 0u));
+            if (rec)
+                rec_midi_put(d1, d2);
         }
         else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
-            if (!seq_arp_note(&seq, track_sel, (uint8_t)d1, 0))
-                synth_track_note_off(&synth, track_sel, (int32_t)d1);
-            rec_midi_put(d1, 0);
+            const uint32_t to = midi_held_take(ch, d1);
+            for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+                if (to >> t & 1u && !seq_arp_note(&seq, t, (uint8_t)d1, 0))
+                    synth_track_note_off(&synth, t, (int32_t)d1);
+            if (to & MIDI_HELD_REC)
+                rec_midi_put(d1, 0);
         }
-        else if (st == 0xF8u)                /* clock, start, continue, stop: the sequencer follows them */
-            seq_midi_clock(&seq);
-        else if (st == 0xFAu || st == 0xFBu)
-            seq_midi_start(&seq, st == 0xFBu);
-        else if (st == 0xFCu)
-            seq.want = SEQ_WANT_STOP;
+        else if (st == 0xF8u || st == 0xFAu || st == 0xFBu || st == 0xFCu) {   /* clock, start, continue, stop: the
+                                                                              * sequencer follows them (CLOCK IN) */
+            if (!clock_in())
+                continue;
+            if (st == 0xF8u)
+                seq_midi_clock(&seq);
+            else if (st == 0xFCu)
+                seq.want = SEQ_WANT_STOP;
+            else
+                seq_midi_start(&seq, st == 0xFBu);
+        }
         else if ((st & 0xF0u) == 0xC0u)      /* program change, any channel: 0..15 a pattern */
             midi_program = d1 + 1u;
     }
 }
 
+/* (0.39) a track's channel changed with notes of it still out: those off, on the channel they went out on */
+static void seq_midi_flush(uint32_t track)   /* audio interrupt */
+{
+    for (uint32_t at = 0; at < 16u; at++)
+        for (uint32_t b = 0; b < 8u; b++)
+            if (seq_midi_sent[track][at] >> b & 1u) {
+                plat_midi_send(0x08u | (0x80u | seq_midi_ch[track]) << 8 | (at << 3 | b) << 16, TO_USB);
+                seq_midi_owed--;
+            }
+    memset(seq_midi_sent[track], 0, sizeof seq_midi_sent[track]);
+}
+
 /* a sequencer event, in the audio interrupt: to its track's voices, and out over USB MIDI on the track's channel
- * (S1..S4: 1..4) while there is room, keeping room for the note-offs owed */
+ * (GLO's MIDI, 0.39; OFF: none) while there is room, keeping room for the note-offs owed */
 static void seq_apply(const seq_event_t *e)
 {
     const uint32_t bit = 1u << (e->note & 7u), at = e->note >> 3, track = e->track % SYNTH_TRACKS;
     switch (e->type) {
-    case SEQ_EV_ON:
+    case SEQ_EV_ON: {
+        const int ch = midi_out_ch(track);
         synth_audio_mute = 0u;
         synth_track_note_on(&synth, track, e->note, e->vel);
-        if (!(seq_midi_sent[track][at] & bit) && plat_midi_out_room(TO_USB) > seq_midi_owed + 2u) {
-            plat_midi_send(0x09u | (0x90u | track) << 8 | (uint32_t)e->note << 16 | (uint32_t)e->vel << 24, TO_USB);
+        if (ch != (int)seq_midi_ch[track]) {  /* (its channel changed: the notes still out off where they went) */
+            seq_midi_flush(track);
+            seq_midi_ch[track] = (uint8_t)(ch < 0 ? 0xFF : ch);
+        }
+        if (ch >= 0 && !(seq_midi_sent[track][at] & bit) && plat_midi_out_room(TO_USB) > seq_midi_owed + 2u) {
+            plat_midi_send(0x09u | (0x90u | (uint32_t)ch) << 8 | (uint32_t)e->note << 16 | (uint32_t)e->vel << 24,
+                           TO_USB);
             seq_midi_sent[track][at] |= (uint8_t)bit;
             seq_midi_owed++;
         }
         break;
+    }
     case SEQ_EV_OFF:
         synth_track_note_off(&synth, track, e->note);
-        if (seq_midi_sent[track][at] & bit) {
-            plat_midi_send(0x08u | (0x80u | track) << 8 | (uint32_t)e->note << 16, TO_USB);
+        if (seq_midi_sent[track][at] & bit) {   /* (on the channel its note-on went out on) */
+            plat_midi_send(0x08u | (0x80u | seq_midi_ch[track]) << 8 | (uint32_t)e->note << 16, TO_USB);
             seq_midi_sent[track][at] &= (uint8_t)~bit;
             seq_midi_owed--;
         }
@@ -408,7 +515,7 @@ static void seq_apply(const seq_event_t *e)
     case SEQ_EV_CLOCK:
     case SEQ_EV_START:
     case SEQ_EV_STOP:
-        if (plat_midi_out_room(TO_USB) > seq_midi_owed) {
+        if (clock_out() && plat_midi_out_room(TO_USB) > seq_midi_owed) {   /* (GLO's MIDI: CLOCK OUT, 0.39) */
             const uint32_t st = e->type == SEQ_EV_CLOCK ? 0xF8u : e->type == SEQ_EV_START ? 0xFAu : 0xFCu;
             plat_midi_send(0x0Fu | st << 8, TO_USB);
         }
@@ -663,9 +770,19 @@ static void fx_defaults(settings_t *s)   /* the effect's knobs at rest, off */
         s->fx_reserved[i] = 0;
 }
 
+static void midi_defaults(settings_t *s)    /* (0.39) as before: S1..S4 on 1..4, D1..D4 on 5..8; any in; clock both */
+{
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+        s->midi_ch[t] = (uint8_t)(t + 1u);
+    s->midi_in = MIDI_IN_SELECTED;
+    s->midi_clock = CLOCK_BOTH;
+    s->midi_reserved[0] = s->midi_reserved[1] = 0;
+}
+
 static void settings_defaults(void)
 {
     set.magic = SET_MAGIC;
+    midi_defaults(&set);
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++) {   /* (0.26) the mixer: every track through the effect at its full
                                               * level, none muted */
         set.send[t] = 100;
@@ -730,7 +847,7 @@ static int set_size_known(int n)
 {
     return n == SET_SIZE_012 || n == SET_SIZE_013 || n == SET_SIZE_016 || n == SET_SIZE_017 || n == SET_SIZE_018 ||
            n == SET_SIZE_021 || n == SET_SIZE_025 || n == SET_SIZE_026 || n == SET_SIZE_036 ||
-           n == (int)sizeof(settings_t);
+           n == SET_SIZE_037 || n == (int)sizeof(settings_t);
 }
 
 /* a record an older version saved (loaded: its size): what it lacks at its defaults */
@@ -772,6 +889,8 @@ static void settings_upgrade(settings_t *s, int loaded)
             memcpy(s->trk_mod[t], s->mod, 3);
             memcpy(s->trk_env[t], s->env, 3);
         }
+    if (loaded <= SET_SIZE_037)              /* (before 0.39: MIDI as it was, the tracks on 1..8) */
+        midi_defaults(s);
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
     if (s->sky == 0 || s->sky > SKY_DAY)     /* (a byte reserved before 0.29; 0.29..0.30.1 kept DAY, their default, as
@@ -811,6 +930,11 @@ static int settings_valid(const settings_t *s, int loaded)
             !percent_ok(s->trk_mod[t], 3) || !percent_ok(s->trk_env[t], 3))
             return 0;
     }
+    for (uint32_t t = 0; t < SYNTH_TRACKS; t++)   /* (0.39) */
+        if (s->midi_ch[t] > 16u)
+            return 0;
+    if (s->midi_in > MIDI_IN_CHANNELS || s->midi_clock > CLOCK_BOTH)
+        return 0;
     return voices <= SYNTH_POLY_VOICES && percent_ok(s->osc, 3) && percent_ok(s->mod, 3) && percent_ok(s->env, 3) &&
            percent_ok(s->fx, FX_N) && s->fx[FX_ECHO_TIME] < GRAV_ECHO_TIMES && s->voices <= SYNTH_POLY_VOICES &&
            s->velocity_off <= 1u && s->fx_quality < GRAV_FX_QUALITIES;
@@ -971,6 +1095,7 @@ static struct {
     uint8_t shown_ext;
     char bpm_text[8];
     uint8_t key_track[NKEYS];            /* the track each held key plays (its note-off goes there) */
+    uint8_t key_ch[NKEYS];               /* (0.39) and the MIDI channel its note-on went out on (its note-off there) */
     uint32_t tracks_until;               /* SELECT turned: the tracks' list shown until then */
     uint32_t shown_hits[SEQ_TRACKS], hit_at[SEQ_TRACKS];   /* each track's last note begun: its light flashes */
     int32_t lane_step;                   /* SEQ: the selected track's step playing, and when it began (its flash) */
@@ -1599,6 +1724,53 @@ static void glo_turn(uint32_t index, int32_t e)
             set_dirty = 1;
         }
         app_say("METRONOME", METRO_NAME[set.metro]);
+    }
+}
+
+static void channel_text(uint32_t c, char *t)   /* (0.39) a track's MIDI channel: 1..16, or OFF */
+{
+    t[0] = 0;
+    if (c)
+        int_text((int32_t)c, t);
+    else
+        text_cat(t, "OFF");
+}
+
+/* (0.39) GLO's MIDI: K1 the selected track's CHANNEL (OFF, 1..16), K2 IN (SELECTED, CHANNELS), K3 CLOCK (OFF, IN, OUT,
+ * IN+OUT). CLOCK OUT off while the song plays by its own: a stop sent; CLOCK IN off while it follows one: stopped */
+static void midi_turn(uint32_t index, int32_t e)
+{
+    char a[24], t[8];
+    if (index == 0u) {
+        const uint8_t c = (uint8_t)clamp((int32_t)set.midi_ch[track_sel] + e, 0, 16);
+        if (c != set.midi_ch[track_sel]) {
+            set.midi_ch[track_sel] = c;
+            set_dirty = 1;
+        }
+        a[0] = 0;
+        text_cat(a, TRACK_NAME[track_sel]);
+        text_cat(a, " CHANNEL");
+        channel_text(c, t);
+        app_say(a, t);
+    } else if (index == 1u) {
+        const uint8_t in = e > 0 ? MIDI_IN_CHANNELS : MIDI_IN_SELECTED;
+        if (in != set.midi_in) {
+            set.midi_in = in;
+            set_dirty = 1;
+        }
+        app_say("MIDI IN", MIDI_IN_NAME[set.midi_in]);
+    } else {
+        const int out = clock_out(), in = clock_in();
+        const uint8_t m = (uint8_t)clamp((int32_t)set.midi_clock + (e > 0 ? 1 : -1), CLOCK_OFF, CLOCK_BOTH);
+        if (m != set.midi_clock) {
+            set.midi_clock = m;
+            set_dirty = 1;
+        }
+        if (out && !clock_out() && seq.playing && !seq.ext)
+            plat_midi_send(0x0Fu | 0xFCu << 8, TO_USB);
+        if (in && !clock_in() && seq.ext)
+            seq.want = SEQ_WANT_STOP;
+        app_say("CLOCK", CLOCK_NAME[set.midi_clock]);
     }
 }
 
@@ -2498,15 +2670,17 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
     return page == PAGE_SEQ || page == PAGE_TEMPO || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
-           page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL :
+           page == PAGE_GLO || page == PAGE_MIDI || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO :
+           page == PAGE_MIXER ? B_SEL :
            IS_ARP_PAGE(page) ? B_ARP : B_FX;
 }
 
 /* its blink's period: the first of a button's pages slow, the next faster (FX: HALL, TAPE, ECHO) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_TEMPO || page == PAGE_SCREEN || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
-           page == PAGE_OSC || page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
+    return page == PAGE_DEBUG ? 125u :       /* (GLO's fourth, 0.39) */
+           page == PAGE_TEMPO || page == PAGE_MIDI || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
+           page == PAGE_OSC || page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_SCREEN ? 250u : 1000u;
 }
 
 /* recording live follows the sequencer: once it stops (PLAY, a MIDI stop), no more; the metronome and MIDI in's
@@ -2769,8 +2943,8 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
         return;
     }
     if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
-        glo_page = active_page == PAGE_GLO ? PAGE_SCREEN : active_page == PAGE_SCREEN ? PAGE_DEBUG :
-                   active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
+        glo_page = active_page == PAGE_GLO ? PAGE_MIDI : active_page == PAGE_MIDI ? PAGE_SCREEN :   /* (0.39) */
+                   active_page == PAGE_SCREEN ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
     if (k == B_ARP && IS_ARP_PAGE(active_page))   /* (0.34) ARP again: its other page */
         arp_page = active_page == PAGE_ARP ? PAGE_ARP_2 : PAGE_ARP;
     active_page = k == B_LFO  ? PAGE_MOD :
@@ -2869,10 +3043,12 @@ static void key_down(uint32_t k)
         ui.last_key = (int32_t)k;
         ui.key_track[k] = track_sel;         /* (its note-off to the same track, whatever is selected then) */
         queue_key_event(SYNTH_EVENT_NOTE_ON, note, v, track_sel);
-        if (seq_arp_on(&seq, track_sel))     /* (0.34: the arp's notes go out, as it plays them) */
+        if (seq_arp_on(&seq, track_sel) || midi_out_ch(track_sel) < 0)   /* (0.34: the arp's notes go out, as it
+                                                                          * plays them; 0.39: a track OFF, none) */
             ui.key_midi &= ~bit;
         else {
-            plat_midi_send(0x09u | (0x90u | track_sel) << 8 | (uint32_t)note << 16 | v << 24, TO_USB);   /* its channel */
+            ui.key_ch[k] = (uint8_t)midi_out_ch(track_sel);   /* its channel (GLO's MIDI) */
+            plat_midi_send(0x09u | (0x90u | ui.key_ch[k]) << 8 | (uint32_t)note << 16 | v << 24, TO_USB);
             ui.key_midi |= bit;
         }
         if (ui.rec && seq.playing)           /* recording live: written as it plays */
@@ -2910,7 +3086,7 @@ static void key_up(uint32_t k)
         ui.prs[k] = 0;
         queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0, ui.key_track[k]);
         if (ui.key_midi & bit)
-            plat_midi_send(0x08u | (0x80u | ui.key_track[k]) << 8 | (uint32_t)note << 16, TO_USB);
+            plat_midi_send(0x08u | (0x80u | ui.key_ch[k]) << 8 | (uint32_t)note << 16, TO_USB);
         ui.key_midi &= ~bit;
         live_release(k);
     }
@@ -2927,7 +3103,7 @@ static void keys_input(uint32_t keys)
             key_up(k);
         else if ((keys & bit) && !(keys_taken() & bit) && (ui.key_midi & bit) && touch_pressure(k) != ui.prs[k]) {
             ui.prs[k] = touch_pressure(k);
-            plat_midi_send(0x0Au | (0xA0u | ui.key_track[k]) << 8 | (uint32_t)ui.note[k] << 16 |
+            plat_midi_send(0x0Au | (0xA0u | ui.key_ch[k]) << 8 | (uint32_t)ui.note[k] << 16 |
                            (uint32_t)ui.prs[k] << 24, TO_USB);
         }
     }
@@ -3278,6 +3454,8 @@ static void encoder_turn(uint32_t k, int32_t e)
             sky_turn(e);
     } else if (knob && active_page == PAGE_GLO)
         glo_turn(index, e);
+    else if (knob && active_page == PAGE_MIDI)
+        midi_turn(index, e);
     else if (k == EN_K1 && active_page == PAGE_FX_TAPE)
         quality_turn(e);
     else if (knob && IS_ARP_PAGE(active_page))   /* (0.34) */
@@ -3556,6 +3734,20 @@ static void knob_own(uint32_t i, knob_t *k)
         k->frac = (int32_t)theme_at() * 25600 / (int32_t)(THEMES - 1u);
         return;
     }
+    if (active_page == PAGE_MIDI) {          /* (0.39) */
+        k->name = PARAM_NAME[PAGE_MIDI][i];
+        if (i == 0u) {
+            channel_text(set.midi_ch[track_sel], k->value);
+            k->frac = (int32_t)set.midi_ch[track_sel] * 25600 / 16;
+        } else if (i == 1u) {
+            text_cat(k->value, MIDI_IN_NAME[set.midi_in]);
+            k->frac = set.midi_in == MIDI_IN_CHANNELS ? 25600 : 0;
+        } else {
+            text_cat(k->value, CLOCK_NAME[set.midi_clock]);
+            k->frac = (int32_t)set.midi_clock * 25600 / CLOCK_BOTH;
+        }
+        return;
+    }
     if (active_page == PAGE_GLO) {
         k->name = PARAM_NAME[PAGE_GLO][i];
         if (i == 0u) {
@@ -3628,7 +3820,7 @@ static void dials_sync(void)
  * radius. (SEQ's are small, in the bottom band: draw_chips) */
 static int32_t knob_row(int32_t *h, int32_t *r)
 {
-    *h = active_page == PAGE_GLO || active_page == PAGE_SCREEN ? 84 : 96;
+    *h = active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_SCREEN ? 84 : 96;
     *r = 17;
     return 46;
 }
@@ -3778,7 +3970,8 @@ static int animate_dials(uint32_t now)
 {
     if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page) ||
           IS_ARP_PAGE(active_page) || active_page == PAGE_TEMPO ||
-          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_SCREEN || active_page == PAGE_MIXER) ||
+          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_SCREEN ||
+          active_page == PAGE_MIXER) ||
         ui.splash_until || list_open()) return 0;
     const uint32_t dt = now - ui.dial_at;
     if (dt < frame_ms()) return 0;
@@ -5170,6 +5363,31 @@ static void draw_glo(void)
     cv_text(176, 130, &FONT_XS, APP_VERSION, C_WHITE);
 }
 
+/* (0.39) GLO's MIDI: its knobs; above them every track's channel (the one selected lit, OFF a red dash), under them
+ * what IN does */
+static void draw_midi_page(void)
+{
+    int32_t h, r;
+    char t[8];
+    draw_dials(knob_row(&h, &r), 7u, 0);
+    for (uint32_t k = 0; k < SYNTH_TRACKS; k++) {
+        const int32_t x = 6 + (int32_t)k * 29;
+        cv_text(x, 26, &FONT_T, TRACK_NAME[k], k == track_sel ? C_HI : C_GRAY);
+        channel_text(set.midi_ch[k], t);
+        if (!set.midi_ch[k])                 /* (OFF, as a dash: the knob says it) */
+            t[0] = '-', t[1] = 0;
+        cv_text(x + text_w(&FONT_T, TRACK_NAME[k]) + 2, 26, &FONT_T, t, set.midi_ch[k] ? C_WHITE : C_RED);
+    }
+    cv_text(8, 130, &FONT_XS, "IN", C_GRAY);
+    if (set.midi_in == MIDI_IN_CHANNELS) {
+        cv_text(26, 130, &FONT_XS, "A TRACK'S CHANNEL PLAYS IT, ELSE", C_WHITE);
+        cv_text(26 + text_w(&FONT_XS, "A TRACK'S CHANNEL PLAYS IT, ELSE") + 4, 130, &FONT_XS, TRACK_NAME[track_sel], C_HI);
+    } else {
+        cv_text(26, 130, &FONT_XS, "EVERY CHANNEL PLAYS", C_WHITE);
+        cv_text(26 + text_w(&FONT_XS, "EVERY CHANNEL PLAYS") + 4, 130, &FONT_XS, TRACK_NAME[track_sel], C_HI);
+    }
+}
+
 /* GLO's SCREEN: THEME as a knob; beside it every palette in the knob's order, five a row: a swatch of its two
  * colours and its name, the one shown framed */
 /* GLO's SCREEN: K1 THEME, K2 SKY (0.28); under the knobs every palette's swatch in THEME's order, the one shown
@@ -5532,6 +5750,8 @@ static void draw_page(void)
         draw_track_line(4);
     if (active_page == PAGE_GLO)
         draw_glo();
+    else if (active_page == PAGE_MIDI)
+        draw_midi_page();
     else if (active_page == PAGE_SCREEN)
         draw_screen_page();
     else if (active_page == PAGE_DEBUG)
@@ -5964,6 +6184,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
                                             !strcmp(cmd, "save016") ? SET_SIZE_016 : !strcmp(cmd, "save018") ? SET_SIZE_018 : SET_SIZE_021);
         return 1;
     }
+    if (!strcmp(cmd, "save038")) {           /* (0.39) the settings as 0.37..0.38 saved them: no MIDI page's */
+        settings_capture();
+        plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_037);
+        return 1;
+    }
     if (!strcmp(cmd, "save036")) {           /* (0.37) the settings as 0.36 saved them: one envelope for every track
                                               * (ATTACK DECAY RELEASE), one LFO */
         settings_capture();
@@ -6064,6 +6289,19 @@ int app_expect(const char *what, int *got)
         *got = (int)lake.echoes;
     else if (!strcmp(what, "lake_ripples"))
         *got = (int)lake.ripples;
+    else if (!strncmp(what, "midi_ch", 7))   /* (0.39) GLO's MIDI: a track's channel (0 OFF), IN, CLOCK */
+        *got = set.midi_ch[atoi(what + 7) % SYNTH_TRACKS];
+    else if (!strcmp(what, "midi_in"))
+        *got = set.midi_in;
+    else if (!strcmp(what, "held_tracks")) {   /* (0.39) the tracks with a note held, a bit each */
+        uint32_t m = 0;
+        for (uint32_t i = 0; i < SYNTH_VOICES_MAX; i++)
+            if (synth.voice_track[i] != SYNTH_NO_TRACK && synth.voice[i].gate)
+                m |= 1u << synth.voice_track[i];
+        *got = (int)m;
+    }
+    else if (!strcmp(what, "midi_clock"))
+        *got = set.midi_clock;
     else if (!strcmp(what, "lock_mode"))     /* (0.35) LOCK mode; the pattern's locks; the steps held; a step's lock
                                               * (lk<step>_<param>, -1 none); a knob heard locked (lkon<param>, -1) */
         *got = ui.lock_mode;

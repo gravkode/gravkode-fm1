@@ -15,7 +15,8 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.38.0**: tap tempo: on the TEMPO page (HOME from HOME's terricons) every key taps it, the last
+Current version: **0.39.0**: a MIDI page on GLO (GLO again): each track's MIDI channel (1 to 16, or OFF), IN
+(the selected track from any channel, or each track from its own) and CLOCK (OFF, IN, OUT, IN+OUT). 0.38.0: tap tempo: on the TEMPO page (HOME from HOME's terricons) every key taps it, the last
 four beats averaged. 0.37.0: each synth track has its own envelope (ENV) and LFO (MOD), part of its sound: a user
 preset keeps them, and ATTACK, DECAY, RELEASE, LFO RATE and LFO DEPTH can be locked on a step. 0.36.2: HOME from HOME's
 terricons shows TEMPO, SWING and LENGTH as knobs on a page of their own (TEMPO), HOME again the sound's pages. 0.36.1: the logo at power-on stays about two seconds, the version under it. 0.36: GRAV CODE is
@@ -70,7 +71,8 @@ hold HOME and turn SELECT to jump.
 - **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch on each synth track, saved with
   its sound, lockable on the steps.
 - **Settings that stay** across a power cycle and a firmware update.
-- **MIDI** in over USB and TRS, out over USB; the FM-1 is also a **USB sound card**.
+- **MIDI** in over USB and TRS, out over USB, each track on a channel of its choosing (GLO's MIDI page); the FM-1 is
+  also a **USB sound card**.
 - **Two-core voice rendering** and a **DEBUG page** showing average/peak load, worker timing, audio xruns and voice cuts.
 - **A web installer** (Chrome or Edge), and the stock firmware back from the same page.
 
@@ -88,6 +90,7 @@ hold HOME and turn SELECT to jump.
 | LFO | MOD (the synth track's) | LFO RATE (0.05 to 20 Hz) | LFO DEPTH | LFO DEST (TIMBRE, MORPH, PITCH) |
 | ENV | ENV (the synth track's) | ATTACK (0 to 2 s) | DECAY (0 to 2 s, to 70 %) | RELEASE (0 to 4 s) |
 | GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
+| GLO again | MIDI | CHANNEL: the track's (OFF, 1 to 16) | IN (SELECTED, CHANNELS) | CLOCK (OFF, IN, OUT, IN+OUT) |
 | GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: HOME's sky (OFF, DAY, NIGHT) | — |
 | FX | HALL | AMOUNT (into the reverb) | TIME (the tail) | TONE (dark to bright) |
 | FX again | TAPE | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) | DIFFUSE | MOD (the tail's movement) |
@@ -155,7 +158,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.38.0.fwsc 0.38.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.39.0.fwsc 0.39.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -170,14 +173,14 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.38.0      # terykons/build/terykons-0.38.0.fwsc
+python3 tools/build.py terykons --release 0.39.0      # terykons/build/terykons-0.39.0.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)
 ```
 
 The tests (`terykons/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
-`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO), `tap.txt` (tap tempo),
+`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO), `tap.txt` (tap tempo), `midi.txt` (GLO's MIDI page: channels, IN, CLOCK),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [terykons/README.md](terykons/README.md).
