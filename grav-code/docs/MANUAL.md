@@ -65,14 +65,15 @@ From the top:
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
   settles back. In step mode (SEQ) its knobs are small, at the page's top, above the tracks' steps (section 5); on
-  the mixer's and the effect's pages small too, in the bottom band (0.33).
+  the mixer's, the effect's (0.33) and the arp's (0.34) pages small too, in the bottom band.
 - **The bottom band:** the page's state (a sound page: how to change pages);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
   STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED, and CPU
-  (the engine is in the header). On the mixer and the effect's pages (0.33) the page's three knobs, small, and under
-  them what the mixer's keys do, or ECHO's time and whether the effect is on, and CPU. The keys are not drawn: the
+  (the engine is in the header). On the mixer, the effect's (0.33) and the arp's (0.34) pages the page's three knobs,
+  small, and under them what the mixer's keys do, ECHO's time and whether the effect is on, or the notes the arp
+  holds; and CPU. The keys are not drawn: the
   FM-1's own are under the screen.
 
 ---
@@ -93,6 +94,7 @@ From the top:
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
+| ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
 | EDIT | Free since 0.32 (until then FREEZE, the grains' recording held) |
 | SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again (0.31): the selected track alone, a synth track's notes as a piano roll, a drum track's 64 steps; a third time: back to the page it was pressed on |
@@ -102,7 +104,7 @@ From the top:
 | SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: HALL, TAPE,
-ECHO; HOME: SEQ, OSC; GLO: GLO, DEBUG). ARP is reserved for a later version.
+ECHO; ARP: ARP, ARP 2; HOME: SEQ, OSC; GLO: GLO, DEBUG).
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when GRAV CODE starts but its USB can't be reached.
@@ -240,7 +242,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003300, version 0.33.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003400, version 0.34.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -268,6 +270,43 @@ GLO once more opens DEBUG, the two cores' timings (section 11).
 ### HALL, TAPE, ECHO (FX)
 
 The effect's three pages, a lake under the terricons showing what it does (0.33): section 7.
+
+### ARP (ARP, 0.34)
+
+![The ARP page: S1's arp, UP-DOWN over two octaves, C E G held; its ladder from C4 up to G5 and back, the note playing white with a line down from it; MODE UP-DOWN, RATE 1/16, OCTAVES 2, small, in the bottom band; S1 HELD 3](img/screen-arp.png "ARP") ![The ladder as the arp plays, in the simulator](img/arp-ladder.gif "ARP playing")
+
+The selected synth track's arpeggiator: the notes held (the keys, MIDI in, and the track's own steps) played one after
+another, in time. ARP shows its page, ARP again its second; ARP is lit while the selected track's arp is on (on
+another page). The knobs are small, in the bottom band; under them the track and the notes its arp holds (HOLD while
+it keeps them).
+
+| Page | K1 | K2 | K3 |
+| --- | --- | --- | --- |
+| ARP | MODE | RATE | OCTAVES |
+| ARP 2 | GATE | HOLD | — |
+
+- **MODE:** OFF; UP, low to high; DOWN; UP-DOWN, up and back, the ends once; RANDOM (not the same note twice running,
+  while there is another); AS PLAYED, in the order the keys went down; CHORD, all its notes together each time.
+- **RATE:** a note value at the tempo, as ECHO's: 1/32 to 1/2, triplets (T) and dotted (.). A 16th as it comes.
+- **OCTAVES:** 1 to 4: the notes, then again an octave up, and so on.
+- **GATE:** each note's length, 5 to 100 % of RATE (50 as it comes); at 100 % they run into one another.
+- **HOLD:** the notes go on once the keys are let go, until the next keys come.
+
+The page draws the arp as a ladder: its notes across in the order it plays them (CHORD: a column an octave, its notes
+stacked), each as high as its pitch, in the track's colour, the note playing white. With nothing held it shows a
+chord's shape (the last one played, or C major), dim.
+
+**In time.** While the song plays, the arp's notes fall on the song's grid: 24 ticks a quarter note, as MIDI clock
+(a MIDI clock in's too); keys played between wait for the next of RATE's. Stopped, the first note sounds at once and
+the rest follow at the tempo.
+
+**What it plays.** The keys and MIDI in on the selected track, and the track's steps: a chord on a step is held for
+the step's length and played through the arp (record a chord, the arp plays it). Recording records the keys, not the
+arp's notes. The arp's notes go out over MIDI on the track's channel, as the sequencer's do; the keys' own notes do
+not while it is on.
+
+**Saved with the sound.** The arp is part of the track's sound: SAVE keeps it, a user preset holds it, and ALGO keeps
+it when it changes the engine; a factory preset, and any sound from before 0.34, has it OFF. A drum track has none.
 
 ---
 

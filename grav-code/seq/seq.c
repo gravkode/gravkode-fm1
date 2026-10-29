@@ -122,6 +122,11 @@ void seq_init(seq_t *s)
     }
     s->due_q8 = SEQ_FAR;
     s->ext_step_q8 = (int32_t)(SEQ_STEP_Q8_BPM / 120u);
+    for (uint32_t k = 0; k < SEQ_S_TRACKS; k++) {   /* (0.34) the arps: none running */
+        s->arp[k].free_q8 = SEQ_FAR;
+        s->arp[k].last = 0xFFu;
+        s->arp[k].rnd = 0x2545F491u + k;
+    }
 }
 
 /* a straight step, by the song's tempo or the clock in's */
@@ -242,6 +247,17 @@ static void play_step(seq_t *s, uint32_t track, uint32_t step, int32_t at_q8, in
     const seq_step_t *t = &s->pat.track[track].step[step];
     if (!t->on)
         return;
+    if (seq_arp_on(s, track)) {          /* (0.34) its arp's: held for the step's length (its notes flash the track) */
+        seq_arp_t *a = &s->arp[track];
+        for (uint32_t k = 0; k < t->n && k < SEQ_NOTES && a->in_n < SEQ_ARP_NOTES; k++) {
+            a->in[a->in_n].note = t->note[k];
+            a->in[a->in_n].vel = t->vel;
+            a->in[a->in_n].at_q8 = at_q8;
+            a->in[a->in_n].rel_q8 = at_q8 + gate;
+            a->in_n++;
+        }
+        return;
+    }
     s->hits[track]++;
     for (uint32_t k = 0; k < t->n && k < SEQ_NOTES; k++) {
         const uint8_t note = t->note[k];
@@ -292,6 +308,13 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
         s->start_due = 0;
         put(ev, ne, max, at_q8, SEQ_EV_START, 0, 0, 0);
     }
+    if (!s->ticking)                     /* (0.34) the song's ticks from its first step: the arps on them */
+        for (uint32_t k = 0; k < SEQ_S_TRACKS; k++)
+            s->arp[k].free_q8 = SEQ_FAR;
+    s->ticking = 1;
+    s->tick_no = count * SEQ_CLOCKS_PER_STEP;   /* (the clock in's: a tick each, seq_midi_clock) */
+    s->tick_q8 = at_q8;
+    s->tick_left = s->ext ? 0u : (uint8_t)SEQ_CLOCKS_PER_STEP;
     if (s->pat_steps >= seq_length(&s->pat)) {   /* the pattern's end: the next one in, if it is ready */
         s->pat_steps = 0;
         if (s->next_ready && s->next != SEQ_NO_PATTERN && s->edits == s->saved) {
@@ -334,6 +357,9 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
 static void start(seq_t *s, int ext, int cont, seq_event_t *ev, uint32_t *ne, uint32_t max)
 {
     s->playing = 1;
+    s->ticking = 0;
+    s->tick_left = 0;
+    s->ext_ticks_n = 0;
     if (!cont) {
         steps_reset(s);
         s->count = 0;
@@ -359,6 +385,9 @@ static void stop(seq_t *s, seq_event_t *ev, uint32_t *ne, uint32_t max)
     s->start_due = 0;
     steps_reset(s);
     s->due_q8 = SEQ_FAR;
+    s->ticking = 0;                      /* (0.34: the arps on their own ticks again, from the next block) */
+    s->tick_left = 0;
+    s->ext_ticks_n = 0;
 }
 
 void seq_midi_clock(seq_t *s)
@@ -381,6 +410,8 @@ void seq_midi_clock(seq_t *s)
     if (s->playing) {
         if (s->ext_ticks % SEQ_CLOCKS_PER_STEP == 0)   /* a step: on the tick (its tracks' swing delays their notes) */
             s->due_q8 = 0;
+        if (s->ext_ticks_n < 4u)         /* (0.34) a tick for the arps, at the next block's start */
+            s->ext_tick[s->ext_ticks_n++] = s->ext_ticks;
         s->ext_ticks++;
     }
 }
@@ -400,6 +431,276 @@ void seq_midi_start(seq_t *s, int cont)
     }
     s->ext_ticks = 0;
     s->due_q8 = SEQ_FAR;
+    s->ticking = 0;
+    s->tick_left = 0;
+    s->ext_ticks_n = 0;
+}
+
+/* ------------------------------------------------------------------ the arpeggiator (0.34) --- */
+static int arp_find(const seq_arp_t *a, uint8_t note)
+{
+    for (uint32_t i = 0; i < a->n; i++)
+        if (a->note[i] == note)
+            return (int)i;
+    return -1;
+}
+
+static void arp_remove(seq_arp_t *a, uint32_t i)   /* (the others kept in the order they came) */
+{
+    for (; i + 1u < a->n; i++) {
+        a->note[i] = a->note[i + 1u];
+        a->vel[i] = a->vel[i + 1u];
+        a->rel_q8[i] = a->rel_q8[i + 1u];
+    }
+    a->n--;
+    if (!a->n)                           /* (all let go: the next ones from its order's start) */
+        a->pos = 0;
+}
+
+/* a note held: a key's (rel_q8 SEQ_FAR) until let go, a step's until rel_q8; held already, its velocity anew and the
+ * later let-go; full, the oldest goes */
+static void arp_add(seq_arp_t *a, uint8_t note, uint8_t vel, int32_t rel_q8)
+{
+    const int i = arp_find(a, note);
+    if (i >= 0) {
+        a->vel[i] = vel;
+        if (rel_q8 == SEQ_FAR || (a->rel_q8[i] != SEQ_FAR && rel_q8 > a->rel_q8[i]))
+            a->rel_q8[i] = rel_q8;
+        return;
+    }
+    if (a->n >= SEQ_ARP_NOTES)
+        arp_remove(a, 0);
+    a->note[a->n] = note;
+    a->vel[a->n] = vel;
+    a->rel_q8[a->n] = rel_q8;
+    a->n++;
+}
+
+int seq_arp_note(seq_t *s, uint32_t track, uint8_t note, uint8_t vel)
+{
+    if (!seq_arp_on(s, track))
+        return 0;
+    seq_arp_t *a = &s->arp[track];
+    const int i = arp_find(a, note);
+    if (vel) {
+        if (a->latched) {                /* HOLD: keys again after all were let go: the notes kept go */
+            for (uint32_t k = 0; k < a->n;)
+                if (a->rel_q8[k] == SEQ_FAR)
+                    arp_remove(a, k);
+                else
+                    k++;
+            a->latched = 0;
+            a->keys = 0;
+        }
+        if (arp_find(a, note) < 0 || a->rel_q8[arp_find(a, note)] != SEQ_FAR)
+            a->keys++;
+        arp_add(a, note, vel, SEQ_FAR);
+        return 1;
+    }
+    if (i < 0 || a->rel_q8[i] != SEQ_FAR)  /* not a key's: a step's, let go by its step; none: the synth's own */
+        return i >= 0;
+    if (a->keys)
+        a->keys--;
+    if (a->hold) {                       /* HOLD: kept; once every key is let go, until the next */
+        if (!a->keys)
+            a->latched = 1;
+    } else
+        arp_remove(a, (uint32_t)i);
+    return 1;
+}
+
+/* its order: the notes held, low to high (AS PLAYED: as they came), then each an octave up, as many octaves as it
+ * has; DOWN the other way; UP-DOWN up and back, the ends once */
+uint32_t seq_arp_order(const seq_arp_t *a, uint8_t *out)
+{
+    uint8_t notes[SEQ_ARP_NOTES];
+    const uint32_t n = a->n, octaves = a->octaves < 1u ? 1u : a->octaves > 4u ? 4u : a->octaves;
+    for (uint32_t i = 0; i < n; i++) {
+        uint8_t v = a->note[i];
+        uint32_t j = i;
+        if (a->mode != SEQ_ARP_PLAYED)   /* (sorted, as it goes) */
+            for (; j > 0 && notes[j - 1u] > v; j--)
+                notes[j] = notes[j - 1u];
+        notes[j] = v;
+    }
+    uint32_t len = 0;
+    for (uint32_t o = 0; o < octaves; o++)
+        for (uint32_t i = 0; i < n; i++)
+            out[len++] = (uint8_t)(notes[i] + 12u * o > 127u ? 127u : notes[i] + 12u * o);
+    if (a->mode == SEQ_ARP_DOWN)
+        for (uint32_t i = 0; i < len / 2u; i++) {
+            const uint8_t t = out[i];
+            out[i] = out[len - 1u - i];
+            out[len - 1u - i] = t;
+        }
+    else if (a->mode == SEQ_ARP_UPDOWN && len > 2u) {
+        const uint32_t up = len;
+        for (uint32_t i = up - 2u; i >= 1u; i--)
+            out[len++] = out[i];
+    }
+    return len;
+}
+
+static uint8_t arp_vel(const seq_arp_t *a, uint8_t note)   /* the velocity of the held note it comes from */
+{
+    for (uint32_t i = 0; i < a->n; i++)
+        if (note >= a->note[i] && (note - a->note[i]) % 12u == 0u)
+            return a->vel[i];
+    return a->n ? a->vel[a->n - 1u] : 100u;
+}
+
+/* a note of its: one sounding on the track ended first; its end len_q8 later */
+static void arp_play(seq_t *s, uint32_t track, uint8_t note, uint8_t vel, int32_t at_q8, int32_t len_q8,
+                     seq_event_t *ev, uint32_t *ne, uint32_t max)
+{
+    for (uint32_t i = 0; i < s->nsounding; i++)
+        if (s->sounding[i].note == note && s->sounding[i].track == track) {   /* (its end, or now if that is later) */
+            put(ev, ne, max, s->sounding[i].off_q8 < at_q8 ? s->sounding[i].off_q8 : at_q8, SEQ_EV_OFF, note, 0,
+                (uint8_t)track);
+            s->sounding[i] = s->sounding[--s->nsounding];
+            break;
+        }
+    if (s->nsounding >= SEQ_SOUNDING)
+        return;
+    put(ev, ne, max, at_q8, SEQ_EV_ON, note, vel, (uint8_t)track);
+    s->sounding[s->nsounding].note = note;
+    s->sounding[s->nsounding].track = (uint8_t)track;
+    s->sounding[s->nsounding].off_q8 = at_q8 + (len_q8 > (int32_t)(SEQ_GRID << 8) ? len_q8 : (int32_t)(SEQ_GRID << 8));
+    s->nsounding++;
+    s->arp[track].last = note;
+}
+
+/* a tick of the song (or its own), number no: every rate ticks, its next note (CHORD: all its notes, an octave up
+ * each time round) */
+static void arp_tick(seq_t *s, uint32_t track, uint32_t no, int32_t at_q8, int32_t tick_q8, seq_event_t *ev,
+                     uint32_t *ne, uint32_t max)
+{
+    seq_arp_t *a = &s->arp[track];
+    const uint32_t rate = a->rate ? a->rate : SEQ_CLOCKS_PER_STEP;
+    if (!a->n || no % rate || (s->mute & (1u << track)))
+        return;
+    /* (in 32 bits: a 64-bit multiply beside a load is the FM-1 core's erratum, felucca-bsp docs/CPU.md; rate x tick_q8
+     * is under 46 M at 30 BPM, a hundredth of it times GATE too) */
+    const int32_t len = (int32_t)rate * tick_q8 / 100 * (int32_t)(a->gate ? a->gate : 50u);
+    if (a->mode == SEQ_ARP_CHORD) {
+        const uint32_t octaves = a->octaves < 1u ? 1u : a->octaves > 4u ? 4u : a->octaves, o = a->pos % octaves;
+        a->pos = (uint8_t)((o + 1u) % octaves);
+        for (uint32_t i = 0; i < a->n; i++)
+            arp_play(s, track, (uint8_t)(a->note[i] + 12u * o > 127u ? 127u : a->note[i] + 12u * o), a->vel[i], at_q8,
+                     len, ev, ne, max);
+    } else {
+        uint8_t order[SEQ_ARP_ORDER];
+        const uint32_t n = seq_arp_order(a, order);
+        uint32_t i;
+        if (a->mode == SEQ_ARP_RANDOM) {   /* (not the same twice running, while there is another) */
+            a->rnd = a->rnd * 1664525u + 1013904223u;
+            i = (a->rnd >> 16) % n;
+            if (n > 1u && order[i] == a->last)
+                i = (i + 1u) % n;
+        } else {
+            i = a->pos % n;
+            a->pos = (uint8_t)((i + 1u) % n);
+        }
+        arp_play(s, track, order[i], arp_vel(a, order[i]), at_q8, len, ev, ne, max);
+    }
+    a->played++;
+    s->hits[track]++;
+}
+
+/* the song's ticks of the step playing that come before limit_q8 (6 a step, from its start), at most 16 a block */
+static void song_ticks(seq_t *s, int32_t limit_q8, int32_t *tk_at, uint32_t *tk_no, uint32_t *ntk)
+{
+    const int32_t tick = straight_q8(s) / (int32_t)SEQ_CLOCKS_PER_STEP;
+    while (s->tick_left && s->tick_q8 < limit_q8 && *ntk < 16u) {
+        tk_at[*ntk] = s->tick_q8;
+        tk_no[(*ntk)++] = s->tick_no++;
+        s->tick_q8 += tick;
+        s->tick_left--;
+    }
+}
+
+/* each arp's block: its steps' notes held and let go, its ticks (the song's, tk: at and number; stopped, its own), in
+ * the order they fall (at the same time: let go, held, then the tick) */
+static void arps_block(seq_t *s, int32_t span, const int32_t *tk_at, const uint32_t *tk_no, uint32_t ntk,
+                       seq_event_t *ev, uint32_t *ne, uint32_t max)
+{
+    const int32_t tick_q8 = straight_q8(s) / (int32_t)SEQ_CLOCKS_PER_STEP;
+    for (uint32_t track = 0; track < SEQ_S_TRACKS; track++) {
+        seq_arp_t *a = &s->arp[track];
+        const int on = seq_arp_on(s, track);
+        if (!on) {                       /* off (or turned off): nothing held, its notes ended */
+            if (a->was & 1u) {
+                for (uint32_t i = 0; i < s->nsounding;)
+                    if (s->sounding[i].track == track) {
+                        put(ev, ne, max, 0, SEQ_EV_OFF, s->sounding[i].note, 0, (uint8_t)track);
+                        s->sounding[i] = s->sounding[--s->nsounding];
+                    } else
+                        i++;
+            }
+            a->n = a->keys = a->latched = a->pos = 0;
+            a->in_n = 0;
+            a->free_q8 = SEQ_FAR;
+            a->was = 0;
+            continue;
+        }
+        if ((a->was & 2u) && !a->hold && a->latched) {   /* HOLD off: the notes kept go */
+            for (uint32_t i = 0; i < a->n;)
+                if (a->rel_q8[i] == SEQ_FAR)
+                    arp_remove(a, i);
+                else
+                    i++;
+            a->latched = 0;
+        }
+        a->was = (uint8_t)(1u | (a->hold ? 2u : 0u));
+        if (!s->ticking && a->n && a->free_q8 == SEQ_FAR) {   /* stopped, a first note: its own ticks, from now */
+            a->free_q8 = 0;
+            a->free_ticks = 0;
+        }
+        uint32_t ki = 0, ii = 0;
+        for (;;) {
+            int32_t t_tick = SEQ_FAR, t_in = ii < a->in_n ? a->in[ii].at_q8 : SEQ_FAR, t_rel = SEQ_FAR;
+            if (s->ticking)
+                t_tick = ki < ntk ? tk_at[ki] : SEQ_FAR;
+            else if (a->n || t_in < span)
+                t_tick = a->free_q8;
+            for (uint32_t i = 0; i < a->n; i++)
+                if (a->rel_q8[i] < t_rel)
+                    t_rel = a->rel_q8[i];
+            const int32_t t = t_rel < t_in ? (t_rel < t_tick ? t_rel : t_tick) : (t_in < t_tick ? t_in : t_tick);
+            if (t >= span)
+                break;
+            if (t_rel == t) {            /* a step's notes let go */
+                for (uint32_t i = 0; i < a->n;)
+                    if (a->rel_q8[i] <= t)
+                        arp_remove(a, i);
+                    else
+                        i++;
+            } else if (t_in == t) {      /* a step's notes held */
+                if (!s->ticking && !a->n && a->free_q8 == SEQ_FAR) {
+                    a->free_q8 = t;
+                    a->free_ticks = 0;
+                }
+                arp_add(a, a->in[ii].note, a->in[ii].vel, a->in[ii].rel_q8);
+                ii++;
+            } else if (s->ticking) {     /* the song's tick */
+                arp_tick(s, track, tk_no[ki], t, tick_q8, ev, ne, max);
+                ki++;
+            } else {                     /* its own tick: stopped once nothing is held */
+                if (!a->n) {
+                    a->free_q8 = SEQ_FAR;
+                    continue;
+                }
+                arp_tick(s, track, a->free_ticks++, t, tick_q8, ev, ne, max);
+                a->free_q8 += tick_q8;
+            }
+        }
+        a->in_n = 0;
+        for (uint32_t i = 0; i < a->n; i++)
+            if (a->rel_q8[i] != SEQ_FAR)
+                a->rel_q8[i] -= span;
+        if (a->free_q8 != SEQ_FAR)
+            a->free_q8 -= span;
+    }
 }
 
 static void sort(seq_event_t *ev, uint32_t ne)
@@ -452,9 +753,12 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
             }
         }
     }
+    int32_t tk_at[16];                   /* (0.34) the song's ticks in this block, for the arps */
+    uint32_t tk_no[16], ntk = 0;
     if (s->playing) {
         while (s->due_q8 < span) {
             const int32_t at = s->due_q8;
+            song_ticks(s, at, tk_at, tk_no, &ntk);   /* (the step before's) */
             flush_pending(s, at + 1, ev, &ne, max);   /* (a swung step comes before the next) */
             fire(s, at, ev, &ne, max);
             if (s->ext) {
@@ -467,15 +771,19 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
         for (uint32_t track = 0; track < SEQ_TRACKS; track++)
             if (s->pend_q8[track] != SEQ_FAR)
                 s->pend_q8[track] -= span;
-        for (uint32_t i = 0; i < s->nsounding;) {   /* the notes that end in this block */
-            if (s->sounding[i].off_q8 < span) {
-                put(ev, &ne, max, s->sounding[i].off_q8, SEQ_EV_OFF, s->sounding[i].note, 0, s->sounding[i].track);
-                s->sounding[i] = s->sounding[--s->nsounding];
-            } else {
-                s->sounding[i].off_q8 -= span;
-                i++;
+        song_ticks(s, span, tk_at, tk_no, &ntk);
+        if (s->tick_left)
+            s->tick_q8 -= span;
+        if (s->ext && s->ticking)        /* (the clock in's ticks, at the block's start) */
+            for (uint32_t i = 0; i < s->ext_ticks_n && ntk < 16u; i++) {
+                for (uint32_t j = ntk++; j > 0; j--) {   /* (before the others: at 0) */
+                    tk_at[j] = tk_at[j - 1u];
+                    tk_no[j] = tk_no[j - 1u];
+                }
+                tk_at[0] = 0;
+                tk_no[0] = s->ext_tick[s->ext_ticks_n - 1u - i];
             }
-        }
+        s->ext_ticks_n = 0;
         if (!s->ext) {
             const int32_t tick = straight_q8(s) / (int32_t)SEQ_CLOCKS_PER_STEP;
             while (s->clock_q8 < span) {
@@ -486,6 +794,16 @@ uint32_t seq_block(seq_t *s, uint32_t n, seq_event_t *ev, uint32_t max)
         }
         if (s->due_q8 != SEQ_FAR)
             s->due_q8 -= span;
+    }
+    arps_block(s, span, tk_at, tk_no, ntk, ev, &ne, max);   /* (0.34) */
+    for (uint32_t i = 0; i < s->nsounding;) {   /* the notes that end in this block (stopped: the arps') */
+        if (s->sounding[i].off_q8 < span) {
+            put(ev, &ne, max, s->sounding[i].off_q8, SEQ_EV_OFF, s->sounding[i].note, 0, s->sounding[i].track);
+            s->sounding[i] = s->sounding[--s->nsounding];
+        } else {
+            s->sounding[i].off_q8 -= span;
+            i++;
+        }
     }
     sort(ev, ne);
     return ne;

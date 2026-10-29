@@ -116,7 +116,7 @@ wait 100
 said GRAV CODE. OCTAVE +1. WAVE FM 2-OP
 tap ARP
 wait 30
-said BUTTON ARP
+said PAGE ARP
 # MASTER turned while a note plays: the gain glides, so no sample jumps further than the wave itself does
 midi 90 45 64
 wait 100

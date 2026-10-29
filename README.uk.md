@@ -13,7 +13,9 @@
 
 ---
 
-Поточна версія: **0.33.0**: сторінки ефекту показують, що він робить: нічне озеро під териконами HOME; кожна нота,
+Поточна версія: **0.34.0**: арпеджіатор на ARP, у кожної синтової доріжки свій, частина її звуку: UP, DOWN,
+UP-DOWN, RANDOM, AS PLAYED або CHORD, тривалістю ноти в темп пісні, на 1–4 октави, з GATE і HOLD; через нього грають
+клавіші, MIDI-вхід і акордові кроки секвенсора. 0.33: сторінки ефекту показують, що він робить: нічне озеро під териконами HOME; кожна нота,
 послана в ефект, падає в нього колом, за нею в темп ідуть повтори ECHO, а хвіст HALL розходиться брижами; ручки
 маленькі, у нижній смузі. 0.32: ефект — HALL (реверб Beads із TIME, TONE, DIFFUSE і MOD), TAPE (чотири середовища
 Beads, що його забарвлюють) і ECHO (затримка в темп); гранули Beads, FREEZE і SEED прибрано. 0.31: SEQ ще раз показує лише вибрану доріжку: ноти синтезатора як піано-рол, 64 кроки барабана
@@ -49,6 +51,8 @@ SELECT перемикає їх швидко.
   чотири сторінки по 16 на білих клавішах, як у TR; своя довжина від 1 до 64 (поліметрія); ноти й акорди зі своєю
   силою та довжиною; шістнадцять патернів, зміна в кінці патерну; спільний темп, свій свінг у кожної доріжки;
   покроковий і живий запис; MIDI clock на вихід і вхід; ноти кожної доріжки на своєму MIDI-каналі (1–8).
+- **Арпеджіатор** на кожній синтовій доріжці (ARP): шість режимів, тривалість ноти в темп, 1–4 октави, GATE і HOLD;
+  через нього грають клавіші, MIDI-вхід і акорди секвенсора, його ноти йдуть по MIDI; зберігається разом зі звуком.
 - **Поліфонія:** до чотирьох голосів (POLY) або один із легато (MONO).
 - **Velocity** з клавіш FM-1 (або фіксована), тиск клавіш іде по MIDI як поліфонічний післядотик.
 - **Обвідна** (атака, спад, затухання) і **LFO** на TIMBRE, MORPH або висоту тону.
@@ -60,7 +64,7 @@ SELECT перемикає їх швидко.
 
 ## Екран і сторінки
 
-<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Вісім сторінок: SEQ (кроки, що грають, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (швидкість, глибина й призначення LFO), ENV (атака, спад, затухання), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME як тривалість ноти, FEEDBACK), GLO (голоси, velocity, версія) і DEBUG"></p>
+<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Вісім сторінок: SEQ (кроки, що грають, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (швидкість, глибина й призначення LFO), ENV (атака, спад, затухання), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME як тривалість ноти, FEEDBACK), GLO (голоси, velocity, версія) і ARP (драбинка арпеджіатора, MODE, RATE, OCTAVES)"></p>
 
 <p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="Постер рушіїв: неонова іконка кожного рушія у своєму кольорі, з назвою"></p>
 
@@ -75,6 +79,8 @@ SELECT перемикає їх швидко.
 | FX | HALL | AMOUNT (скільки йде в реверб) | TIME (довжина хвоста) | TONE (від темного до яскравого) |
 | FX ще раз | TAPE | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) | DIFFUSE | MOD (рух хвоста) |
 | FX ще раз | ECHO | AMOUNT (скільки йде в луну) | TIME (від 1/32 до 1/2, тріолі й з крапкою, у темп) | FEEDBACK (повтори) |
+| ARP | ARP | MODE (OFF, UP, DOWN, UP-DOWN, RANDOM, AS PLAYED, CHORD) | RATE (від 1/32 до 1/2, у темп) | OCTAVES (1–4) |
+| ARP ще раз | ARP 2 | GATE (5–100 %) | HOLD (OFF, ON) | — |
 | GLO ще раз | DEBUG | одне/два ядра | скидання піків і лічильників | — |
 | SEL | MIXER | VOL (фейдер вибраної доріжки) | SEND (частка в ефект) | RETURN (AMOUNT ревербу HALL); білі клавіші 1–8 — м'ют доріжок, чорні 1–8 — соло |
 
@@ -139,7 +145,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.33.0.fwsc 0.33.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.34.0.fwsc 0.34.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -154,14 +160,14 @@ GRAV CODE збирається інструментом fm1-base `tools/build.py
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.33.0      # grav-code/build/grav_code-0.33.0.fwsc
+python3 tools/build.py grav-code --release 0.34.0      # grav-code/build/grav_code-0.34.0.fwsc
 python3 tools/build.py grav-code --host                # симулятор для тестів:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # емулятор у браузері (Emscripten)
 ```
 
 Тести (`grav-code/tests/`): `basic.txt` (клавіші, октава, збереження, MIDI), `engines.txt` (усі рушії звучать),
-`voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, збереження, старі налаштування),
+`voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор),
 `seq.txt` (секвенсор), `rec.txt` (живий запис, метроном), `theme.txt` (кольори екрана й небо), `mixer.txt`
 (мікшер), `browser.txt` (терикони HOME, браузер пресетів), `playback.txt` (усі вісім доріжок грають, розподіл
 голосів VOICES), `tracks.txt` (синтові доріжки), `drums.txt` (барабанні доріжки), `patterns.txt` (патерни),

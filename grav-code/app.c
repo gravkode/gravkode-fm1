@@ -128,17 +128,22 @@ enum {
     PAGE_OUTPUT,
     PAGE_SCREEN,                         /* (0.25.1) GLO again: THEME, the screen's colours (GLO again: DEBUG) */
     PAGE_MIXER,                          /* (0.26) SEL: the eight tracks' LEVEL, SEND, mutes; the effect's RETURN */
+    PAGE_ARP,                            /* (0.34) ARP: the selected track's arpeggiator: MODE, RATE, OCTAVES */
+    PAGE_ARP_2,                          /* ARP again: GATE, HOLD */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_HALL && (p) <= PAGE_FX_ECHO)
+#define IS_ARP_PAGE(p) ((p) == PAGE_ARP || (p) == PAGE_ARP_2)
 #define IS_SOUND_PAGE(p) ((p) == PAGE_OSC || (p) == PAGE_SHAPE || (p) == PAGE_SOUND || (p) == PAGE_OUTPUT)
 
 static uint8_t active_page = PAGE_SEQ;
 static uint8_t fx_page = PAGE_FX_HALL;   /* the FX page shown last: FX goes back to it (0.32: HALL first) */
 static uint8_t home_page = PAGE_SEQ;     /* HOME's (SEQ or OSC) and GLO's (GLO or DEBUG) shown last */
 static uint8_t glo_page = PAGE_GLO;
+static uint8_t arp_page = PAGE_ARP;      /* (0.34) the ARP page shown last */
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "HALL", "TAPE", "ECHO", "DEBUG",
-                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER"};
+                                              "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER", "ARP",
+                                              "ARP 2"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -229,8 +234,23 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"TEMPO", "SWING", "LENGTH"},
     {"PUNCH", "SWEEP", "DRIVE"},
     [PAGE_SCREEN] = {"THEME", "SKY", ""},
-    [PAGE_MIXER] = {"VOL", "SEND", "RETURN"}
+    [PAGE_MIXER] = {"VOL", "SEND", "RETURN"},
+    [PAGE_ARP] = {"MODE", "RATE", "OCTAVES"},
+    [PAGE_ARP_2] = {"GATE", "HOLD", ""}
 };
+
+/* (0.34) the arpeggiator: a synth track's, its settings its sound's (grav_controls_t.arp; 0 as sounds were before:
+ * off). arp[0]: MODE (bits 0..2, SEQ_ARP_*), OCTAVES - 1 (bits 3..4), HOLD (bit 5); arp[1]: RATE, ECHO's note
+ * values, its index + 1 (0: a 16th); arp[2]: GATE, 5..100 % of RATE (0: 50) */
+static const char *const ARP_MODE_NAME[SEQ_ARP_MODES] = {"OFF", "UP", "DOWN", "UP-DOWN", "RANDOM", "AS PLAYED",
+                                                         "CHORD"};
+static const uint8_t ARP_TICKS[GRAV_ECHO_TIMES] = {3, 4, 6, 8, 9, 12, 16, 18, 24, 32, 36, 48};   /* (24 a quarter) */
+#define ARP_RATE_16TH 2u
+static uint32_t arp_mode(uint32_t t) { return SYNTH_IS_DRUM(t) ? SEQ_ARP_OFF : set.controls[t].arp[0] & 7u; }
+static uint32_t arp_octaves(uint32_t t) { return 1u + (set.controls[t].arp[0] >> 3 & 3u); }
+static uint32_t arp_hold(uint32_t t) { return set.controls[t].arp[0] >> 5 & 1u; }
+static uint32_t arp_rate(uint32_t t) { return set.controls[t].arp[1] ? set.controls[t].arp[1] - 1u : ARP_RATE_16TH; }
+static uint32_t arp_gate(uint32_t t) { return set.controls[t].arp[2] ? set.controls[t].arp[2] : 50u; }
 
 static int32_t clamp_percent(int32_t value)
 {
@@ -266,13 +286,16 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
             midi_last_port = (uint32_t)port;
             midi_count++;
         }
-        if ((st & 0xF0u) == 0x90u && d2) {      /* (any channel: the track selected; recording live: recorded) */
+        if ((st & 0xF0u) == 0x90u && d2) {      /* (any channel: the track selected, or its arp; recording live:
+                                                 * recorded) */
             synth_audio_mute = 0u;
-            synth_track_note_on(&synth, track_sel, (int32_t)d1, d2);
+            if (!seq_arp_note(&seq, track_sel, (uint8_t)d1, (uint8_t)d2))
+                synth_track_note_on(&synth, track_sel, (int32_t)d1, d2);
             rec_midi_put(d1, d2);
         }
         else if ((st & 0xF0u) == 0x80u || (st & 0xF0u) == 0x90u) {
-            synth_track_note_off(&synth, track_sel, (int32_t)d1);
+            if (!seq_arp_note(&seq, track_sel, (uint8_t)d1, 0))
+                synth_track_note_off(&synth, track_sel, (int32_t)d1);
             rec_midi_put(d1, 0);
         }
         else if (st == 0xF8u)                /* clock, start, continue, stop: the sequencer follows them */
@@ -363,6 +386,14 @@ static void click_mix(int32_t *lr, uint32_t from, uint32_t to, uint32_t master_q
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     synth_event_t event;
+    for (uint32_t t = 0; t < SYNTH_S_TRACKS; t++) {   /* (0.34) the arps, as the tracks' sounds have them */
+        seq_arp_t *a = &seq.arp[t];
+        a->rate = ARP_TICKS[arp_rate(t) % GRAV_ECHO_TIMES];
+        a->octaves = (uint8_t)arp_octaves(t);
+        a->gate = (uint8_t)arp_gate(t);
+        a->hold = (uint8_t)arp_hold(t);
+        a->mode = (uint8_t)arp_mode(t);
+    }
 
     float lfo_rate = 0.05f + (float)mod_params[0] * 0.1995f;
     float lfo_depth = (float)mod_params[1] * 0.01f;
@@ -379,12 +410,14 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 
     while (synth_event_queue_pop(&synth_queue, &event)) {
         switch (event.type) {
-        case SYNTH_EVENT_NOTE_ON:
+        case SYNTH_EVENT_NOTE_ON:            /* (0.34: to the track's arp, if it is on) */
             synth_audio_mute = 0u;
-            synth_track_note_on(&synth, event.track, event.note, event.velocity);
+            if (!seq_arp_note(&seq, event.track, (uint8_t)clamp(event.note, 0, 127), (uint8_t)event.velocity))
+                synth_track_note_on(&synth, event.track, event.note, event.velocity);
             break;
         case SYNTH_EVENT_NOTE_OFF:
-            synth_track_note_off(&synth, event.track, event.note);
+            if (!seq_arp_note(&seq, event.track, (uint8_t)clamp(event.note, 0, 127), 0))
+                synth_track_note_off(&synth, event.track, event.note);
             break;
         case SYNTH_EVENT_PANIC:
             synth_audio_mute = 1u;
@@ -849,6 +882,9 @@ static struct {
     uint8_t home_down, home_used, home_shown;   /* HOME held; a pattern picked meanwhile (no page change); the grid shown */
     uint32_t home_at;                    /* when HOME went down */
     uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
+    uint32_t key_midi;                   /* (0.34) the keys whose notes went out over MIDI (not to an arp: its notes go) */
+    uint32_t arp_sig, arp_at;            /* (0.34) the ARP page: what its ladder showed, when it last changed; */
+    uint8_t arp_band;                    /* its band's (held, HOLD) */
     uint32_t key_mix;                    /* (0.26) the keys pressed on the mixer (mutes, tracks: let go as such) */
     uint8_t mixer_from;                  /* the page SEL opened the mixer on (SEL again: back to it) */
     uint8_t sel_down;                    /* SEL held (let go: the mixer) */
@@ -1646,6 +1682,56 @@ static void sound_param_turn(uint32_t index, int32_t e)
     app_say(param_name(active_page, index), t);
 }
 
+/* (0.34) the ARP pages' knobs: the selected synth track's arp, its sound's (marked * as its other edits) */
+static void arp_turn(uint32_t index, int32_t e)
+{
+    const uint32_t t = track_sel;
+    if (SYNTH_IS_DRUM(t)) {
+        app_say("ARP", "S1-S4 ONLY");
+        return;
+    }
+    grav_controls_t c = set.controls[t];
+    uint32_t mode = c.arp[0] & 7u, octaves = c.arp[0] >> 3 & 3u, hold = c.arp[0] >> 5 & 1u;
+    uint32_t rate = arp_rate(t), gate = arp_gate(t);
+    if (active_page == PAGE_ARP) {
+        if (index == 0u)
+            mode = (uint32_t)clamp((int32_t)mode + e, 0, SEQ_ARP_MODES - 1);
+        else if (index == 1u)
+            rate = (uint32_t)clamp((int32_t)rate + e, 0, GRAV_ECHO_TIMES - 1);
+        else
+            octaves = (uint32_t)clamp((int32_t)octaves + e, 0, 3);
+    } else if (index == 0u)
+        gate = (uint32_t)clamp((int32_t)gate + e, 5, 100);
+    else if (index == 1u)
+        hold = e > 0;
+    else
+        return;
+    c.arp[0] = (uint8_t)(mode | octaves << 3 | hold << 5);
+    c.arp[1] = (uint8_t)(rate + 1u);
+    c.arp[2] = (uint8_t)gate;
+    if (memcmp(c.arp, set.controls[t].arp, sizeof c.arp)) {
+        const uint32_t f = plat_lock();
+        memcpy(set.controls[t].arp, c.arp, sizeof c.arp);
+        plat_unlock(f);
+        ui.preset_edited |= (uint8_t)(1u << t);
+        set_dirty = 1;
+    }
+    char v[12];
+    v[0] = 0;
+    if (active_page == PAGE_ARP && index == 0u)
+        text_cat(v, ARP_MODE_NAME[mode]);
+    else if (active_page == PAGE_ARP && index == 1u)
+        text_cat(v, grav_echo_time_name(rate));
+    else if (active_page == PAGE_ARP)
+        int_text((int32_t)octaves + 1, v);
+    else if (index == 0u) {
+        int_text((int32_t)gate, v);
+        text_cat(v, "%");
+    } else
+        text_cat(v, hold ? "ON" : "OFF");
+    app_say(PARAM_NAME[active_page][index], v);
+}
+
 /* TAPE's K1: QUALITY, from DIGITAL to DIRTY TAPE (Beads' media) */
 static void quality_turn(int32_t e)
 {
@@ -2158,13 +2244,14 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
     return page == PAGE_SEQ || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
-           page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL : B_FX;
+           page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL :
+           IS_ARP_PAGE(page) ? B_ARP : B_FX;
 }
 
 /* its blink's period: the first of a button's pages slow, the next faster (FX: HALL, TAPE, ECHO) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_TAPE ? 500u :
+    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
            page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
 }
 
@@ -2323,6 +2410,8 @@ static void lights(uint32_t btn, uint32_t keys)
                    (ui.step_mode ? 1u << B_SEQ : 0u), mid = 0;
     if (grav_fx_on() && !IS_FX_PAGE(active_page))
         lit |= 1u << B_FX;
+    if (seq_arp_on(&seq, track_sel) && !IS_ARP_PAGE(active_page))   /* (0.34) the selected track's arp on */
+        lit |= 1u << B_ARP;
     {
         const uint32_t b = 1u << page_button(active_page), period = page_period(active_page);
         if (now % period < period / 2u)
@@ -2401,9 +2490,12 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
     if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
         glo_page = active_page == PAGE_GLO ? PAGE_SCREEN : active_page == PAGE_SCREEN ? PAGE_DEBUG :
                    active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
+    if (k == B_ARP && IS_ARP_PAGE(active_page))   /* (0.34) ARP again: its other page */
+        arp_page = active_page == PAGE_ARP ? PAGE_ARP_2 : PAGE_ARP;
     active_page = k == B_LFO  ? PAGE_MOD :
                   k == B_ENV  ? PAGE_ENV :
-                  k == B_GLO  ? glo_page : fx_page;
+                  k == B_GLO  ? glo_page :
+                  k == B_ARP  ? arp_page : fx_page;
     app_say("PAGE", page_name(active_page));
     ui.redraw = 1;
 }
@@ -2452,7 +2544,12 @@ static void key_down(uint32_t k)
         ui.last_key = (int32_t)k;
         ui.key_track[k] = track_sel;         /* (its note-off to the same track, whatever is selected then) */
         queue_key_event(SYNTH_EVENT_NOTE_ON, note, v, track_sel);
-        plat_midi_send(0x09u | (0x90u | track_sel) << 8 | (uint32_t)note << 16 | v << 24, TO_USB);   /* its channel */
+        if (seq_arp_on(&seq, track_sel))     /* (0.34: the arp's notes go out, as it plays them) */
+            ui.key_midi &= ~bit;
+        else {
+            plat_midi_send(0x09u | (0x90u | track_sel) << 8 | (uint32_t)note << 16 | v << 24, TO_USB);   /* its channel */
+            ui.key_midi |= bit;
+        }
         if (ui.rec && seq.playing)           /* recording live: written as it plays */
             live_note(k, note, v);
         if (!ui.chord_open) {                /* a chord: the notes held together, in the order they came */
@@ -2481,7 +2578,9 @@ static void key_up(uint32_t k)
         const int32_t note = ui.note[k];
         ui.prs[k] = 0;
         queue_key_event(SYNTH_EVENT_NOTE_OFF, note, 0, ui.key_track[k]);
-        plat_midi_send(0x08u | (0x80u | ui.key_track[k]) << 8 | (uint32_t)note << 16, TO_USB);
+        if (ui.key_midi & bit)
+            plat_midi_send(0x08u | (0x80u | ui.key_track[k]) << 8 | (uint32_t)note << 16, TO_USB);
+        ui.key_midi &= ~bit;
         live_release(k);
     }
 }
@@ -2495,7 +2594,7 @@ static void keys_input(uint32_t keys)
             key_down(k);
         else if (!(keys & bit) && (ui.keys & bit))
             key_up(k);
-        else if ((keys & bit) && !(keys_taken() & bit) && touch_pressure(k) != ui.prs[k]) {
+        else if ((keys & bit) && !(keys_taken() & bit) && (ui.key_midi & bit) && touch_pressure(k) != ui.prs[k]) {
             ui.prs[k] = touch_pressure(k);
             plat_midi_send(0x0Au | (0xA0u | ui.key_track[k]) << 8 | (uint32_t)ui.note[k] << 16 |
                            (uint32_t)ui.prs[k] << 24, TO_USB);
@@ -2587,6 +2686,7 @@ static void button_press(uint32_t k)
     case B_ENV:
     case B_GLO:
     case B_FX:
+    case B_ARP:                              /* (0.34) */
         page_open(k);
         break;
     case B_PLAY:
@@ -2823,6 +2923,8 @@ static void encoder_turn(uint32_t k, int32_t e)
         glo_turn(index, e);
     else if (k == EN_K1 && active_page == PAGE_FX_TAPE)
         quality_turn(e);
+    else if (knob && IS_ARP_PAGE(active_page))   /* (0.34) */
+        arp_turn(index, e);
     else if (k == EN_K3 && active_page == PAGE_MOD)
         lfo_dest_turn(e);
     else if (knob && (active_page == PAGE_SOUND || active_page == PAGE_OUTPUT))
@@ -3039,6 +3141,34 @@ static void knob_get(uint32_t i, knob_t *k)
         }
         return;
     }
+    if (IS_ARP_PAGE(active_page)) {          /* (0.34) the selected track's arp (a drum track has none) */
+        const uint32_t t = track_sel;
+        k->name = PARAM_NAME[active_page][i];
+        if (SYNTH_IS_DRUM(t) || (active_page == PAGE_ARP_2 && i == 2u)) {
+            k->frac = KNOB_NONE;
+            return;
+        }
+        if (active_page == PAGE_ARP) {
+            if (i == 0u) {
+                text_cat(k->value, ARP_MODE_NAME[arp_mode(t)]);
+                k->frac = (int32_t)arp_mode(t) * 25600 / (int32_t)(SEQ_ARP_MODES - 1u);
+            } else if (i == 1u) {
+                text_cat(k->value, grav_echo_time_name(arp_rate(t)));
+                k->frac = (int32_t)arp_rate(t) * 25600 / (int32_t)(GRAV_ECHO_TIMES - 1u);
+            } else {
+                int_text((int32_t)arp_octaves(t), k->value);
+                k->frac = ((int32_t)arp_octaves(t) - 1) * 25600 / 3;
+            }
+        } else if (i == 0u) {
+            int_text((int32_t)arp_gate(t), k->value);
+            text_cat(k->value, "%");
+            k->frac = ((int32_t)arp_gate(t) - 5) * 25600 / 95;
+        } else {
+            text_cat(k->value, arp_hold(t) ? "ON" : "OFF");
+            k->frac = arp_hold(t) ? 25600 : 0;
+        }
+        return;
+    }
     if (active_page == PAGE_MIXER) {         /* the selected track's VOL (0.27) and SEND, the effect's RETURN */
         const int32_t v = i == 0u ? set.vol[track_sel] : i == 1u ? set.send[track_sel] : fx_params[FX_HALL];
         k->name = PARAM_NAME[PAGE_MIXER][i];
@@ -3206,6 +3336,8 @@ static void draw_chips(int32_t y0, uint32_t mask, int32_t xoffset)
             continue;
         knob_t k;
         knob_get(i, &k);
+        if (k.frac == KNOB_NONE)             /* (0.34: none, as ARP 2's K3) */
+            continue;
         const int32_t x = 18 + (int32_t)i * 80 - xoffset, y = y0 + 19;
         const int hot = knob_since(i) < 450u;
         ui.dial_hot |= (uint8_t)(hot << i);
@@ -3251,6 +3383,7 @@ static int list_open(void)
 static int animate_dials(uint32_t now)
 {
     if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page) ||
+          IS_ARP_PAGE(active_page) ||
           active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_SCREEN || active_page == PAGE_MIXER) ||
         ui.splash_until || list_open()) return 0;
     const uint32_t dt = now - ui.dial_at;
@@ -3280,7 +3413,7 @@ static int animate_dials(uint32_t now)
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
     if (active_page == PAGE_SEQ && !ui.step_mode)   /* (HOME's terricons: no knobs drawn) */
         return 0;
-    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER || IS_FX_PAGE(active_page)) {   /* (small: SEQ's at the
+    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER || IS_FX_PAGE(active_page) || IS_ARP_PAGE(active_page)) {   /* (small: SEQ's at the
                                                                    * page's top, 0.28; the mixer's and, 0.33, the
                                                                    * effect's in the bottom band) */
         cv_begin(80, CHIP_H, C_BLACK);
@@ -4010,6 +4143,90 @@ static void draw_lake(int32_t dy, uint32_t now)
     cv_text(8, 24 + dy, &FONT_XS, page_name(active_page), C_HI);   /* (over the sky, as every page has it) */
 }
 
+/* (0.34) the ARP pages: the selected track's arp as a ladder, its order across (a column a note, as RATE plays them;
+ * CHORD: a column an octave, its notes stacked), each note a bar as high as its pitch, in the track's colour; the
+ * note playing white, fading, a line down from it. Nothing held: the last chord's ladder (a C major one's), dim, and
+ * how to fill it;
+ * MODE OFF: dimmer still. A drum track has none. Redrawn alone as it plays (arp_frame) */
+#define ARP_Y 40                             /* the ladder's top in the page: redrawn from here */
+static void draw_arp_ladder(int32_t dy, uint32_t now)
+{
+    const uint32_t t = track_sel;
+    const int32_t top = ARP_Y + 6 + dy, bottom = ARP_Y + 82 + dy;
+    if (SYNTH_IS_DRUM(t)) {
+        cv_text(120 - text_w(&FONT_XS, "NO ARP ON A DRUM TRACK") / 2, ARP_Y + 34 + dy, &FONT_XS, "NO ARP ON A DRUM TRACK",
+                C_DIM);
+        return;
+    }
+    seq_arp_t a = seq.arp[t];
+    const uint32_t mode = arp_mode(t);
+    const int ghost = a.n == 0u;
+    if (ghost) {                             /* (nothing held: the last chord played, its shape; a C major one) */
+        static const uint8_t TRIAD[3] = {60, 64, 67};
+        a.n = (uint8_t)(ui.last_n > 1u ? ui.last_n : 3u);
+        for (uint32_t k = 0; k < a.n && k < SEQ_NOTES; k++)
+            a.note[k] = ui.last_n > 1u ? ui.last_chord[k] : TRIAD[k];
+    }
+    a.mode = (uint8_t)(mode == SEQ_ARP_OFF || mode == SEQ_ARP_RANDOM || mode == SEQ_ARP_CHORD ? SEQ_ARP_UP : mode);
+    a.octaves = (uint8_t)arp_octaves(t);
+    uint8_t order[SEQ_ARP_ORDER];
+    const uint32_t n = seq_arp_order(&a, order), cols = mode == SEQ_ARP_CHORD ? a.octaves : n;
+    if (!n)
+        return;
+    int32_t lo = 127, hi = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        lo = order[i] < lo ? order[i] : lo;
+        hi = order[i] > hi ? order[i] : hi;
+    }
+    const int32_t range = hi - lo < 12 ? 12 : hi - lo;
+    int32_t at = -1;                         /* the column playing */
+    if (!ghost && mode != SEQ_ARP_OFF && a.last != 0xFFu) {
+        if (mode == SEQ_ARP_CHORD)
+            at = (int32_t)((a.pos + a.octaves - 1u) % a.octaves);
+        else if (mode == SEQ_ARP_RANDOM) {
+            for (uint32_t i = 0; i < n && at < 0; i++)
+                if (order[i] == a.last)
+                    at = (int32_t)i;
+        } else
+            at = (int32_t)((a.pos + n - 1u) % n);
+    }
+    const int32_t w = 224 / (int32_t)cols > 14 ? 14 : 224 / (int32_t)cols, x0 = 8 + (224 - w * (int32_t)cols) / 2;
+    const int32_t flash = flash256(now - ui.arp_at, 250u);
+    const uint16_t hue = TRACK_HUE[t], base = ghost || mode == SEQ_ARP_OFF ? (mode == SEQ_ARP_OFF ? C_LINE : C_DIM) :
+                                                                             mix565(C_BLACK, hue, 150);
+    for (int32_t c = 0; c < (int32_t)cols; c++) {
+        const int32_t x = x0 + c * w;
+        cv_rect(x + w / 2, bottom + 4, 1, c % 4 ? 2 : 4, C_LINE);   /* (a tick a note, longer each fourth) */
+        if (c == at)                         /* (the column playing: a line down from it) */
+            cv_rect(x + w / 2, top, 1, bottom - top + 2, mix565(C_BLACK, hue, 60 + flash / 3));
+        for (uint32_t k = 0; k < (mode == SEQ_ARP_CHORD ? a.n : 1u); k++) {
+            const int32_t note = mode == SEQ_ARP_CHORD ? (int32_t)a.note[k] + 12 * c : (int32_t)order[c];
+            const int32_t y = bottom - (note - lo) * (bottom - top) / range;
+            cv_rect(x + 1, y - 1, w - 2 > 2 ? w - 2 : 2, 3, c == at ? mix565(hue, C_WHITE, 120 + flash / 2) : base);
+        }
+    }
+    {                                        /* the lowest note and the highest, at the left */
+        char b[6];
+        note_name(lo, b);
+        cv_text(x0 - 2 - text_w(&FONT_T, b) < 0 ? 0 : x0 - 2 - text_w(&FONT_T, b), bottom - 5, &FONT_T, b, C_DIM);
+        note_name(lo + (hi - lo), b);
+        if (hi > lo)
+            cv_text(x0 - 2 - text_w(&FONT_T, b) < 0 ? 0 : x0 - 2 - text_w(&FONT_T, b), top - 6, &FONT_T, b, C_DIM);
+    }
+    if (mode == SEQ_ARP_OFF || ghost) {
+        const char *m = mode == SEQ_ARP_OFF ? "MODE OFF" : "PLAY KEYS OR A CHORD STEP";
+        cv_text(120 - text_w(&FONT_T, m) / 2, bottom + 7, &FONT_T, m, C_GRAY);
+    }
+}
+
+static void draw_arp_page(void)
+{
+    cv_text(8, 24, &FONT_XS, page_name(active_page), C_HI);
+    if (!SYNTH_IS_DRUM(track_sel) && arp_hold(track_sel))
+        cv_text(232 - text_w(&FONT_XS, "HOLD"), 24, &FONT_XS, "HOLD", seq.arp[track_sel].latched ? C_HI : C_DIM);
+    draw_arp_ladder(0, plat_ms());
+}
+
 /* the effect's page: the lake (its name in it) */
 static void draw_fx_page(void)
 {
@@ -4449,6 +4666,10 @@ static void draw_seq_grid(void)
         cv_begin(240, 144u - LAKE_Y, C_BLACK);
         draw_lake(-LAKE_Y, plat_ms());
         cv_blit(0, 36 + LAKE_Y);
+    } else if (IS_ARP_PAGE(active_page)) {   /* (0.34) the arp's ladder */
+        cv_begin(240, 144u - ARP_Y, C_BLACK);
+        draw_arp_ladder(-ARP_Y, plat_ms());
+        cv_blit(0, 36 + ARP_Y);
     } else {                                 /* (step mode: under its knobs, and on into the page's foot) */
         cv_begin(240, 144u - SEQ_STRIP_Y, C_BLACK);
         draw_seq_body(-SEQ_STRIP_Y);
@@ -4731,6 +4952,31 @@ static void draw_fx_band(void)
     draw_cpu(178, y);
 }
 
+/* (0.34) the ARP pages' bottom band: their knobs, small; under them the track and its arp's state (the notes held,
+ * HOLD keeping them), or a moment's message; the load */
+static void draw_arp_band(void)
+{
+    char t[48];
+    const int32_t y = 43;
+    const seq_arp_t *a = &seq.arp[track_sel];
+    draw_chips(CHIP_Y, 7u, 0);
+    if (band_message(t, 160))
+        cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
+    else if (!SYNTH_IS_DRUM(track_sel)) {
+        cv_text(8, y, &FONT_XS, TRACK_NAME[track_sel], TRACK_HUE[track_sel]);
+        if (arp_mode(track_sel) == SEQ_ARP_OFF)
+            cv_text(32, y, &FONT_XS, "ARP OFF", C_GRAY);
+        else {
+            cv_text(32, y, &FONT_XS, "HELD", C_GRAY);
+            int_text(a->n, t);
+            cv_text(32 + text_w(&FONT_XS, "HELD") + 6, y, &FONT_XS, t, C_WHITE);
+            if (a->latched)
+                cv_text(92, y, &FONT_XS, "HOLD", C_HI);
+        }
+    }
+    draw_cpu(178, y);
+}
+
 /* the header's battery: a rounded 26x14 body and its terminal; three levels (none invented between), a bolt on USB
  * power, empty when unknown */
 static void draw_battery(int batt)
@@ -4807,6 +5053,8 @@ static void draw_page(void)
         draw_mixer_body(0);
     else if (IS_FX_PAGE(active_page))        /* (0.33) the lake; its knobs small, in the bottom band */
         draw_fx_page();
+    else if (IS_ARP_PAGE(active_page))       /* (0.34) the arp's ladder; its knobs small, in the bottom band */
+        draw_arp_page();
     else
         draw_knobs();
     if (ui.splash_until)
@@ -4866,6 +5114,8 @@ static void draw_bottom(void)
         draw_mixer_band();
     else if (IS_FX_PAGE(active_page))
         draw_fx_band();
+    else if (IS_ARP_PAGE(active_page))
+        draw_arp_band();
     else {
         draw_status(6);
         octave_text(t);
@@ -5035,6 +5285,29 @@ static void fx_frame(uint32_t now)
     lake.shown = (uint8_t)moving;
 }
 
+/* (0.34) the ARP pages: the ladder redrawn when the arp plays a note or its notes change (and as its flash fades);
+ * the band when the notes held or HOLD's keeping change */
+static void arp_frame(uint32_t now)
+{
+    if (now - ui.grid_at < frame_ms() || list_open() || ui.splash_until)
+        return;
+    const seq_arp_t *a = &seq.arp[track_sel];
+    uint32_t sig = a->played * 977u + a->n * 31u + a->pos + arp_mode(track_sel) * 7919u;
+    for (uint32_t i = 0; i < a->n && i < SEQ_ARP_NOTES; i++)
+        sig = sig * 131u + a->note[i];
+    const uint8_t band = (uint8_t)(a->n | a->latched << 4);
+    if (band != ui.arp_band) {
+        ui.arp_band = band;
+        ui.redraw = 1;
+    }
+    if (sig != ui.arp_sig) {
+        ui.arp_sig = sig;
+        ui.arp_at = now;
+        ui.redraw_grid = 1;
+    } else if (now - ui.arp_at < 300u)
+        ui.redraw_grid = 1;
+}
+
 /* a frame: the input, the patterns, the presets, the screen reader; then whatever changed drawn, the least that
  * shows it: everything, SEQ's or the mixer's strip, a knob's tile, or a live icon's area */
 void app_frame(void)
@@ -5058,6 +5331,8 @@ void app_frame(void)
         mixer_frame(now);
     else if (IS_FX_PAGE(active_page))
         fx_frame(now);
+    else if (IS_ARP_PAGE(active_page))
+        arp_frame(now);
     if (ui.splash_until && now >= ui.splash_until) {
         ui.splash_until = 0;
         ui.redraw = 1;
@@ -5269,6 +5544,14 @@ int app_expect(const char *what, int *got)
         *got = (int)lake.echoes;
     else if (!strcmp(what, "lake_ripples"))
         *got = (int)lake.ripples;
+    else if (!strncmp(what, "arp_", 4)) {    /* (0.34) the selected track's arp: its settings, notes held, played */
+        const char *w = what + 4;
+        *got = !strcmp(w, "mode") ? (int)arp_mode(track_sel) : !strcmp(w, "rate") ? (int)arp_rate(track_sel) :
+               !strcmp(w, "oct") ? (int)arp_octaves(track_sel) : !strcmp(w, "gate") ? (int)arp_gate(track_sel) :
+               !strcmp(w, "hold") ? (int)arp_hold(track_sel) : !strcmp(w, "held") ? (int)seq.arp[track_sel].n :
+               !strcmp(w, "latched") ? (int)seq.arp[track_sel].latched :
+               !strcmp(w, "played") ? (int)seq.arp[track_sel].played : -1;
+    }
     else if (!strcmp(what, "lake_moving"))
         *got = lake_moving(plat_ms());
     else if (!strncmp(what, "param", 5))

@@ -351,3 +351,21 @@ wait 1600
 turn ALGO 1
 wait 300
 shot screen-splash.png
+# (0.34) ARP on S1 (CHORDS again): UP-DOWN over two octaves, C E G held, stopped (on its own ticks): its ladder, the
+# note playing
+turn ALGO -1
+wait 1600
+tap ARP
+wait 30
+turn K1 3
+turn K3 1
+wait 30
+key 7 down 100 0
+key 11 down 90 0
+key 14 down 110 0
+wait 1700
+shot screen-arp.png
+key 7 up
+key 11 up
+key 14 up
+wait 30

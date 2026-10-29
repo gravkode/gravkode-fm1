@@ -13,7 +13,9 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.33.0**: the effect's pages show what it does, a lake at night under HOME's terricons: each note
+Current version: **0.34.0**: an arpeggiator on ARP, each synth track's, part of its sound: UP, DOWN, UP-DOWN,
+RANDOM, AS PLAYED or CHORD, at a note value in time with the song, over 1 to 4 octaves, with GATE and HOLD; the keys,
+MIDI in and the sequencer's chord steps play through it. 0.33: the effect's pages show what it does, a lake at night under HOME's terricons: each note
 sent into the effect drops a ring, ECHO's repeats follow it in time, HALL's tail ripples on; the knobs small, in the
 bottom band. 0.32: the effect is HALL (Beads' reverb, with its TIME, TONE, DIFFUSE and MOD), TAPE (Beads' four media
 colouring it) and ECHO (a delay in time with the tempo); Beads' grains, FREEZE and SEED are gone. 0.31: SEQ pressed again shows the selected track alone: a synth track's notes as a piano
@@ -49,6 +51,8 @@ hold HOME and turn SELECT to jump.
   (polymeters), notes and chords with their velocity and length; sixteen patterns, switched at the pattern's end;
   the song's tempo, each pattern's swing; step recording, MIDI clock out and in (it follows one); each track's notes
   on its MIDI channel (1–8).
+- **An arpeggiator** on each synth track (ARP): six modes, a note value in time, 1–4 octaves, GATE and HOLD; the keys,
+  MIDI in and the sequencer's chords through it, its notes out over MIDI; saved with the sound.
 - **Polyphony:** up to four voices (POLY), or one with legato (MONO).
 - **Velocity** from the FM-1's keys (or a fixed one), pressure sent as polyphonic aftertouch.
 - **An envelope** (attack, decay, release) and **an LFO** to TIMBRE, MORPH or pitch.
@@ -59,7 +63,7 @@ hold HOME and turn SELECT to jump.
 
 ## The screen and its pages
 
-<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME as a note value, FEEDBACK), GLO (VOICES, VELOCITY, the version) and DEBUG"></p>
+<p align="center"><img src="grav-code/docs/img/readme-pages.png" width="488" alt="Eight pages: SEQ (the steps playing, TEMPO, SWING, LENGTH), OSC (TIMBRE, MORPH, HARMONICS), MOD (LFO RATE, DEPTH, DEST), ENV (ATTACK, DECAY, RELEASE), HALL (AMOUNT, TIME, TONE), ECHO (AMOUNT, TIME as a note value, FEEDBACK), GLO (VOICES, VELOCITY, the version) and ARP (the arp's ladder, MODE, RATE, OCTAVES)"></p>
 
 <p align="center"><img src="grav-code/docs/img/readme-icons.png" width="560" alt="The engines' poster: each engine's neon icon in its own colour, with its name"></p>
 
@@ -74,6 +78,8 @@ hold HOME and turn SELECT to jump.
 | FX | HALL | AMOUNT (into the reverb) | TIME (the tail) | TONE (dark to bright) |
 | FX again | TAPE | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) | DIFFUSE | MOD (the tail's movement) |
 | FX again | ECHO | AMOUNT (into the echo) | TIME (1/32 to 1/2, triplets and dotted, at the tempo) | FEEDBACK |
+| ARP | ARP | MODE (OFF, UP, DOWN, UP-DOWN, RANDOM, AS PLAYED, CHORD) | RATE (1/32 to 1/2, at the tempo) | OCTAVES (1 to 4) |
+| ARP again | ARP 2 | GATE (5 to 100 %) | HOLD (OFF, ON) | — |
 | GLO again | DEBUG | one/two cores | reset peaks/counters | — |
 | SEL | MIXER | VOL (the selected track's fader) | SEND (its share through the effect) | RETURN (HALL's AMOUNT); white keys 1–8 mute the tracks, black keys 1–8 solo them |
 
@@ -135,7 +141,7 @@ manual has the details: [grav-code/docs/MANUAL.md](grav-code/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.33.0.fwsc 0.33.0 grav-code/build/site
+   python3 tools/make_site.py grav-code grav-code/build/grav_code-0.34.0.fwsc 0.34.0 grav-code/build/site
    python3 -m http.server 8080 --directory grav-code/build/site
    ```
 
@@ -150,14 +156,14 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py grav-code --release 0.33.0      # grav-code/build/grav_code-0.33.0.fwsc
+python3 tools/build.py grav-code --release 0.34.0      # grav-code/build/grav_code-0.34.0.fwsc
 python3 tools/build.py grav-code --host                # the simulator, for the tests:
 grav-code/build/host/grav_code_host grav-code/tests/basic.txt grav-code/build/host
 python3 tools/build.py grav-code --web                 # the browser emulator (Emscripten)
 ```
 
 The tests (`grav-code/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
-`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings),
+`voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator),
 `dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [grav-code/README.md](grav-code/README.md).

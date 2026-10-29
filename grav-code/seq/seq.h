@@ -81,6 +81,38 @@ typedef struct {
     uint8_t type, note, vel, track;      /* a note's track (0..SEQ_TRACKS - 1) */
 } seq_event_t;
 
+/* (0.34) a synth track's arpeggiator, its settings its sound's (app.c sets them every block). The notes held (the keys
+ * and MIDI in, through seq_arp_note; the track's steps, each for its length) are played one after another, a note
+ * every rate ticks of the song (24 a quarter note, as MIDI clock goes: on the step grid while the song plays, on the
+ * clock in while one leads), each gate % of that long; stopped, on its own ticks from the first note held. HOLD keeps
+ * the keys' notes once all are let go, until the next ones come */
+#define SEQ_ARP_NOTES 8u
+#define SEQ_ARP_ORDER (2u * SEQ_ARP_NOTES * 4u)   /* its order's notes, at most: 8 notes, 4 octaves, up and down */
+enum { SEQ_ARP_OFF, SEQ_ARP_UP, SEQ_ARP_DOWN, SEQ_ARP_UPDOWN, SEQ_ARP_RANDOM, SEQ_ARP_PLAYED, SEQ_ARP_CHORD,
+       SEQ_ARP_MODES };
+typedef struct {
+    volatile uint8_t mode;               /* SEQ_ARP_* (the app's) */
+    volatile uint8_t rate;               /* ticks between its notes: 3 (a 32nd) .. 48 (a half) */
+    volatile uint8_t octaves;            /* 1..4: its notes, then an octave up, ... */
+    volatile uint8_t gate;               /* a note's length, % of rate: 5..100 */
+    volatile uint8_t hold;               /* HOLD: 1 */
+    volatile uint8_t n;                  /* notes held, in the order they came (the screen's) */
+    volatile uint8_t note[SEQ_ARP_NOTES];
+    uint8_t vel[SEQ_ARP_NOTES];
+    int32_t rel_q8[SEQ_ARP_NOTES];       /* a step's note: when it is let go; SEQ_FAR (seq.c): a key's */
+    uint8_t keys;                        /* keys (and MIDI in's notes) held now */
+    uint8_t latched;                     /* HOLD: every key let go, their notes kept until the next */
+    uint8_t pos;                         /* where it is in its order */
+    uint8_t was;                         /* at the last block: 1 on, 2 HOLD (to see them go) */
+    volatile uint8_t last;               /* the note it played last (the screen's) */
+    volatile uint32_t played;            /* its notes played (the screen's, the tests) */
+    int32_t free_q8;                     /* stopped: to its next tick (SEQ_FAR: not running); its ticks so far */
+    uint32_t free_ticks;
+    uint32_t rnd;
+    uint8_t in_n;                        /* this block's steps' notes: held from at_q8, let go at rel_q8 */
+    struct { uint8_t note, vel; int32_t at_q8, rel_q8; } in[SEQ_ARP_NOTES];
+} seq_arp_t;
+
 /* the UI's requests (and MIDI in's stop), taken by the audio interrupt at its next block */
 enum { SEQ_WANT_NONE, SEQ_WANT_PLAY, SEQ_WANT_STOP };
 #define SEQ_NO_PATTERN 0xFFu
@@ -125,6 +157,13 @@ typedef struct {
     int32_t ext_step_q8;                 /* a step's length by the clock in */
     struct { uint8_t note, track; int32_t off_q8; } sounding[SEQ_SOUNDING];
     uint32_t nsounding;
+    seq_arp_t arp[SEQ_S_TRACKS];         /* (0.34) the synth tracks' arpeggiators */
+    uint8_t ticking;                     /* (0.34) the song's ticks run: its first step played (no count-in left) */
+    uint8_t tick_left;                   /* the song's ticks still to come in this step (6 a step), the next's */
+    int32_t tick_q8;                     /* time and number */
+    uint32_t tick_no;
+    uint8_t ext_ticks_n;                 /* clocks in since the last block: the arps' ticks at its start */
+    uint32_t ext_tick[4];
 } seq_t;
 
 void seq_defaults(seq_pattern_t *p);
@@ -157,3 +196,14 @@ static inline const void *seq_record_of(const seq_pattern_t *p) { return p; }
 static inline const void *seq_drum_record_of(const seq_pattern_t *p) { return &p->track[SEQ_S_TRACKS]; }
 int seq_from_record(const seq_record_t *r, seq_pattern_t *p);          /* the synth tracks, tempo, swing; 0: refused */
 int seq_from_drum_record(const seq_drum_record_t *d, seq_pattern_t *p);   /* the drum tracks; 0: refused */
+/* (0.34) audio interrupt: a note from the keys or MIDI in for a synth track's arpeggiator (vel 0: let go), from the
+ * next block's start; 1 if it took it (its arp on; a let-go: a note it holds), 0: to play as it is */
+int seq_arp_note(seq_t *s, uint32_t track, uint8_t note, uint8_t vel);
+/* (0.34) an arp's order: the notes held, low to high (AS PLAYED: as they came), each octave up as many as it has; DOWN
+ * the other way, UP-DOWN up and back (the ends once): into out (SEQ_ARP_ORDER at most); how many */
+uint32_t seq_arp_order(const seq_arp_t *a, uint8_t *out);
+/* (0.34) a synth track's arp on (its mode not OFF) */
+static inline int seq_arp_on(const seq_t *s, uint32_t track)
+{
+    return track < SEQ_S_TRACKS && s->arp[track].mode != SEQ_ARP_OFF && s->arp[track].mode < SEQ_ARP_MODES;
+}

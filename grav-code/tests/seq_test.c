@@ -436,6 +436,108 @@ int main(void)
         printf("%d failures\n", fails);
         return 1;
     }
-    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats, a track's swing, count-in)\n");
+    /* (0.34) the arp: S1's chord step (C E G, 4 steps long) held for its length, UP over two octaves at a 16th: a note
+     * on each step, on the step grid, C E G C5, each half a step long (GATE 50), none after the step lets go */
+    {
+        static const uint8_t up[4] = {60, 64, 67, 72};
+        fresh(&s);
+        for (uint32_t i = 0; i < SEQ_PAGE; i++)
+            s.pat.track[0].step[i].on = 0;
+        seq_step_t *c = &s.pat.track[0].step[0];
+        c->on = 1, c->n = 3, c->note[0] = 60, c->note[1] = 64, c->note[2] = 67, c->len = 4;
+        s.arp[0].mode = SEQ_ARP_UP, s.arp[0].rate = 6, s.arp[0].octaves = 2, s.arp[0].gate = 50;
+        s.want = SEQ_WANT_PLAY;
+        run(&s, 100);                    /* 4.6 steps */
+        CHECK(count(SEQ_EV_ON) == 4, "arp: 4 notes over the chord's 4 steps, got %u", count(SEQ_EV_ON));
+        for (uint32_t k = 0; k < 4; k++) {
+            uint32_t at = find(SEQ_EV_ON, k), i;
+            for (i = 0; i < nlog && !(log_[i].e.type == SEQ_EV_ON && log_[i].t == at); i++) {}
+            CHECK(at == grid(k * step), "arp note %u at %u, not %u", k, at, grid(k * step));
+            CHECK(i < nlog && log_[i].e.note == up[k] && log_[i].e.track == 0, "arp note %u: %u", k, log_[i].e.note);
+            CHECK(find(SEQ_EV_OFF, k) == grid(k * step + step / 2), "arp gate %u ends at %u", k, find(SEQ_EV_OFF, k));
+        }
+        CHECK(s.arp[0].played == 4 && s.hits[0] == 4, "arp: played %u, hits %u", s.arp[0].played, s.hits[0]);
+    }
+    /* DOWN at a 32nd (3 ticks): G E C G E C ..., two a step; UP-DOWN: C E G E C E ... */
+    {
+        static const uint8_t want_down[6] = {67, 64, 60, 67, 64, 60}, want_ud[6] = {60, 64, 67, 64, 60, 64};
+        for (uint32_t m = 0; m < 2; m++) {
+            fresh(&s);
+            for (uint32_t i = 0; i < SEQ_PAGE; i++)
+                s.pat.track[0].step[i].on = 0;
+            seq_step_t *c = &s.pat.track[0].step[0];
+            c->on = 1, c->n = 3, c->note[0] = 60, c->note[1] = 64, c->note[2] = 67, c->len = 8;
+            s.arp[0].mode = m ? SEQ_ARP_UPDOWN : SEQ_ARP_DOWN, s.arp[0].rate = 3, s.arp[0].octaves = 1;
+            s.arp[0].gate = 50;
+            s.want = SEQ_WANT_PLAY;
+            run(&s, 70);                 /* 3.25 steps: 7 notes */
+            uint32_t k = 0;
+            for (uint32_t i = 0; i < nlog && k < 6; i++)
+                if (log_[i].e.type == SEQ_EV_ON) {
+                    CHECK(log_[i].t == grid(k * step / 2), "arp %s note %u at %u", m ? "up-down" : "down", k, log_[i].t);
+                    CHECK(log_[i].e.note == (m ? want_ud : want_down)[k], "arp %s note %u: %u", m ? "up-down" : "down",
+                          k, log_[i].e.note);
+                    k++;
+                }
+            CHECK(k == 6, "arp %s: 6 notes", m ? "up-down" : "down");
+        }
+    }
+    /* stopped: the keys' notes (seq_arp_note) on its own ticks from the first, a 16th apart at the song's tempo; let go,
+     * nothing more; a let-go of a note it does not hold is not its */
+    fresh(&s);
+    for (uint32_t i = 0; i < SEQ_PAGE; i++)
+        s.pat.track[0].step[i].on = 0;
+    s.arp[1].mode = SEQ_ARP_UP, s.arp[1].rate = 6, s.arp[1].octaves = 1, s.arp[1].gate = 50;
+    CHECK(seq_arp_note(&s, 1, 64, 90) == 1 && seq_arp_note(&s, 1, 60, 80) == 1, "arp: the keys' notes taken");
+    CHECK(seq_arp_note(&s, 2, 60, 80) == 0, "no arp on S3: its note not taken");
+    run(&s, 60);                         /* 2.8 steps: C at 0, E, C */
+    CHECK(count(SEQ_EV_ON) == 3, "arp stopped: 3 notes, got %u", count(SEQ_EV_ON));
+    CHECK(find(SEQ_EV_ON, 0) == 0 && find(SEQ_EV_ON, 1) == grid(step) && find(SEQ_EV_ON, 2) == grid(2 * step),
+          "arp stopped: on its own ticks (%u %u %u)", find(SEQ_EV_ON, 0), find(SEQ_EV_ON, 1), find(SEQ_EV_ON, 2));
+    CHECK(log_[0].e.note == 60 && log_[0].e.vel == 80 && log_[0].e.track == 1, "arp stopped: C first, its velocity");
+    CHECK(seq_arp_note(&s, 1, 62, 0) == 0, "arp: a let-go of a note not held is not its");
+    seq_arp_note(&s, 1, 60, 0);
+    seq_arp_note(&s, 1, 64, 0);
+    {
+        const uint32_t before = count(SEQ_EV_ON);
+        run(&s, 60);
+        CHECK(count(SEQ_EV_ON) == before && s.nsounding == 0, "arp: let go, nothing more, nothing sounding");
+    }
+    /* HOLD: the notes kept once the keys are let go; the next key starts anew; CHORD: all its notes at once */
+    s.arp[1].hold = 1;
+    seq_arp_note(&s, 1, 60, 100);
+    seq_arp_note(&s, 1, 67, 100);
+    seq_arp_note(&s, 1, 60, 0);
+    seq_arp_note(&s, 1, 67, 0);
+    CHECK(s.arp[1].n == 2 && s.arp[1].latched, "arp HOLD: kept (%u)", s.arp[1].n);
+    seq_arp_note(&s, 1, 72, 100);
+    CHECK(s.arp[1].n == 1 && s.arp[1].note[0] == 72 && !s.arp[1].latched, "arp HOLD: the next key anew");
+    s.arp[1].mode = SEQ_ARP_CHORD;
+    seq_arp_note(&s, 1, 76, 100);
+    nlog = 0;
+    run(&s, 30);
+    CHECK(count(SEQ_EV_ON) >= 2 && find(SEQ_EV_ON, 0) == find(SEQ_EV_ON, 1), "arp CHORD: its notes at once");
+    /* turned off: its notes end at once, nothing more; HOLD off lets the kept notes go */
+    s.arp[1].mode = SEQ_ARP_OFF;
+    nlog = 0;
+    run(&s, 30);
+    CHECK(count(SEQ_EV_ON) == 0 && s.nsounding == 0 && s.arp[1].n == 0, "arp off: silent, nothing held");
+    /* on the clock in: a note every 6 clocks */
+    fresh(&s);
+    for (uint32_t i = 0; i < SEQ_PAGE; i++)
+        s.pat.track[0].step[i].on = 0;
+    s.arp[0].mode = SEQ_ARP_UP, s.arp[0].rate = 6, s.arp[0].octaves = 1, s.arp[0].gate = 50;
+    seq_arp_note(&s, 0, 60, 100);
+    seq_arp_note(&s, 0, 64, 100);
+    run(&s, 1);
+    seq_midi_start(&s, 0);
+    nlog = 0;
+    for (uint32_t c = 0; c < 24; c++) {  /* a quarter note's clocks, one a block */
+        seq_midi_clock(&s);
+        run(&s, 1);
+    }
+    CHECK(count(SEQ_EV_ON) == 4, "arp on the clock in: 4 notes in 24 clocks, got %u", count(SEQ_EV_ON));
+
+    printf("PASS: sequencer timing (straight, swing, length, chords, stop, clock out and in, 8 tracks, records, patterns, live quantizing, skip, beats, a track's swing, count-in, the arp)\n");
     return 0;
 }

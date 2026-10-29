@@ -6,7 +6,8 @@
 #define GRAV_CUSTOM_FM 1u
 #define GRAV_DRUM_HOLD 2u
 typedef struct {
-    uint8_t tune, level, aux, flags, accent, reserved[3];
+    uint8_t tune, level, aux, flags, accent;
+    uint8_t arp[3];                      /* (0.34) the arpeggiator (reserved before, 0: off): app.c ARP_* */
     uint8_t value[GRAV_CONTROL_BYTES];
 } grav_controls_t;
 

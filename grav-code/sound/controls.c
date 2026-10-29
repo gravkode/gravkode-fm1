@@ -112,7 +112,9 @@ void grav_control_write(grav_controls_t *c, const grav_control_info_t *i, uint32
 int grav_controls_valid(uint32_t e, const grav_controls_t *c)
 {
     if (e >= GRAV_ENGINE_ALL || c->tune > 100 || c->level > 100 || c->aux > 100 || c->accent > 100 ||
-        (c->flags & ~(GRAV_CUSTOM_FM | GRAV_DRUM_HOLD)) || c->reserved[0] || c->reserved[1] || c->reserved[2]) return 0;
+        (c->flags & ~(GRAV_CUSTOM_FM | GRAV_DRUM_HOLD))) return 0;
+    if ((c->arp[0] & 7u) > 6u || (c->arp[0] & 0xC0u) || c->arp[1] > 12u || (c->arp[2] && (c->arp[2] < 5u || c->arp[2] > 100u)))
+        return 0;                        /* (0.34) the arp: MODE, OCTAVES, HOLD; RATE; GATE (app.c) */
     if (!grav_controls_fm(e) && (c->flags & GRAV_CUSTOM_FM)) return 0;
     if (grav_controls_fm(e) && !(c->flags & GRAV_CUSTOM_FM)) return 1;
     for (uint32_t p = 0; p < grav_control_pages(e); p++)
