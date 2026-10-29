@@ -420,6 +420,7 @@ static void fire(seq_t *s, int32_t at_q8, seq_event_t *ev, uint32_t *ne, uint32_
     s->tick_left = s->ext ? 0u : (uint8_t)SEQ_CLOCKS_PER_STEP;
     if (s->pat_steps >= seq_length(&s->pat)) {   /* the pattern's end: the next one in, if it is ready */
         s->pat_steps = 0;
+        s->turns++;
         if (s->next_ready && s->next != SEQ_NO_PATTERN && s->edits == s->saved) {
             seq_load(s, s->next_src);
             s->pattern = s->next;

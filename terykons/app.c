@@ -129,6 +129,17 @@ static uint8_t set_dirty;                /* changed since the last save: SAVE is
 static bank_t bank;                      /* the patterns in the flash (seq/bank.h) */
 static int8_t copy_from = -1, clip_from = -1;   /* (0.40) the pattern copied (being, and done); -1: none, or not
                                                 * known (since a restart, the copy kept but not its number) */
+/* (0.41) a chain: HOME held, white keys one after another (repeats too): the patterns in that order, round. pos: the
+ * one playing (-1: the first, still queued); turns: the sequencer's pattern ends seen; build: the keys while HOME is
+ * held (two or more make the chain when it is let go) */
+#define CHAIN_MAX 16u
+static struct {
+    uint8_t n, at[CHAIN_MAX];
+    int8_t pos;
+    uint8_t playing;
+    uint32_t turns;
+    uint8_t bn, build[CHAIN_MAX];
+} chain;
 static uint32_t used_mask, used_seq;     /* the bank's patterns with a step on, as of its save used_seq (patterns_used) */
 
 /* Parameter pages: UI state only, independent of DSP. */
@@ -2327,14 +2338,20 @@ static void seq_turn(uint32_t index, int32_t e)
 
 /* HOME held and a white key, K4, MIDI program change: the pattern to play next (stopped: at once, patterns()); the
  * one playing again: the queue undone */
+static void pattern_queue(uint32_t n)        /* the next one (the one playing: none) */
+{
+    uint32_t f = plat_lock();
+    seq.next = n == seq.pattern ? SEQ_NO_PATTERN : (uint8_t)n;
+    seq.next_ready = 0;
+    plat_unlock(f);
+}
+
 static void pattern_pick(int32_t n)
 {
     char t[8];
     n = clamp(n, 0, (int32_t)BANK_PATTERNS - 1);
-    uint32_t f = plat_lock();
-    seq.next = (uint32_t)n == seq.pattern ? SEQ_NO_PATTERN : (uint8_t)n;
-    seq.next_ready = 0;
-    plat_unlock(f);
+    chain.n = 0;                             /* (0.41: one pattern picked by hand, the chain gone) */
+    pattern_queue((uint32_t)n);
     ui.patterns_until = plat_ms() + 1500u;
     ui.redraw = 1;
     int_text(n + 1, t);
@@ -2406,6 +2423,60 @@ static void pattern_clear(void)
     app_say("CLEAR", t);
 }
 
+/* (0.41) HOME let go after two or more white keys: the chain, from the first (picked as the keys went: stopped, in
+ * at once; playing, queued) */
+static void chain_start(void)
+{
+    char t[3 * CHAIN_MAX + 1], k[4];
+    memcpy(chain.at, chain.build, chain.bn);
+    chain.n = chain.bn;
+    chain.playing = seq.playing;
+    uint32_t f = plat_lock();
+    chain.turns = seq.turns;
+    chain.pos = !seq.playing || (seq.pattern == chain.at[0] && seq.next == SEQ_NO_PATTERN) ? 0 : -1;
+    plat_unlock(f);
+    t[0] = 0;
+    for (uint32_t i = 0; i < chain.n; i++) {
+        int_text(chain.at[i] + 1, k);
+        if (i)
+            text_cat(t, " ");
+        text_cat(t, k);
+    }
+    app_say("CHAIN", t);
+    ui.redraw = 1;
+}
+
+/* each frame: at each pattern's end the chain's next one has come in (or, the same again, loops on); the one after it
+ * queued while playing; stopped, back to its first */
+static void chain_update(void)
+{
+    uint32_t f = plat_lock();
+    const uint32_t turns = seq.turns, next = seq.next, playing = seq.playing;
+    plat_unlock(f);
+    if (!chain.n) {
+        chain.turns = turns;
+        chain.playing = (uint8_t)playing;
+        return;
+    }
+    if (chain.playing && !playing) {         /* stopped: the chain from its start again */
+        chain.pos = 0;
+        pattern_queue(chain.at[0]);
+        ui.redraw = 1;
+    }
+    chain.playing = (uint8_t)playing;
+    if (turns != chain.turns) {              /* an end: the next one in (unless it could not come in yet) */
+        if (next == SEQ_NO_PATTERN)
+            chain.pos = (int8_t)((chain.pos + (int32_t)(turns - chain.turns)) % (int32_t)chain.n);
+        chain.turns = turns;
+        ui.redraw = 1;
+    }
+    if (playing && chain.pos >= 0) {
+        const uint32_t want = chain.at[((uint32_t)chain.pos + 1u) % chain.n];
+        if (want != next && !(want == seq.pattern && next == SEQ_NO_PATTERN))
+            pattern_queue(want);
+    }
+}
+
 static uint32_t patterns_used(void)          /* a bit for each pattern with a step on (the one playing: as it is) */
 {
     if (used_seq != bank.seq) {              /* (the flash's, again after each save) */
@@ -2428,6 +2499,7 @@ static void patterns(void)
     const uint32_t now = plat_ms();
     const int dirty = seq.edits != seq.saved;
     char t[8];
+    chain_update();                          /* (0.41) */
     if (midi_program) {                      /* a program change in: 1..16 the patterns */
         const uint32_t program = midi_program - 1u;
         midi_program = 0;
@@ -3094,8 +3166,12 @@ static void key_down(uint32_t k)
     } else if (ui.home_down) {
         ui.key_pat |= bit;
         ui.home_used = 1;
-        if (w >= 0)
+        if (w >= 0 && !chain.bn)             /* the first: that pattern, as before */
             pattern_pick(w);
+        if (w >= 0 && chain.bn < CHAIN_MAX) {   /* (0.41) and the next ones after it: a chain, once HOME is let go */
+            chain.build[chain.bn++] = (uint8_t)w;
+            ui.redraw = 1;
+        }
     } else if (ui.edit_down && w >= 0) {     /* (0.35) EDIT held, a white key: that step's locks cleared */
         ui.key_lock |= bit;
         ui.edit_used = 1;
@@ -3286,6 +3362,7 @@ static void button_press(uint32_t k)
     case B_HOME:
         ui.home_down = 1;
         ui.home_used = ui.home_shown = 0;
+        chain.bn = 0;                        /* (0.41) */
         ui.sound_nav = 0;
         ui.home_at = plat_ms();
         break;
@@ -3400,6 +3477,9 @@ static void buttons_let_go(uint32_t btn)
         save_let_go();
     if (ui.home_down && !(btn & 1u << B_HOME)) {
         ui.home_down = 0;
+        if (chain.bn >= 2u)                  /* (0.41) two or more patterns picked: the chain */
+            chain_start();
+        chain.bn = 0;
         if (ui.home_shown)
             ui.redraw = 1;
         ui.home_shown = 0;
@@ -5272,9 +5352,20 @@ static void draw_patterns(void)
         int_text((ui.copy_req || ui.bank_copy ? copy_from : clip_from) + 1, t);
         cv_text(110, 24, &FONT_XS, t, C_WHITE);
     }
-    cv_text(12, 129, &FONT_XS, "OCT- COPY", C_DIM);
-    cv_text(120 - text_w(&FONT_XS, "OCT+ PASTE") / 2, 129, &FONT_XS, "OCT+ PASTE", C_DIM);
-    cv_text(228 - text_w(&FONT_XS, "REC CLEAR"), 129, &FONT_XS, "REC CLEAR", C_DIM);
+    if (chain.bn || chain.n) {               /* (0.41) the chain (being made: the keys so far), the one playing lit */
+        const uint32_t n = chain.bn ? chain.bn : chain.n;
+        const uint8_t *at = chain.bn ? chain.build : chain.at;
+        cv_text(12, 129, &FONT_XS, "CHAIN", C_GRAY);
+        for (uint32_t i = 0; i < n; i++) {
+            int_text(at[i] + 1, t);
+            cv_text(46 + (int32_t)i * 12, 129, &FONT_XS, t,
+                    !chain.bn && (int32_t)i == chain.pos ? C_HI : C_WHITE);
+        }
+    } else {
+        cv_text(12, 129, &FONT_XS, "OCT- COPY", C_DIM);
+        cv_text(120 - text_w(&FONT_XS, "OCT+ PASTE") / 2, 129, &FONT_XS, "OCT+ PASTE", C_DIM);
+        cv_text(228 - text_w(&FONT_XS, "REC CLEAR"), 129, &FONT_XS, "REC CLEAR", C_DIM);
+    }
     if (seq.next != SEQ_NO_PATTERN) {
         cv_text(150, 24, &FONT_XS, "NEXT", C_GRAY);
         int_text(seq.next + 1, t);
@@ -6236,6 +6327,7 @@ void app_host_reboot(void)
     fx_page = PAGE_FX_HALL;
     memset(seq_midi_sent, 0, sizeof seq_midi_sent);   /* (every track's) */
     seq_midi_owed = 0;
+    memset(&chain, 0, sizeof chain);         /* (0.41: a chain is RAM's, gone at power-off) */
 }
 
 int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, const char *d)
@@ -6340,6 +6432,10 @@ int app_expect(const char *what, int *got)
         *got = ui.shown_ext;
     else if (!strcmp(what, "pattern"))       /* the pattern playing, 0..15; the next (-1: none); unsaved edits */
         *got = seq.pattern;
+    else if (!strcmp(what, "chain_n"))       /* (0.41) the chain: its patterns, the one playing (-1: its first queued) */
+        *got = chain.n;
+    else if (!strcmp(what, "chain_pos"))
+        *got = chain.pos;
     else if (!strcmp(what, "clip"))          /* (0.40) a copy to paste (1), its pattern (clip_from, -1 not known) */
         *got = bank_pattern(&bank, BANK_CLIP) != 0;
     else if (!strcmp(what, "clip_from"))

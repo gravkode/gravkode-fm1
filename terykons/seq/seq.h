@@ -153,6 +153,8 @@ typedef struct {
     volatile uint8_t next_ready;
     volatile uint32_t edits, saved;
     uint32_t pat_steps;                  /* steps since the pattern began */
+    volatile uint32_t turns;             /* (0.41) the patterns' ends so far (each a loop, or the next one in): the
+                                          * app's chains follow them */
     volatile uint8_t want;               /* SEQ_WANT_* */
     volatile uint8_t playing;
     volatile uint8_t ext;                /* following MIDI clock in (one came in the last half second) */

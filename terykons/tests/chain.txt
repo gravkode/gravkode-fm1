@@ -1,0 +1,128 @@
+# Chains (0.41): HOME held, white keys one after another (repeats too): those patterns in that order, round, each
+# coming in at the end of the one before (here empty patterns: 16 steps, 2 s at 120 BPM). Stopped, the first at once;
+# playing, queued. Stopping takes it back to its first. One pattern picked by hand (HOME and one key, K4, a MIDI
+# program change) ends the chain. The grid shows it: CHAIN and its patterns, the one playing lit.
+#   terykons/build/host/terykons_host terykons/tests/chain.txt terykons/build/host
+wait 600
+expect chain_n 0
+# stopped: 1, 1, 2, 3
+listen
+press HOME
+wait 400
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+wait 30
+key 4 down 100 0
+wait 30
+key 4 up
+wait 100
+shot chain-build.png
+release HOME
+wait 30
+said CHAIN 1 1 2 3
+expect chain_n 4
+expect chain_pos 0
+expect pattern 0
+expect page 8
+# playing: 1 (0..2 s), 1 again (2..4 s), 2 (4..6 s), 3 (6..8 s), 1 (8..10 s)
+tap PLAY
+wait 1000
+expect pattern 0
+expect chain_pos 0
+wait 2000
+expect pattern 0
+expect chain_pos 1
+wait 2000
+expect pattern 1
+expect chain_pos 2
+press HOME
+wait 400
+shot chain-playing.png
+release HOME
+wait 1600
+expect pattern 2
+expect chain_pos 3
+wait 2000
+expect pattern 0
+expect chain_pos 0
+expect seq_playing 1
+# stopped in the middle (on 2): back to the chain's first
+wait 2000
+expect pattern 0
+expect chain_pos 1
+wait 2000
+expect chain_pos 2
+expect pattern 1
+tap PLAY
+wait 300
+expect seq_playing 0
+expect pattern 0
+expect chain_pos 0
+expect chain_n 4
+# one pattern by hand: the chain gone
+press HOME
+wait 30
+key 6 down 100 0
+wait 30
+key 6 up
+release HOME
+wait 300
+expect chain_n 0
+expect pattern 3
+# made while playing: its first queued (-1), in at the end of the one playing, then round
+tap PLAY
+wait 500
+press HOME
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+wait 30
+key 4 down 100 0
+wait 30
+key 4 up
+release HOME
+wait 30
+expect chain_n 2
+expect chain_pos -1
+expect pattern 3
+wait 2000
+expect pattern 1
+expect chain_pos 0
+wait 2000
+expect pattern 2
+expect chain_pos 1
+wait 2000
+expect pattern 1
+expect chain_pos 0
+# K4: one pattern, the chain gone
+turn K4 1
+wait 30
+expect chain_n 0
+# a MIDI program change too
+press HOME
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+key 2 down 100 0
+wait 30
+key 2 up
+release HOME
+wait 30
+expect chain_n 2
+midi C0 05
+wait 30
+expect chain_n 0
+tap PLAY
+wait 300
