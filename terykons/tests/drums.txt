@@ -53,6 +53,8 @@ expect_out USB 84 3C 00
 # HOME again: D1's DRUM page, its own: TUNE (a half semitone a detent, from the middle), DECAY, TONE
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 said PAGE DRUM
 expect tune 50
@@ -242,6 +244,8 @@ expect osc0 40
 expect step0 1
 expect tune 50
 # 0.18's settings (the drums on Plaits' three knobs): TUNE as the note, SHAPE from HARMONICS, TONE as saved
+tap HOME
+wait 30
 tap HOME
 wait 30
 expect page 0

@@ -6,6 +6,8 @@
 wait 600
 tap HOME
 wait 30
+tap HOME
+wait 30
 turn ALGO -1
 wait 60
 key 7 down 100 0

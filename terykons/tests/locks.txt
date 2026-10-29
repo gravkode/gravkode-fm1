@@ -29,6 +29,8 @@ expect locks 0
 # the OSC page: step 1 held (white key 1), K1 turned: TIMBRE locked on it, heard while it is held
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 key 0 down 100 0
 wait 30
@@ -104,6 +106,8 @@ wait 130
 tap REC
 wait 20
 said REC LIVE
+tap HOME
+wait 30
 tap HOME
 wait 20
 expect page 0

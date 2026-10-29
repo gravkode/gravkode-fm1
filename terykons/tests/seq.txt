@@ -250,6 +250,8 @@ expect page 8
 expect step_mode 0
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 tap SEQ
 wait 30

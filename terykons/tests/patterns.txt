@@ -49,6 +49,8 @@ said PATTERN 2
 # HOME tapped: OSC, then the first extra sound page
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 tap HOME
 wait 30

@@ -20,6 +20,8 @@ expect wave 1
 # HOME again: OSC (the sound), from SEQ
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 turn K3 3
 wait 300
@@ -45,6 +47,8 @@ wait 30
 tap HOME
 wait 30
 expect page 8
+tap HOME
+wait 30
 tap HOME
 wait 30
 expect page 0

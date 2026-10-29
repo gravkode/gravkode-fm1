@@ -31,6 +31,8 @@ expect trk_engine0 0
 # OSC (HOME again): S2's knobs; S1's stay as they were
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 turn K1 10
 wait 30

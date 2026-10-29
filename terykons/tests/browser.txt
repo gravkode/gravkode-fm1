@@ -114,6 +114,8 @@ expect store_writes 0
 # a page's button closes it, keeping the sound (and opens its page)
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect browser 0
 expect page 0
 # a sound changed after its preset (OSC's K1): the name kept, marked *; loaded anew: not

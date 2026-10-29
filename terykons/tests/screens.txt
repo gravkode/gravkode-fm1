@@ -4,6 +4,8 @@
 wait 900
 # HOME again (from SEQ): the OSC page at rest, Waveshaping
 tap HOME
+wait 30
+tap HOME
 wait 400
 shot screen-osc.png
 # a chord on CHORDS (five on from Waveshaping, in ALGO's order), its CHORD knob just turned (grown, lit)
@@ -403,6 +405,14 @@ key 4 up
 wait 30
 tap EDIT
 wait 30
+# (0.36.2) HOME's next page (from the terricons, HOME again): TEMPO, SWING, LENGTH as knobs
+tap SEQ
+wait 30
+tap HOME
+wait 30
+tap HOME
+wait 400
+shot screen-tempo.png
 # (0.36) the splash at power-on: the logo, as the FM-1 draws it
 splash
 shot screen-logo.png

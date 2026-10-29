@@ -95,7 +95,7 @@ From the top:
 | SELECT (knob) | The track: S1 to S4, then D1 to D4, on every page (the keys, MIDI in, PRESET, OSC, VOICES and the steps are for it); while step recording, the step |
 | K1, K2, K3 | The page's three parameters (the GLO page: its settings) |
 | K4 | The pattern: the next one (section 5) |
-| HOME | HOME's terricons (every track, 0.28) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
+| HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (section 5) |
 | LFO | The MOD page: LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: ATTACK, DECAY, RELEASE |
 | GLO | The GLO page: VOICES, VELOCITY, METRONOME; again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
@@ -110,7 +110,7 @@ From the top:
 | SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: HALL, TAPE,
-ECHO; ARP: ARP, ARP 2; HOME: SEQ, OSC; GLO: GLO, DEBUG).
+ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, DEBUG).
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when Terykons starts but its USB can't be reached.
@@ -123,7 +123,15 @@ chip's update mode, a way to install when Terykons starts but its USB can't be r
 
 The sequencer's page, Terykons' main one: section 5.
 
-### OSC (HOME again)
+### TEMPO (HOME again, 0.36.2)
+
+![The TEMPO page: TEMPO 123, SWING 58%, LENGTH 16 as knobs; HOME NEXT PAGE in the bottom band](img/screen-tempo.png "TEMPO")
+
+From HOME's terricons, HOME again shows the song's time as knobs: **TEMPO** (K1, 30 to 300 BPM, the whole song's),
+**SWING** (K2, the selected track's, grey while it is the pattern's) and **LENGTH** (K3, the selected track's steps,
+1 to 64). They are the knobs HOME's terricons and step mode have too (section 5), shown here. HOME again: OSC.
+
+### OSC (HOME a third time)
 
 The first sound page retains the engine's three main parameters, as on Plaits: **TIMBRE** (K1), **MORPH** (K2) and **HARMONICS** (K3). What each
 does depends on the engine: section 6. They start at 65, 50 and 75.
@@ -248,7 +256,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003601, version 0.36.1](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73003602, version 0.36.2](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 

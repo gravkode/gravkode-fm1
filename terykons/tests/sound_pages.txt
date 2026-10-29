@@ -2,6 +2,8 @@
 wait 600
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 expect sound_pages 3
 expect param0 65

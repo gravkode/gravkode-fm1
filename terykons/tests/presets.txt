@@ -5,6 +5,8 @@ expect preset 0
 expect store_writes 0
 tap HOME
 wait 30
+tap HOME
+wait 30
 listen
 turn PRESET 1
 wait 30
@@ -133,6 +135,8 @@ turn PRESET 2
 wait 30
 expect wave 13
 expect preset 1
+tap HOME
+wait 30
 tap HOME
 wait 30
 expect page 0

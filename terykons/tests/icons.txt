@@ -10,6 +10,8 @@ expect live_w 0
 # OSC (HOME): the icon alive, ~30 frames a second
 tap HOME
 wait 30
+tap HOME
+wait 30
 expect page 0
 expect live_w 38
 key 7 down 100 0
@@ -72,6 +74,8 @@ expect page 8
 # a drum's DRUM and SHAPE pages: the drum's icon
 turn SELECT 4
 wait 1600
+tap HOME
+wait 30
 tap HOME
 wait 30
 expect page 0

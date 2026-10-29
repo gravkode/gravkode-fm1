@@ -130,6 +130,8 @@ enum {
     PAGE_MIXER,                          /* (0.26) SEL: the eight tracks' LEVEL, SEND, mutes; the effect's RETURN */
     PAGE_ARP,                            /* (0.34) ARP: the selected track's arpeggiator: MODE, RATE, OCTAVES */
     PAGE_ARP_2,                          /* ARP again: GATE, HOLD */
+    PAGE_TEMPO,                          /* (0.36.2) HOME again (from HOME's terricons): TEMPO, SWING, LENGTH; again
+                                          * the sound's pages */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_HALL && (p) <= PAGE_FX_ECHO)
@@ -143,7 +145,7 @@ static uint8_t glo_page = PAGE_GLO;
 static uint8_t arp_page = PAGE_ARP;      /* (0.34) the ARP page shown last */
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "HALL", "TAPE", "ECHO", "DEBUG",
                                               "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER", "ARP",
-                                              "ARP 2"};
+                                              "ARP 2", "TEMPO"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -236,7 +238,8 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     [PAGE_SCREEN] = {"THEME", "SKY", ""},
     [PAGE_MIXER] = {"VOL", "SEND", "RETURN"},
     [PAGE_ARP] = {"MODE", "RATE", "OCTAVES"},
-    [PAGE_ARP_2] = {"GATE", "HOLD", ""}
+    [PAGE_ARP_2] = {"GATE", "HOLD", ""},
+    [PAGE_TEMPO] = {"TEMPO", "SWING", "LENGTH"}
 };
 
 /* (0.34) the arpeggiator: a synth track's, its settings its sound's (grav_controls_t.arp; 0 as sounds were before:
@@ -2428,7 +2431,7 @@ static void track_clear(void)
 
 static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
-    return page == PAGE_SEQ || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
+    return page == PAGE_SEQ || page == PAGE_TEMPO || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
            page == PAGE_GLO || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO : page == PAGE_MIXER ? B_SEL :
            IS_ARP_PAGE(page) ? B_ARP : B_FX;
@@ -2437,8 +2440,8 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 /* its blink's period: the first of a button's pages slow, the next faster (FX: HALL, TAPE, ECHO) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_OSC || page == PAGE_SCREEN || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
-           page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
+    return page == PAGE_TEMPO || page == PAGE_SCREEN || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
+           page == PAGE_OSC || page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_DEBUG ? 250u : 1000u;
 }
 
 /* recording live follows the sequencer: once it stops (PLAY, a MIDI stop), no more; the metronome and MIDI in's
@@ -2688,8 +2691,9 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
         app_say("HOME", TRACK_NAME[track_sel]);
         return;
     }
-    if (k == B_HOME) {
-        if (active_page == PAGE_SEQ) sound_activate(0);
+    if (k == B_HOME) {                       /* (0.36.2) HOME's terricons, TEMPO, the sound's pages, round */
+        if (active_page == PAGE_SEQ) active_page = home_page = PAGE_TEMPO;
+        else if (active_page == PAGE_TEMPO) sound_activate(0);
         else if (IS_SOUND_PAGE(active_page)) {
             if (ui.sound_page[track_sel] + 1u < sound_pages()) sound_activate(ui.sound_page[track_sel] + 1u);
             else active_page = home_page = PAGE_SEQ;
@@ -3150,7 +3154,7 @@ static void encoder_turn(uint32_t k, int32_t e)
         app_say("LOCK", "NOT ON THIS PAGE");
     else if ((knob || k == EN_K4) && active_page == PAGE_DEBUG)
         debug_turn(index, e);
-    else if (knob && active_page == PAGE_SEQ)
+    else if (knob && (active_page == PAGE_SEQ || active_page == PAGE_TEMPO))
         seq_turn(index, e);
     else if (k == EN_SELECT)
         select_turn(e);
@@ -3349,7 +3353,7 @@ static void knob_own(uint32_t i, knob_t *k)
     k->centred = 0;
     k->inherit = 0;
     k->value[0] = 0;
-    if (active_page == PAGE_SEQ) {
+    if (active_page == PAGE_SEQ || active_page == PAGE_TEMPO) {   /* (0.36.2: TEMPO's page, HOME's next, the same) */
         static const char *const HELD[3] = {"NOTE", "VELOCITY", "LENGTH"};
         if (ui.step_held >= 0) {
             const seq_step_t *st = &TRK.step[(uint32_t)ui.step_held];
@@ -3652,7 +3656,7 @@ static int list_open(void)
 static int animate_dials(uint32_t now)
 {
     if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page) ||
-          IS_ARP_PAGE(active_page) ||
+          IS_ARP_PAGE(active_page) || active_page == PAGE_TEMPO ||
           active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_SCREEN || active_page == PAGE_MIXER) ||
         ui.splash_until || list_open()) return 0;
     const uint32_t dt = now - ui.dial_at;
@@ -5285,7 +5289,7 @@ static void draw_mixer_band(void)
 /* the page's state, in the bottom band's first line: a sound page's HOME */
 static void draw_status(int32_t y)
 {
-    if (IS_SOUND_PAGE(active_page)) {
+    if (IS_SOUND_PAGE(active_page) || active_page == PAGE_TEMPO) {
         cv_text(8, y + 2, &FONT_T, "HOME  NEXT PAGE", C_GRAY);
         cv_text(232 - text_w(&FONT_T, "HOLD HOME + SELECT  JUMP"), y + 2, &FONT_T, "HOLD HOME + SELECT  JUMP", C_DIM);
     }
