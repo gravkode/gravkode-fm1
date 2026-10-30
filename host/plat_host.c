@@ -504,9 +504,10 @@ void plat_usb_audio_full(int on) { uac_full = on != 0; }
 /* MULTI: as if a computer recorded all along; the tracks of the last render stay in host_trk (an app's test reads
  * them back through plat_usb_tracks) */
 static int uac_multi;
-static int16_t host_trk[APP_BLOCK * PLAT_USB_TRACKS];
+static int16_t host_trk[APP_BLOCK * PLAT_USB_CH];
 void plat_usb_audio_multi(int on) { uac_multi = on != 0; }
 int16_t *plat_usb_tracks(void) { return uac_multi ? host_trk : 0; }
+void plat_usb_tracks_push(void) {}
 #endif
 
 /* flash: one buffer per object, kept across a simulated reboot */

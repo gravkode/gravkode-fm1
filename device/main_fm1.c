@@ -411,10 +411,10 @@ static int log_frame(const uint8_t *p, uint32_t n)
         t5_gap_max = t5_late = t5_run_max = lock_max = 0;
     }
 #if FELUCCA_UAC_CH > 2
-    {   /* USB audio MULTI's costs: the last render's resampling (us), uac_service's time since the last log (us) and
-         * its calls */
-        static const char *const L[3] = {"rs ", " svc ", " n "};
-        const uint32_t v[3] = {uac_rm_us, uac_svc_us / FM1_TICKS_PER_US, uac_svc_n};
+    {   /* USB audio MULTI: the last resampling job's time (us), the input's underruns (packets short of frames) and
+         * the producer's overruns (blocks dropped) since the start */
+        static const char *const L[3] = {"rs ", " under ", " over "};
+        const uint32_t v[3] = {rm.us, uac.underruns, rm.overruns};
         uint32_t i;
         q = b;
         for (i = 0; i < 3u; i++) {
@@ -426,7 +426,6 @@ static int log_frame(const uint8_t *p, uint32_t n)
         }
         *q = 0;
         log_line_send(b);
-        uac_svc_us = uac_svc_n = 0;
     }
 #endif
 #if FM1B_BLE

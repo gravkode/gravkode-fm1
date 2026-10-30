@@ -202,12 +202,27 @@ static volatile uint8_t uac_full;
 void plat_usb_audio_full(int on) { uac_full = (uint8_t)(on != 0); }
 #ifdef PLAT_USB_TRACKS
 #if FELUCCA_UAC_CH > 2
-_Static_assert(PLAT_USB_TRACKS == UA_TRK, "the app's tracks: a USB audio channel each");
+_Static_assert(PLAT_USB_CH == FELUCCA_UAC_CH, "the app's channels: the USB audio input's");
 void plat_usb_audio_multi(int on) { usb_uac_switch((uint32_t)(on != 0)); }
-int16_t *plat_usb_tracks(void) { return uac_multi && uac.feed ? ua_tblk : 0; }   /* (feed: sampled as the render began) */
+int16_t *plat_usb_tracks(void) { return uac_multi && uac.feed ? ua_mblk : 0; }   /* (feed: sampled as the render began) */
+/* the render's frames into the USB ring (usb.c uac_rs_job, in RAM): on the second core when it takes the job, while
+ * this core goes on (the render is over: its jobs are joined, and the job calls nothing in the flash, so the main
+ * loop may turn it off meanwhile); else here */
+void plat_usb_tracks_push(void)
+{
+    void (*volatile job)(uint32_t) = uac_rs_job;        /* (XIP -> RAM: past a call's 23-bit reach) */
+    if (!(uac_multi && uac.feed))
+        return;
+#if FM1B_CPU2
+    if (plat_cpu2_on() && plat_cpu2_run(job, HALF_FRAMES))
+        return;
+#endif
+    job(HALF_FRAMES);
+}
 #else
 void plat_usb_audio_multi(int on) { (void)on; }
 int16_t *plat_usb_tracks(void) { return 0; }
+void plat_usb_tracks_push(void) {}
 #endif
 #endif
 void plat_yield(void)

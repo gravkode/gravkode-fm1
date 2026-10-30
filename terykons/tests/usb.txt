@@ -1,7 +1,8 @@
 # GLO's USB page (0.42): GLO three times (GLO, MIDI, USB). K1 AUDIO: STEREO (as before: the mix to the computer on its
-# inputs 1-2, and the computer's sound through the FM-1) or MULTI (the mix on 1-2 and each track on 3..10, dry, after
-# its fader; 0.42.1: the computer's sound through the FM-1 as in STEREO). The simulator records all along in MULTI:
-# usb_trk<t> is track t's loudest sample in the last render (-1: STEREO). Saved with the settings; older: STEREO.
+# inputs 1-2, and the computer's sound through the FM-1) or MULTI (the mix on 1-2, MASTER aside, and each track on
+# 3..10, dry, after its fader; 0.42.1: the computer's sound through the FM-1 as in STEREO). The simulator records all
+# along in MULTI: usb_trk<t> is track t's loudest sample in the last render, usb_mix the mix's (-1: STEREO). Saved with
+# the settings; older: STEREO.
 #   terykons/build/host/terykons_host terykons/tests/usb.txt terykons/build/host
 wait 600
 expect usb_audio 0
@@ -37,7 +38,7 @@ turn K3 1
 wait 30
 expect usb_audio 0
 expect dirty 0
-# MULTI: silence on every track
+# MULTI: silence on every track and the mix
 turn K1 1
 wait 30
 expect usb_audio 1
@@ -46,15 +47,18 @@ expect dirty 1
 wait 30
 expect usb_trk0 0
 expect usb_trk4 0
-# S1's key: on S1's channel, on no other
+expect usb_mix 0
+# S1's key: on S1's channel and in the mix, on no other
 key 0 down 100 0
 wait 200
 expect usb_trk0 >100
+expect usb_mix >100
 expect usb_trk1 0
 expect usb_trk4 0
 key 0 up
 wait 3000
 expect usb_trk0 0
+expect usb_mix 0
 # D1 (SELECT on it): its hit on its own channel
 turn SELECT 4
 wait 30
@@ -89,6 +93,7 @@ wait 30
 expect usb_audio 0
 said USB AUDIO STEREO
 expect usb_trk0 -1
+expect usb_mix -1
 turn K1 1
 wait 30
 # saved: a restart keeps it

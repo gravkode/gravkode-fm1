@@ -16,7 +16,7 @@
 #include "presets/presets.h"
 #include "presets/store.h"
 #if defined PLAT_USB_TRACKS
-_Static_assert(PLAT_USB_TRACKS == SYNTH_TRACKS, "USB audio MULTI: a channel for each track (fm1.toml usb_audio_tracks)");
+_Static_assert(PLAT_USB_CH == GRAV_USB_CH, "USB audio MULTI: the mix and a channel for each track (fm1.toml usb_audio_tracks)");
 #endif
 
 _Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
@@ -648,7 +648,7 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     const uint32_t ne = seq_block(&seq, n, ev, SEQ_EVENTS);
     uint32_t pos = 0, k = 0;
 #ifdef PLAT_USB_TRACKS
-    int16_t *const trk = plat_usb_tracks();  /* (0.42) USB audio MULTI, recording: each track on its own too */
+    int16_t *const trk = plat_usb_tracks();  /* (0.42) USB audio MULTI, recording: the mix and each track, apart */
 #else
     int16_t *const trk = 0;
 #endif
@@ -656,11 +656,11 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         while (k < ne && ev[k].at <= pos)
             seq_apply(&ev[k++]);
         const uint32_t end = k < ne && ev[k].at < n ? ev[k].at : n;
-        grav_track_out = trk ? trk + SYNTH_TRACKS * pos : 0;
+        grav_usb_out = trk ? trk + GRAV_USB_CH * pos : 0;
         render_span(lr + 2u * pos, end - pos, master_q12, &fx);
         pos = end;
     }
-    grav_track_out = 0;
+    grav_usb_out = 0;
     while (k < ne)
         seq_apply(&ev[k++]);
     {                                        /* the metronome: a click sounding goes on; a beat begins another */
@@ -678,8 +678,12 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
         for (uint32_t i = 0; i < 2u * n; ++i)
             lr[i] = 0;
         if (trk)
-            memset(trk, 0, SYNTH_TRACKS * n * sizeof *trk);
+            memset(trk, 0, GRAV_USB_CH * n * sizeof *trk);
     }
+#ifdef PLAT_USB_TRACKS
+    if (trk)                                 /* (the metronome's click is heard, not sent) */
+        plat_usb_tracks_push();
+#endif
 }
 
 /* n samples of the voices (their LFO, the effect, MASTER), from where the last span left them */
@@ -6595,17 +6599,18 @@ int app_expect(const char *what, int *got)
     }
     else if (!strcmp(what, "midi_clock"))
         *got = set.midi_clock;
-    else if (!strcmp(what, "usb_audio"))     /* (0.42) GLO's USB: AUDIO; a track's loudest sample in the last render's
-                                              * USB audio (usb_trk<track>; -1: not MULTI) */
+    else if (!strcmp(what, "usb_audio"))     /* (0.42) GLO's USB: AUDIO; the loudest sample in the last render's USB
+                                              * audio of a track (usb_trk<track>) or the mix (usb_mix; -1: not MULTI) */
         *got = set.usb_audio;
 #ifdef PLAT_USB_TRACKS
-    else if (!strncmp(what, "usb_trk", 7)) {
+    else if (!strncmp(what, "usb_trk", 7) || !strcmp(what, "usb_mix")) {
         const int16_t *b = plat_usb_tracks();
+        const uint32_t c = what[4] == 'm' ? 0u : 2u + (uint32_t)atoi(what + 7) % SYNTH_TRACKS;
         int peak = -1;
         if (b) {
             peak = 0;
             for (uint32_t i = 0; i < APP_BLOCK; i++) {
-                const int v = b[i * SYNTH_TRACKS + (uint32_t)atoi(what + 7) % SYNTH_TRACKS];
+                const int v = b[i * GRAV_USB_CH + c];
                 if ((v < 0 ? -v : v) > peak)
                     peak = v < 0 ? -v : v;
             }

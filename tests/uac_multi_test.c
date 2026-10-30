@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 /* USB audio MULTI (bsp/chip/usb.c, FELUCCA_UAC_CH 10): the render's blocks at the I2S rate (360 MHz / 8160 =
- * 44,117.647 Hz) into packets at the USB frames' rate (the 44.1 pattern, 44,100 a second), resampled by uac_tap_m.
+ * 44,117.647 Hz) into packets at the USB frames' rate (the 44.1 pattern, 44,100 a second), resampled by uac_rs_job.
  * Thirty simulated seconds, a render's frames landing as it ends (it takes a share of its block's time, up to 95 %,
  * the packets going on meanwhile), the I2S off by up to 200 ppm: the ring's fill stays near its target (nothing
  * dropped, nothing repeated), and sines on the master and the tracks come out clean (their residual against the ideal
- * sine).
+ * sine); a silent channel comes out as exact silence.
  *   cc -O2 -w -Ibsp/chip -Ibsp/boards/fm1 -Idevice tests/uac_multi_test.c -lm && ./a.out */
 #include <math.h>
 #include <stdint.h>
@@ -26,7 +26,7 @@ static void fm1_delay_ms(uint32_t ms) { (void)ms; }
 #define CH FELUCCA_UAC_CH
 static int16_t got[(SECONDS + 1) * 44100 * CH];
 static const double FREQ[CH] = {1000, 2000, 500, 700, 1100, 3000, 5000, 7000, 9000, 11000};
-static const double AMP[CH] = {0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25};
+static const double AMP[CH] = {0.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0};   /* (the last: silent) */
 
 /* the residual of channel c against the best sine at frequency f (Hz at 44,100), over frames a..b: dB under it */
 static double snr(uint32_t c, double f, uint32_t a, uint32_t b)
@@ -51,7 +51,6 @@ static double snr(uint32_t c, double f, uint32_t a, uint32_t b)
  * share of its block's time */
 static int run(double ppm, double load)
 {
-    static int32_t out[2 * HALF_FRAMES];
     const double fs_in = FS_IN * (1.0 + ppm * 1e-6);
     uint32_t frames = 0, blocks = 0, i, c, lo = 0xFFFFFFFFu, hi = 0, fails = 0;
     double t_render = 0, t_packet = 0, in_at = 0, t_tap = 0;
@@ -65,8 +64,8 @@ static int run(double ppm, double load)
     uac_multi = 1;
     printf(" I2S %+.0f ppm, renders taking %.0f %% of their time\n", ppm, load * 100);
     while (t_packet < SECONDS) {
-        if (pending && t_tap <= t_packet) {             /* the render ends: its frames into the ring */
-            uac_tap(out, HALF_FRAMES);
+        if (pending && t_tap <= t_packet) {             /* the render ends: its frames into the ring (the job) */
+            uac_rs_job(HALF_FRAMES);
             pending = 0;
             t_render += HALF_FRAMES / fs_in;
             if (++blocks > 3000) {                      /* (after the loop has settled: ~17 s) */
@@ -75,15 +74,9 @@ static int run(double ppm, double load)
             }
         } else if (!pending && t_render <= t_packet) {  /* a render begins: the next 256 frames at the I2S rate */
             uac_render_start();
-            for (i = 0; i < HALF_FRAMES; i++, in_at += 1) {
-                for (c = 0; c < CH; c++) {
-                    double v = AMP[c] * sin(2 * M_PI * FREQ[c] * in_at / fs_in);
-                    if (c < 2)
-                        out[2 * i + c] = (int32_t)lrint(v * 8388607.0);
-                    else
-                        ua_tblk[i * UA_TRK + c - 2] = (int16_t)lrint(v * 32767.0);
-                }
-            }
+            for (i = 0; i < HALF_FRAMES; i++, in_at += 1)
+                for (c = 0; c < CH; c++)
+                    ua_mblk[i * CH + c] = (int16_t)lrint(AMP[c] * sin(2 * M_PI * FREQ[c] * in_at / fs_in) * 32767.0);
             pending = 1;
             t_tap = t_render + load * HALF_FRAMES / fs_in;
         } else {                                        /* a USB frame: one packet */
@@ -104,6 +97,14 @@ static int run(double ppm, double load)
                                   * slow drift, under 0.01 %, is no fault: far under a wow one would hear) */
         double worst = 1e9, f = FREQ[c];   /* (resampled, its pitch kept: FREQ at 44,100 too) */
         uint32_t w, j;
+        if (AMP[c] == 0) {                              /* silent in: exact silence out */
+            uint32_t nz = 0;
+            for (i = 0; i < frames; i++)
+                nz |= (uint16_t)got[i * CH + c];
+            printf("  ch %2u silent: %s\n", c + 1, nz ? "FAIL not silent" : "silence");
+            if (nz) fails++;
+            continue;
+        }
         for (w = 0; w < 10; w++) {
             const uint32_t a = (SECONDS - 10) * 44100u + w * 44100u;
             double best = -1e9, at = 0, span = 1e-5;

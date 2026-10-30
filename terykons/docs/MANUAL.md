@@ -274,7 +274,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004201, version 0.42.1](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004202, version 0.42.2](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -314,10 +314,11 @@ GLO again opens USB, what the computer gets over the cable (section 10):
 
 | Knob | Setting | Values |
 | --- | --- | --- |
-| K1 | AUDIO | STEREO (left, as it comes, as before 0.42): the mix to the computer on its inputs 1-2, and the computer's sound through the FM-1. MULTI (right): the mix on 1-2 and each track on an input of its own, S1 to S4 on 3 to 6, D1 to D4 on 7 to 10, on the computer's clock (for a DAW: section 10); the computer's sound through the FM-1 as in STEREO (0.42.1; 0.42.0: none) |
+| K1 | AUDIO | STEREO (left, as it comes, as before 0.42): the mix to the computer on its inputs 1-2, and the computer's sound through the FM-1. MULTI (right): the mix on 1-2 and each track on an input of its own, S1 to S4 on 3 to 6, D1 to D4 on 7 to 10, at a fixed level, on the computer's clock (for a DAW: section 10); the computer's sound through the FM-1 as in STEREO (0.42.1; 0.42.0: none) |
 
 A turn reconnects the FM-1 to the computer (about a second): the computer finds it again with its new inputs (an
-app recording from it may need its audio device chosen again). Above the knob every track with its input (the
+app recording from it may need its audio device chosen again). In MULTI a Mac sees one device, Terykons FM-1 with
+10 inputs and 2 outputs (0.42.2; before, the input and the output were two). Above the knob every track with its input (the
 selected one lit; STEREO: a red dash, none of its own); under it what 1-2 carry. Saved with the settings (SAVE);
 settings from before 0.42 are STEREO.
 
@@ -870,9 +871,12 @@ two ways:
   FM-1's speaker and headphones, at MASTER.
 - **MULTI**: a computer records the mix on inputs 1-2 and each of the eight tracks on an input of its own: S1 on 3,
   S2 on 4, S3 on 5, S4 on 6, D1 on 7, D2 on 8, D3 on 9, D4 on 10 (a multitrack in a DAW). A track's input is its
-  voices after its fader (VOL), as it plays in the mix, mono, without the effect (that is on 1-2 alone), and at the same
-  level whatever MASTER says. In MULTI the inputs come on the computer's clock (0.42.1, below), about 7 ms later
-  than in STEREO, and the computer's sound comes through the FM-1 as in STEREO.
+  voices after its fader (VOL), as it plays in the mix, mono, without the effect (that is on 1-2 alone). All ten come
+  at a fixed level whatever MASTER says: 6 dB under what a full MASTER gives the speaker (0.42.2; a hot drum stays
+  clean, where 0.42.0's tracks hit the limiter), on the computer's clock (0.42.1, below), about 7 ms later than in
+  STEREO. They carry the FM-1 alone: the computer's own playback through the FM-1 and the metronome's click are heard
+  but not sent (0.42.2; a DAW monitoring its inputs feeds nothing back), and the computer's sound comes through the
+  FM-1 as in STEREO.
 
 **Recording into a DAW: MULTI.** The FM-1's sound runs on its own clock, about 44,120 Hz by a Mac's (0.045 % fast).
 STEREO sends it so: a DAW that records from the FM-1 and plays through another device drifts from it and breaks
@@ -883,10 +887,12 @@ the effect on) records without a hold. The DAW's sample rate must be 44100 (the 
 output device at 48 kHz, Ableton refuses ("do not share a valid sample rate"); set that device to 44.1 kHz in
 macOS's Audio MIDI Setup, or choose the FM-1 as the output.
 
-In Ableton Live, say: Preferences, Audio: Input Device Terykons FM-1, Output Device the one to hear it through,
-Sample Rate 44100; in Input Config the inputs 1/2 as a stereo pair and 3 to 10 as mono; then an audio track for
+In Ableton Live, say: Preferences, Audio: Input Device Terykons FM-1, Output Device the one to hear it through
+(Terykons FM-1 too, or the Mac's), Sample Rate 44100; in Input Config the inputs 1/2 as a stereo pair and 3 to 10 as mono; then an audio track for
 each, its input the track's (3 for S1 and so on), armed. Monitoring the FM-1's inputs in the DAW while hearing the
-FM-1 itself plays them twice: leave monitoring off, or MASTER down.
+FM-1 itself plays them twice: leave monitoring off, or MASTER down. MULTI costs the FM-1 nothing it can hear: the
+work for the computer runs on its second core, after each block's sound is done (0.42.2; 0.42.1 spent 16 % of the
+first core on it, and a heavy patch with the effect then shed voices and broke up).
 
 Ten channels and the output at 44.1 kHz fill most of the full-speed USB the FM-1 has: they come in whole (checked on
 an FM-1 and macOS, every frame, the output playing); computers other than a Mac are not tested yet.

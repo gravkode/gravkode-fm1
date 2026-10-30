@@ -187,11 +187,16 @@ void plat_usb_audio_full(int on);
  * as without it (the default). A change while plugged in reconnects USB (about a second). Main loop, or app_init
  * (before USB starts: no reconnection) */
 #if defined FM1B_UAC_CH && FM1B_UAC_CH > 2
+#define PLAT_USB_CH FM1B_UAC_CH
 #define PLAT_USB_TRACKS (FM1B_UAC_CH - 2)
 void plat_usb_audio_multi(int on);
-/* during app_render: where its tracks go, PLAT_USB_TRACKS samples a frame (track 0 first), its frames in order from
- * the render's first; NULL when not wanted (stereo, or nobody recording). What the app does not write is silence */
+/* in app_render: where the frames for the computer go, PLAT_USB_CH 16-bit samples a frame (channels 1-2: the mix as
+ * the app wants it there, then its tracks), its frames in order from the render's first; NULL when not wanted (stereo,
+ * or nobody recording). The app writes every sample of every frame, then calls plat_usb_tracks_push() once, at the
+ * end of app_render: the platform takes them from there (on the second core, where there is one, while the render
+ * is over). The master output (the speaker's, MASTER, the computer's playback) is not in them. */
 int16_t *plat_usb_tracks(void);
+void plat_usb_tracks_push(void);
 #endif
 
 /* the keys' velocity and pressure (an app with APP_KEY_SENSE): on, the scan reads the keys on the analog rows and
