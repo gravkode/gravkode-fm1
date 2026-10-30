@@ -81,7 +81,8 @@ hold HOME and turn SELECT to jump.
   its sound, lockable on the steps.
 - **Settings that stay** across a power cycle and a firmware update.
 - **MIDI** in over USB and TRS, out over USB, each track on a channel of its choosing (GLO's MIDI page); the FM-1 is
-  also a **USB sound card**: the mix in stereo, or (MULTI, GLO's USB page) the mix and each track on its own input.
+  also a **USB sound card**: the mix in stereo, or (MULTI, GLO's USB page) the mix and each track on its own input
+  (on a Mac, the DAW's Mic Mode Standard, not Voice Isolation: the manual, section 10).
 - **Two-core voice rendering** and a **DEBUG page** showing average/peak load, worker timing, audio xruns and voice cuts.
 - **A web installer** (Chrome or Edge), and the stock firmware back from the same page.
 

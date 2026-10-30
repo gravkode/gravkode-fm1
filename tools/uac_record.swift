@@ -2,7 +2,10 @@
 // Records an audio input as the macOS driver hands it over (CoreAudio's HAL unit, no resampling), every channel, to
 // a 16-bit WAV: for tools/uac_check.py (ffmpeg's AVFoundation input reorders and drops its buffers under load).
 //   swiftc -O tools/uac_record.swift -o uac_record && ./uac_record "Terykons FM-1" 30 rec.wav
-// Prints the gaps the HAL itself reports (a callback's sample time not following the last one's).
+// Prints the gaps the HAL itself reports (a callback's sample time not following the last one's) and the input's rate
+// by the Mac's clock. As a DAW would read it: UAC_BUFFER=64 (the IO buffer, frames), UAC_CHANNELS=2 (a stereo
+// stream: CoreAudio maps the device's channels), UAC_MAP=7,8 (that pair, by number from 1). A DAW on 1-2 getting
+// scraps where this gets the signal: the DAW's Mic Mode (Voice Isolation), not the device.
 import AudioToolbox
 import CoreAudio
 import Foundation
@@ -64,8 +67,11 @@ let (dev, devName) = findDevice(args[1])
 let seconds = Double(args[2]) ?? 10
 var rate: Float64 = 0
 _ = prop(dev, kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal, &rate)
-let ch = inputChannels(dev)
-print("device   \(devName): \(ch) input channels, \(Int(rate)) Hz")
+let devCh = inputChannels(dev)
+/* UAC_CHANNELS=2: ask the unit for a stereo stream, as a DAW does for its input 1/2 (CoreAudio then maps the device's
+ * channels for us); UAC_MAP=a,b: that pair, by number from 1 */
+let ch = Int(ProcessInfo.processInfo.environment["UAC_CHANNELS"] ?? "") ?? devCh
+print("device   \(devName): \(devCh) input channels, \(Int(rate)) Hz" + (ch != devCh ? "; asking for \(ch)" : ""))
 
 var desc = AudioComponentDescription(componentType: kAudioUnitType_Output, componentSubType: kAudioUnitSubType_HALOutput,
                                      componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
@@ -86,6 +92,11 @@ var fmt = AudioStreamBasicDescription(mSampleRate: rate, mFormatID: kAudioFormat
 st = AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &fmt,
                           UInt32(MemoryLayout<AudioStreamBasicDescription>.size))
 if st != noErr { fail("format: \(st)") }
+if let m = ProcessInfo.processInfo.environment["UAC_MAP"] {
+    var map = m.split(separator: ",").map { Int32($0)! - 1 }
+    let r = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_ChannelMap, kAudioUnitScope_Output, 1, &map, UInt32(4 * map.count))
+    print("map      channels \(m)" + (r == noErr ? "" : " (refused: \(r))"))
+}
 
 let callback: AURenderCallback = { refCon, flags, ts, bus, n, _ in
     let r = Unmanaged<Rec>.fromOpaque(refCon).takeUnretainedValue()
@@ -106,6 +117,11 @@ let callback: AURenderCallback = { refCon, flags, ts, bus, n, _ in
 var cb = AURenderCallbackStruct(inputProc: callback, inputProcRefCon: Unmanaged.passUnretained(rec).toOpaque())
 AudioUnitSetProperty(unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &cb,
                      UInt32(MemoryLayout<AURenderCallbackStruct>.size))
+if let env = ProcessInfo.processInfo.environment["UAC_BUFFER"], var frames = UInt32(env) {   /* the IO buffer, as a DAW sets it */
+    var ba = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyBufferFrameSize, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    let r = AudioObjectSetPropertyData(dev, &ba, 0, nil, 4, &frames)
+    print("buffer   \(frames) frames" + (r == noErr ? "" : " (refused: \(r))"))
+}
 st = AudioUnitInitialize(unit)
 if st != noErr { fail("initialize: \(st)") }
 st = AudioOutputUnitStart(unit)

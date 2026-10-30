@@ -887,6 +887,13 @@ the effect on) records without a hold. The DAW's sample rate must be 44100 (the 
 output device at 48 kHz, Ableton refuses ("do not share a valid sample rate"); set that device to 44.1 kHz in
 macOS's Audio MIDI Setup, or choose the FM-1 as the output.
 
+**On a Mac, the DAW's Mic Mode must be Standard.** macOS gives each app a Mic Mode of its own: Standard, Voice
+Isolation or Wide Spectrum, in Control Center while the app is recording (its orange microphone in the menu bar).
+Voice Isolation works on an interface's first two inputs alone and takes a synth for noise: inputs 3 to 10 record
+cleanly while 1-2 come as near silence, scraps and clicks. Nothing on the FM-1's side changes that: set the DAW's
+Mic Mode to Standard (start the app again if it holds on). The app needs the microphone permission too (System
+Settings, Privacy & Security, Microphone).
+
 In Ableton Live, say: Preferences, Audio: Input Device Terykons FM-1, Output Device the one to hear it through
 (Terykons FM-1 too, or the Mac's), Sample Rate 44100; in Input Config the inputs 1/2 as a stereo pair and 3 to 10 as mono; then an audio track for
 each, its input the track's (3 for S1 and so on), armed. Monitoring the FM-1's inputs in the DAW while hearing the
@@ -895,7 +902,9 @@ work for the computer runs on its second core, after each block's sound is done 
 first core on it, and a heavy patch with the effect then shed voices and broke up).
 
 Ten channels and the output at 44.1 kHz fill most of the full-speed USB the FM-1 has: they come in whole (checked on
-an FM-1 and macOS, every frame, the output playing); computers other than a Mac are not tested yet.
+an FM-1 and macOS, every frame, the output playing); computers other than a Mac are not tested yet. Checked too: the
+ten inputs read alike through CoreAudio's audio unit, a raw HAL IOProc and a stereo client, in Ableton Live 11 (its
+Mic Mode Standard) and in iZotope RX.
 
 Terykons has no Bluetooth or WiFi.
 

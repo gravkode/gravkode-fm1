@@ -457,7 +457,9 @@ static const uint8_t CFG_DESC_PLAIN[] = {D_CFG(CFG_LEN_PLAIN, AUD_NIF), D_AUDIO(
 typedef char cfg_plain_len_ok[sizeof CFG_DESC_PLAIN == CFG_LEN_PLAIN ? 1 : -1];
 #if FELUCCA_UAC_CH > 2
 /* MULTI (uac_multi): as the plain one, the input FELUCCA_UAC_CH channels (L R, then the app's tracks, no place of their
- * own), the audio output as ever (FELUCCA_UAC_OUT). One device, in and out on one clock: a DAW recording from it plays
+ * own: a client mapping the device's channels to a stereo pair by their labels, as CoreAudio's converter does, gets
+ * silence from channels none of which is labelled, and the pair from these), the audio output as ever
+ * (FELUCCA_UAC_OUT). One device, in and out on one clock: a DAW recording from it plays
  * through it. (0.42.0's MULTI had no output: a DAW played through another device, on a clock of its own; the FM-1's
  * runs ~450 ppm fast, and the DAW broke its recordings every few seconds.) The input's endpoint is synchronous (on the
  * computer's clock, as the frames are since 0.42.1: uac_rs_job), the output's adaptive: one clock, so macOS makes one
