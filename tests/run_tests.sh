@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Charles Vestal
-# fm1-base's tests: the platform's pieces on the host (encoder, TRS jack, storage, fastmath, backup and restore, the
+# fm1-base's tests: the platform's pieces on the host (encoder, TRS jack, USB audio MULTI, storage, fastmath, backup and restore, the
 # screen mirror), the tools and web pages for them, the installer against a simulated FM-1, the update path against
 # the template's package (tools/build.py template first), and the template in the simulator (tests/basic.txt).
 #   tests/run_tests.sh
@@ -25,6 +25,8 @@ run() {
 }
 run encoder sh -c "$CC -O2 -w -Ibsp/chip -Ibsp/boards/fm1 -o $OUT/encoder_test tests/encoder_test.c && $OUT/encoder_test"
 run trs sh -c "$CC -O2 -w -Ibsp/chip -Ibsp/boards/fm1 -Idevice -o $OUT/trs_test tests/trs_test.c && $OUT/trs_test"
+# USB audio MULTI (bsp/chip/usb.c): ten channels resampled from the I2S rate to the USB frames', the ring steady, clean
+run uac-multi sh -c "$CC -O2 -w -Ibsp/chip -Ibsp/boards/fm1 -Idevice -o $OUT/uac_multi_test tests/uac_multi_test.c -lm && $OUT/uac_multi_test"
 run storage sh -c "$CC -O2 -w -o $OUT/storage_test tests/storage_test.c && $OUT/storage_test"
 run fastmath sh -c "$CC -O2 -w -o $OUT/fastmath_test tests/fastmath_test.c -lm && $OUT/fastmath_test"
 run installer "$PY" tests/install_test.py

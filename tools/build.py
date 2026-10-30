@@ -40,7 +40,7 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
   usb_audio_in = true        the FM-1 recordable over USB (FM1B_UAC; the default: true)
   usb_audio_out = true       a computer plays through the FM-1 over USB (FM1B_UAC_OUT; the default: true)
   usb_audio_tracks = 8       and MULTI, which the app switches on (plat_usb_audio_multi): the USB audio input with the
-                             master and these tracks, a channel each (1..8; FM1B_UAC_CH = N + 2), no output then.
+                             master and these tracks, a channel each (1..8; FM1B_UAC_CH = N + 2); the output stays.
                              FM1B_UAC_SAW=1 in the environment: a bench build, sawtooths on the tracks' channels
                              (tools/uac_record.swift records them, tools/uac_check.py checks every frame)
   mirror = true              the screen and panel mirrored over USB (FM1B_MIRROR: device/mirror.c; web/mirror/,

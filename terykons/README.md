@@ -64,13 +64,13 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py terykons --release 0.42.0    # terykons/build/terykons-0.42.0.fwsc, identity FM-1_73004200
+    python3 tools/build.py terykons --release 0.42.1    # terykons/build/terykons-0.42.1.fwsc, identity FM-1_73004201
     python3 tools/build.py terykons --web
-    python3 tools/make_site.py terykons terykons/build/terykons-0.42.0.fwsc 0.42.0 terykons/build/site
+    python3 tools/make_site.py terykons terykons/build/terykons-0.42.1.fwsc 0.42.1 terykons/build/site
 
 ## The pictures
 
-    python3 tools/build.py terykons --host --release 0.42.0   # (so GLO shows the version and identity)
+    python3 tools/build.py terykons --host --release 0.42.1   # (so GLO shows the version and identity)
     terykons/build/host/terykons_host terykons/tests/screens.txt terykons/docs/img
     python3 terykons/docs/img/compose.py
 
@@ -79,8 +79,8 @@ Python with Pillow (the fonts).
 A bench build sends sawtooths on the tracks' inputs (3 to 10) instead of the tracks, each frame a value of its own;
 recorded on a Mac, every frame is checked (lost, repeated or changed on the way):
 
-    FM1B_UAC_SAW=1 python3 tools/build.py terykons --release 0.42.0-saw
-    python3 tools/fm1_install.py terykons/build/terykons-0.42.0-saw.fwsc
+    FM1B_UAC_SAW=1 python3 tools/build.py terykons --release 0.42.1-saw
+    python3 tools/fm1_install.py terykons/build/terykons-0.42.1-saw.fwsc
     (GLO three times: USB; K1 to MULTI)
     python3 tools/uac_check.py --record 20
 

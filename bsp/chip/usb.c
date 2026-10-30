@@ -29,8 +29,9 @@
  * fill steers the rate, so it neither runs dry nor overflows.
  * FELUCCA_UAC_CH > 2 (up to 10; 44.1 kHz only, no CDC) adds MULTI: usb_uac_switch presents the USB audio input with
  * FELUCCA_UAC_CH channels instead, the master on 1 and 2 and the app's tracks on the rest (16-bit, one each, from
- * ua_tblk: plat_usb_tracks), and no audio output. 10 channels take 920 of a full-speed frame's 1023 isochronous
- * bytes, ~0.65 of each 1 ms on the wire: the packets are queued at 10 kHz then (main.c), or some miss their frame.
+ * ua_tblk: plat_usb_tracks); the audio output stays. 10 channels take 920 of a full-speed frame's 1023 isochronous
+ * bytes, ~0.65 of each 1 ms on the wire: the packets are queued at 10 kHz then (main.c), or some miss their frame;
+ * with the output's 196 the periodic budget is nearly full (Linux's sum: 886 of 900 us), and macOS takes both.
  * FELUCCA_UAC_SAW=1 (a bench build): sawtooths on the tracks' channels instead, each frame's value its own, so a
  * recording shows every frame lost or repeated (tools/uac_check.py). */
 #include "fm1_usb.h"   /* registers (chip/) */
@@ -150,13 +151,29 @@ static uint32_t ep4tx[UA_MAXF] __attribute__((aligned(4)));
 #define UA_TRK (FELUCCA_UAC_CH - 2u)     /* MULTI: the app's tracks, a channel each */
 #define UAC_MAXP_M (UA_MAXF * 2u * FELUCCA_UAC_CH)
 _Static_assert(UAC_MAXP_M <= 1023u, "an isochronous packet at full speed: 1023 bytes at most");
-static uint16_t ua_trk[UA_N][UA_TRK];    /* the tracks' frames, each beside ua_ring's of the same index */
-static int16_t ua_tblk[HALF_FRAMES * UA_TRK];   /* a render's tracks (plat_usb_tracks), into ua_trk by uac_tap */
+/* MULTI's own ring: each frame every channel's 16-bit sample (the master's L R, then the tracks'), at the USB frames'
+ * rate (uac_tap_m). Deeper than the stereo one: a render's frames land only when it ends, and the packets keep going
+ * meanwhile, so the fill at a render's start is kept near RM_TGT (~7 ms): enough for a render taking nearly all its
+ * time (Terykons' do, with the effect: the stereo ring's ~2.9 ms ran dry past ~35 %, a hold in the recording). Its
+ * places are counted apart (rm_wp, rm_rp: RM_N is no power of two); the fill is ua_w - ua_r, as for stereo */
+#define RM_N 640u
+#define RM_TGT 320u
+_Static_assert(RM_TGT + 32u + HALF_FRAMES + HALF_FRAMES / 64u + 4u <= RM_N, "the ring holds its fill and a render");
+static int16_t rm_ring[RM_N][FELUCCA_UAC_CH];
+static uint32_t rm_wp, rm_rp;            /* the producer's place in it, the consumer's */
+static int16_t ua_tblk[HALF_FRAMES * UA_TRK];   /* a render's tracks (plat_usb_tracks), into rm_ring by uac_tap_m */
 static uint16_t ep4m[UA_MAXF * FELUCCA_UAC_CH] __attribute__((aligned(4)));   /* a MULTI packet */
 static uint8_t uac_multi;                /* 1: presented as MULTI (usb_uac_switch) */
-#define UAC_MULTI uac_multi
+static void uac_rm_prime(uint32_t frames);
+/* MULTI's costs, for the log (device/main_fm1.c): the last render's resampling (us), the time in uac_service since
+ * the log last read it (timer ticks), and its calls (0 on the host) */
+static uint32_t uac_rm_us, uac_svc_us, uac_svc_n;
+#endif
+#ifdef FM1_TICKS_PER_US
+#define UAC_T() fm1_ticks()
 #else
-#define UAC_MULTI 0
+#define UAC_T() 0u
+#define FM1_TICKS_PER_US 1u
 #endif
 static struct {
     volatile uint8_t alt;        /* streaming interface setting: 1 = the host records */
@@ -416,13 +433,26 @@ static const uint8_t DEV_DESC_PLAIN[18] = {D_DEV(0x0110, 0, 0, 0, 0)};
 static const uint8_t CFG_DESC_PLAIN[] = {D_CFG(CFG_LEN_PLAIN, AUD_NIF), D_AUDIO(0)};
 typedef char cfg_plain_len_ok[sizeof CFG_DESC_PLAIN == CFG_LEN_PLAIN ? 1 : -1];
 #if FELUCCA_UAC_CH > 2
-/* MULTI (uac_multi): as the plain one without the audio output, the input FELUCCA_UAC_CH channels (L R, then the app's
- * tracks, no place of their own); bcdDevice 3.90 (+0.80), so that a host never takes it for the stereo one */
+/* MULTI (uac_multi): as the plain one, the input FELUCCA_UAC_CH channels (L R, then the app's tracks, no place of their
+ * own), the audio output as ever (FELUCCA_UAC_OUT). One device, in and out on one clock: a DAW recording from it plays
+ * through it. (0.42.0's MULTI had no output: a DAW played through another device, on a clock of its own; the FM-1's
+ * runs ~450 ppm fast, and the DAW broke its recordings every few seconds.) bcdDevice +0.80: never taken for the stereo
+ * one (3.D0; 0.42.0's 3.90) */
+#if FELUCCA_UAC_OUT
+#define D_AC_M(a)                                                                                    \
+    9, 4, (a), 0, 0, 1, 1, 0, 0,                                                                     \
+    11, 0x24, 1, 0x00, 0x01, 53, 0, 3, (a) + 1, (a) + 2, (a) + 3,   /* AC header: MIDI, both streams */  \
+    12, 0x24, 2, 1, 0x03, 0x06, 0, FELUCCA_UAC_CH, 0x03, 0x00, 0, 0,   /* input terminal 1: L R, the tracks */ \
+    9, 0x24, 3, 2, 0x01, 0x01, 0, 1, 0,                    /* output terminal 2: USB streaming, from 1 */ \
+    12, 0x24, 2, 3, 0x01, 0x01, 0, 2, 0x03, 0x00, 0, 0,    /* input terminal 3: USB streaming, 2 ch */   \
+    9, 0x24, 3, 4, 0x01, 0x03, 0, 3, 0,                    /* output terminal 4: speaker, from 3 */
+#else
 #define D_AC_M(a)                                                                                    \
     9, 4, (a), 0, 0, 1, 1, 0, 0,                                                                     \
     10, 0x24, 1, 0x00, 0x01, 31, 0, 2, (a) + 1, (a) + 2,   /* AC header 1.00: MIDI + audio streaming */ \
     12, 0x24, 2, 1, 0x03, 0x06, 0, FELUCCA_UAC_CH, 0x03, 0x00, 0, 0,   /* input terminal 1: L R, the tracks */ \
     9, 0x24, 3, 2, 0x01, 0x01, 0, 1, 0,                    /* output terminal 2: USB streaming, from 1 */
+#endif
 #define D_AS_M(s)                                                                                    \
     9, 4, (s), 0, 0, 1, 2, 0, 0,                           /* audio streaming, alt 0: no bandwidth */    \
     9, 4, (s), 1, 1, 1, 2, 0, 0,                           /* alt 1: the stream */                      \
@@ -430,9 +460,10 @@ typedef char cfg_plain_len_ok[sizeof CFG_DESC_PLAIN == CFG_LEN_PLAIN ? 1 : -1];
     11, 0x24, 2, 1, FELUCCA_UAC_CH, 2, 16, 1, UAC_RATE & 0xFF, (UAC_RATE >> 8) & 0xFF, UAC_RATE >> 16,          \
     9, 5, 0x84, 0x05, UAC_MAXP_M & 0xFF, UAC_MAXP_M >> 8, 1, 0, 0,   /* EP4 IN isochronous async, 1 ms */ \
     7, 0x25, 1, 0x01, 0, 0, 0,                             /* CS endpoint: sampling frequency control */
-#define CFG_LEN_MULTI (9 + 92 + 63 + 11)
-static const uint8_t DEV_DESC_MULTI[18] = {D_DEV_LO(0x0110, 0, 0, 0, 0x10 + 0x80)};
-static const uint8_t CFG_DESC_MULTI[] = {D_CFG(CFG_LEN_MULTI, 3), D_AC_M(0) D_MIDI(1) D_AS_M(2)};
+#define CFG_LEN_MULTI (9 + 92 + 63 + 11 + 74 * FELUCCA_UAC_OUT)
+static const uint8_t DEV_DESC_MULTI[18] = {D_DEV_LO(0x0110, 0, 0, 0, 0x10 + 0x40 * FELUCCA_UAC_OUT + 0x80)};
+static const uint8_t CFG_DESC_MULTI[] = {D_CFG(CFG_LEN_MULTI, 3 + FELUCCA_UAC_OUT), D_AC_M(0) D_MIDI(1) D_AS_M(2)
+                                         D_ASO(3)};
 typedef char cfg_multi_len_ok[sizeof CFG_DESC_MULTI == CFG_LEN_MULTI ? 1 : -1];
 #endif
 #if FELUCCA_CDC
@@ -848,7 +879,7 @@ static void ep0_service(void)
         }
 #endif
 #if FELUCCA_UAC_OUT
-        if (s[4] == UAC_ASO_IF && wvalue <= 1u && usb.config && !UAC_MULTI) {
+        if (s[4] == UAC_ASO_IF && wvalue <= 1u && usb.config) {
             uo_ep4_reset();
             uo_stream(wvalue);
             goto ack;
@@ -867,7 +898,7 @@ static void ep0_service(void)
         }
 #endif
 #if FELUCCA_UAC_OUT
-        if (s[4] == UAC_ASO_IF && !UAC_MULTI) {
+        if (s[4] == UAC_ASO_IF) {
             static uint8_t alt_o;
             alt_o = uo.alt;
             e0_send(&alt_o, 1, wlength);
@@ -1272,15 +1303,14 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
             rs.w = rs.ph = 0;
         }
 #endif
+#if FELUCCA_UAC_CH > 2
+        if (uac_multi) {                                /* MULTI: its own ring, deeper; the resampler from silence */
+            prime = RM_TGT;
+            uac_rm_prime(prime);
+        } else
+#endif
         for (i = 0; i < prime; i++)
             ua_ring[(r + i) & (UA_N - 1u)] = 0;
-#if FELUCCA_UAC_CH > 2
-        for (i = 0; i < prime; i++) {                   /* (MULTI: the tracks' silence beside it) */
-            uint32_t c;
-            for (c = 0; c < UA_TRK; c++)
-                ua_trk[(r + i) & (UA_N - 1u)][c] = 0;
-        }
-#endif
         RING_PUBLISH();
         ua_w = r + prime;
         uac.fill_min = prime;
@@ -1296,12 +1326,12 @@ static __attribute__((noinline)) void uac_render_start(void)   /* audio ISR, bef
         uac.fill_hi = fill;
 }
 
-static inline int32_t uac_s16(int32_t v)
+static inline __attribute__((always_inline)) int32_t uac_s16(int32_t v)
 {
     return v > 32767 ? 32767 : v < -32768 ? -32768 : v;
 }
 /* a sample as the I2S takes it (24-bit, fm1_audio.h) to 16 bits, rounded */
-static inline int32_t uac_in16(int32_t v) { return uac_s16((v + 128) >> 8); }
+static inline __attribute__((always_inline)) int32_t uac_in16(int32_t v) { return uac_s16((v + 128) >> 8); }
 
 #if FELUCCA_UAC_48K
 /* 44.1 -> 48 kHz (x 160 / 147), one block: each input frame enters the history, then the 1 or 2 output
@@ -1363,36 +1393,194 @@ static __attribute__((noinline)) void uac_tap48(const int32_t *out, uint32_t n)
 #endif
 
 #if FELUCCA_UAC_CH > 2
-/* MULTI: the render's tracks (ua_tblk, the app's through plat_usb_tracks) into ua_trk beside its master frames, from
- * ring index w; ua_tblk cleared for the next render (an app that did not write it this time sends silence) */
-static void uac_tap_tracks(uint32_t w, uint32_t n)
+/* MULTI: the render's frames (the master's, 24-bit in out; the tracks', ua_tblk) into the ring at the USB frames' rate,
+ * not the I2S's. A computer then takes the input on its own clock (44,100 frames a second by its frames), not the
+ * FM-1's (~44,117.6: ~450 ppm fast), as it takes the output (adaptive: on its clock too), so a DAW recording from the
+ * FM-1 and playing through it, or through another device, never drifts from it. (0.42.0 sent the I2S rate, as stereo
+ * does: a DAW broke its recordings every few seconds.) An 8-tap windowed-sinc fractional delay (RM_FIR) over the last
+ * input frames, its step steered by the ring's fill at each render's start, as uac_play steers the output; the
+ * packets carry the 44.1 pattern exactly. All channels alike: in time with each other. ua_tblk is cleared for the next
+ * render. Four frames of latency (~0.1 ms). */
+#define RM_STEP 4296685970LL            /* 2^32 x 44117.647 / 44100: input frames per output frame, Q32 */
+#define RM_TAPS 8
+#define RM_HALF (RM_TAPS / 2)
+#define RM_PH 32
+/* an 8-tap fractional delay: a sinc under a Kaiser window (beta 6), RM_PH + 1 phases (the delay 0 .. 1 frame) with the
+ * coefficients interpolated between them, each summing to 1; tap m weighs input frame (left point - 3 + m). Whatever
+ * the delay, its error (in gain and in time) stays 68 dB under a sine at 1 kHz, 61 at 5, 56 at 10; at 15 kHz the gain
+ * dips up to 1 dB as the delay sweeps (4-point Catmull-Rom: 21 dB at 10 kHz, the highs fluttering). 12 taps (58 dB to
+ * 15 kHz) took ~2.2 ms a render on the FM-1: too much of its time */
+/* Q14 (16384: 1), each row summing to 1; in RAM (.data), out of the XIP cache's way, as the samples are */
+static int16_t RM_FIR[RM_PH + 1][RM_TAPS] = {
+    {0, 0, 0, 16384, 0, 0, 0, 0},
+    {-26, 119, -412, 16356, 448, -128, 29, -2},
+    {-50, 227, -787, 16271, 932, -266, 62, -5},
+    {-69, 324, -1124, 16127, 1449, -412, 97, -8},
+    {-86, 410, -1423, 15927, 1998, -564, 135, -13},
+    {-100, 485, -1684, 15670, 2577, -723, 176, -17},
+    {-111, 548, -1908, 15364, 3182, -886, 218, -23},
+    {-119, 600, -2094, 15003, 3812, -1051, 262, -29},
+    {-124, 641, -2244, 14593, 4463, -1218, 308, -35},
+    {-127, 672, -2360, 14141, 5131, -1383, 353, -43},
+    {-128, 692, -2442, 13644, 5814, -1545, 399, -50},
+    {-127, 703, -2492, 13110, 6507, -1703, 445, -59},
+    {-124, 705, -2512, 12539, 7207, -1853, 489, -67},
+    {-120, 699, -2505, 11939, 7909, -1994, 531, -75},
+    {-114, 685, -2471, 11310, 8610, -2122, 570, -84},
+    {-108, 664, -2414, 10660, 9305, -2237, 606, -92},
+    {-100, 638, -2335, 9989, 9989, -2335, 638, -100},
+    {-92, 606, -2237, 9305, 10660, -2414, 664, -108},
+    {-84, 570, -2122, 8610, 11310, -2471, 685, -114},
+    {-75, 531, -1994, 7909, 11939, -2505, 699, -120},
+    {-67, 489, -1853, 7207, 12539, -2512, 705, -124},
+    {-59, 445, -1703, 6507, 13110, -2492, 703, -127},
+    {-50, 399, -1545, 5814, 13644, -2442, 692, -128},
+    {-43, 353, -1383, 5131, 14141, -2360, 672, -127},
+    {-35, 308, -1218, 4463, 14593, -2244, 641, -124},
+    {-29, 262, -1051, 3812, 15003, -2094, 600, -119},
+    {-23, 218, -886, 3182, 15364, -1908, 548, -111},
+    {-17, 176, -723, 2577, 15670, -1684, 485, -100},
+    {-13, 135, -564, 1998, 15927, -1423, 410, -86},
+    {-8, 97, -412, 1449, 16127, -1124, 324, -69},
+    {-5, 62, -266, 932, 16271, -787, 227, -50},
+    {-2, 29, -128, 448, 16356, -412, 119, -26},
+    {0, 0, 0, 0, 16384, 0, 0, 0},
+};
+static struct {
+    int64_t rel;                 /* Q32: the next output frame's place, from the newest input frame (<= 0) */
+    uint32_t at;                 /* input frames kept (h's next slot: at & 15) */
+    float err;                   /* the fill at a render's start, its distance from RM_TGT, smoothed (frames) */
+    float integ;                 /* the steering's integral: the crystals' difference, learnt (Q16 of step) */
+    int16_t h[FELUCCA_UAC_CH][32];   /* each channel's last 16 input samples, twice (at j and j + 16): a window of
+                                      * RM_TAPS from any of them is in one piece, read in order */
+#if FELUCCA_UAC_SAW
+    uint8_t saw[UA_TRK];         /* (bench: each track channel's sawtooth phase) */
+#endif
+} rm;
+
+static void uac_rm_prime(uint32_t frames)               /* the stream (re)primed: silence ahead, the resampler from it */
 {
     uint32_t i, c;
-    int16_t *t = ua_tblk;
-#if FELUCCA_UAC_SAW
-    /* bench: on track channel c a sawtooth of UA_SAW_P[c] frames (about (c + 3) x 100 Hz, -18 dBFS), phase p being
-     * p x UA_SAW_S - 4096: a value for each frame */
-    static const uint8_t UA_SAW_P[8] = {147, 110, 88, 74, 63, 55, 49, 44};
-    static const uint8_t UA_SAW_S[8] = {55, 74, 93, 110, 130, 148, 167, 186};   /* 8192 / its period, rounded down */
-    static uint8_t saw[UA_TRK];
-    for (i = 0; i < n; i++) {
-        uint16_t *d = ua_trk[(w + i) & (UA_N - 1u)];
-        for (c = 0; c < UA_TRK; c++) {
-            uint32_t p = saw[c];
-            d[c] = (uint16_t)(p * UA_SAW_S[c] - 4096u);
-            saw[c] = (uint8_t)(p + 1u == UA_SAW_P[c] ? 0u : p + 1u);
-        }
+    rm_wp = rm_rp;
+    for (i = 0; i < frames; i++) {
+        for (c = 0; c < FELUCCA_UAC_CH; c++)
+            rm_ring[rm_wp][c] = 0;
+        rm_wp = rm_wp + 1u == RM_N ? 0u : rm_wp + 1u;
     }
-#else
-    for (i = 0; i < n; i++) {
-        uint16_t *d = ua_trk[(w + i) & (UA_N - 1u)];
-        for (c = 0; c < UA_TRK; c++, t++) {
-            d[c] = (uint16_t)*t;
-            *t = 0;
-        }
-    }
+    rm.rel = 0;
+    rm.at = 0;
+    rm.err = rm.integ = 0.0f;
+    for (c = 0; c < FELUCCA_UAC_CH; c++)
+        for (i = 0; i < 32u; i++)
+            rm.h[c][i] = 0;
+}
+
+/* in RAM (.ram_text, calling nothing): out of the XIP cache's way, which the render's code keeps full (from the flash it
+ * took ~2.3 ms a render, ~40 % of its time) */
+#ifndef UAC_RAMFN
+#define UAC_RAMFN __attribute__((section(".ram_text"), noinline, used))
 #endif
-    (void)t;
+static UAC_RAMFN void uac_tap_m(const int32_t *out, uint32_t n)
+{
+    uint32_t w = ua_w, wp = rm_wp, k = 0, i, c;
+    int64_t step;
+    float adj;
+    if (RM_N - (w - ua_r) < n + n / 64u + 4u) {         /* nobody reads: drop the block */
+        uac.overruns++;
+        goto clear;
+    }
+    /* the fill at a render's start jitters by up to a packet and more (the renders and the packets are not in step):
+     * averaged over ~500 renders (3 s); a gentle proportional part and an integral one, which learns the crystals'
+     * steady difference, so the step barely moves from one render to the next (a step changing each render is a
+     * jitter in time) and the fill settles at RM_TGT. Q16 of step per frame of error: fuller, faster through it */
+    rm.err += ((float)uac.fill_min - (float)RM_TGT - rm.err) * 0.002f;
+    rm.integ += rm.err * 0.0002f;
+    rm.integ = rm.integ > 400.0f ? 400.0f : rm.integ < -400.0f ? -400.0f : rm.integ;
+    adj = rm.err * 0.25f + rm.integ;
+    adj = adj > 400.0f ? 400.0f : adj < -400.0f ? -400.0f : adj;
+    step = RM_STEP + (int64_t)(int32_t)(adj * 65536.0f);   /* (Q32: no step in the step) */
+    for (i = 0; i < n; i++) {
+        const uint32_t j = rm.at & 15u;                 /* input frame i into the history (twice) */
+        const int16_t *tr = &ua_tblk[i * UA_TRK];
+        rm.h[0][j] = rm.h[0][j + 16u] = (int16_t)uac_in16(out[2u * i]);
+        rm.h[1][j] = rm.h[1][j + 16u] = (int16_t)uac_in16(out[2u * i + 1u]);
+        for (c = 0; c < UA_TRK; c++)
+            rm.h[2u + c][j] = rm.h[2u + c][j + 16u] = tr[c];
+        rm.at++;
+        rm.rel -= (int64_t)1 << 32;
+        while ((int32_t)(rm.rel >> 32) <= -RM_HALF) {   /* an output frame: its RM_TAPS input frames are in */
+            const uint32_t fr = (uint32_t)rm.rel, p = fr >> 27;
+            const int32_t t = (int32_t)((fr >> 12) & 0x7FFFu);   /* Q15: from phase p to p + 1 */
+            const uint32_t first = (rm.at - 1u + (uint32_t)((int32_t)(rm.rel >> 32) - (RM_HALF - 1))) & 15u;   /* (its oldest) */
+            const int16_t *f0 = RM_FIR[p], *f1 = RM_FIR[p + 1u];
+            /* the coefficients, in registers for every channel; the taps written out (no loop to count: on this core
+             * each instruction counts, ~3 cycles) */
+#define RM_CO(m) const int32_t c##m = f0[m] + (((f1[m] - f0[m]) * t) >> 15)
+            RM_CO(0); RM_CO(1); RM_CO(2); RM_CO(3); RM_CO(4); RM_CO(5); RM_CO(6); RM_CO(7);
+#undef RM_CO
+            int16_t *o = rm_ring[wp];
+            _Static_assert(RM_TAPS == 8, "the taps written out");
+            for (c = 0; c < FELUCCA_UAC_CH; c++) {      /* a channel at a time: one sum, its window in order */
+                const int16_t *x = &rm.h[c][first];     /* (16 x 14 bits in 32: |sum| < 1.4 x 2^29) */
+                const int32_t a = (1 << 13) + c0 * x[0] + c1 * x[1] + c2 * x[2] + c3 * x[3] + c4 * x[4] + c5 * x[5] +
+                                  c6 * x[6] + c7 * x[7];
+                o[c] = (int16_t)uac_s16(a >> 14);
+            }
+#if FELUCCA_UAC_SAW
+            for (c = 0; c < UA_TRK; c++) {
+                /* bench: on track channel c a sawtooth of UA_SAW_P[c] frames (about (c + 3) x 100 Hz, -18 dBFS), made
+                 * per frame sent (not resampled), phase q being q x UA_SAW_S - 4096: a value for each frame */
+                static const uint8_t UA_SAW_P[8] = {147, 110, 88, 74, 63, 55, 49, 44};
+                static const uint8_t UA_SAW_S[8] = {55, 74, 93, 110, 130, 148, 167, 186};
+                const uint32_t q = rm.saw[c];
+                o[2u + c] = (int16_t)(uint16_t)(q * UA_SAW_S[c] - 4096u);
+                rm.saw[c] = (uint8_t)(q + 1u == UA_SAW_P[c] ? 0u : q + 1u);
+            }
+#endif
+            wp = wp + 1u == RM_N ? 0u : wp + 1u;
+            k++;
+            rm.rel += step;
+        }
+    }
+    rm_wp = wp;
+    RING_PUBLISH();
+    ua_w = w + k;
+clear:
+    for (i = 0; i < n * UA_TRK; i++)
+        ua_tblk[i] = 0;
+}
+
+/* MULTI: the next packet's n frames from rm_ring into ep4m (until primed: silence; the ring run dry: its last again) */
+static uint32_t uac_packet_m(uint32_t n)
+{
+    uint32_t r = ua_r, rp = rm_rp, fill, k, i, c;
+    uint16_t *o = ep4m;
+    if (!uac.go) {
+        for (i = 0; i < n * FELUCCA_UAC_CH; i++)
+            o[i] = 0;
+        return n;
+    }
+    fill = ua_w - r;
+    RING_PUBLISH();                                     /* the slots after the index */
+    k = fill < n ? fill : n;
+    for (i = 0; i < n; i++, o += FELUCCA_UAC_CH) {
+        if (i < k) {
+            for (c = 0; c < FELUCCA_UAC_CH; c++)
+                o[c] = (uint16_t)rm_ring[rp][c];
+            rp = rp + 1u == RM_N ? 0u : rp + 1u;
+        } else {
+            for (c = 0; c < FELUCCA_UAC_CH; c++)
+                o[c] = i ? o[(int32_t)c - (int32_t)FELUCCA_UAC_CH] : 0u;
+        }
+    }
+    if (k < n)
+        uac.underruns++;
+    RING_PUBLISH();
+    rm_rp = rp;
+    ua_r = r + k;
+    uac.pkts++;
+    uac.frames += n;
+    return n;
 }
 #endif
 
@@ -1404,6 +1592,15 @@ static __attribute__((noinline)) void uac_tap(const int32_t *out, uint32_t n)   
 #if FELUCCA_UAC_48K
     if (uac.ring48) {
         uac_tap48(out, n);
+        return;
+    }
+#endif
+#if FELUCCA_UAC_CH > 2
+    if (uac_multi) {                                    /* (at the USB frames' rate) */
+        void (*volatile tap)(const int32_t *, uint32_t) = uac_tap_m;   /* (XIP -> RAM: past a call's 23-bit reach) */
+        const uint32_t t0 = UAC_T();
+        tap(out, n);
+        uac_rm_us = (UAC_T() - t0) / FM1_TICKS_PER_US;
         return;
     }
 #endif
@@ -1427,35 +1624,9 @@ static __attribute__((noinline)) void uac_tap(const int32_t *out, uint32_t n)   
         ua_ring[(w + i) & (UA_N - 1u)] = (uint32_t)(uint16_t)uac_in16(out[2u * i]) |
                                          (uint32_t)(uint16_t)uac_in16(out[2u * i + 1u]) << 16;
 #endif
-#if FELUCCA_UAC_CH > 2
-    if (uac_multi)
-        uac_tap_tracks(w, n);
-#endif
     RING_PUBLISH();
     ua_w = w + n;
 }
-
-#if FELUCCA_UAC_CH > 2
-/* MULTI: the packet's n frames into ep4m, the master's (d) and the tracks' (ring index r, k of them from the ring; an
- * underrun repeats the last, none at all is silence) */
-static void uac_spread(const uint32_t *d, uint32_t r, uint32_t k, uint32_t n)
-{
-    uint16_t *o = ep4m;
-    uint32_t i, c;
-    for (i = 0; i < n; i++, o += FELUCCA_UAC_CH) {
-        o[0] = (uint16_t)d[i];
-        o[1] = (uint16_t)(d[i] >> 16);
-        if (k) {
-            const uint16_t *t = ua_trk[(r + (i < k ? i : k - 1u)) & (UA_N - 1u)];
-            for (c = 0; c < UA_TRK; c++)
-                o[2u + c] = t[c];
-        } else {
-            for (c = 0; c < UA_TRK; c++)
-                o[2u + c] = 0;
-        }
-    }
-}
-#endif
 
 /* the next packet into d: 44 / 45 frames (+-1 to hold the ring's fill), from the ring or, until it is
  * primed, silence. An empty ring repeats the last frame. Returns the frame count. */
@@ -1476,13 +1647,13 @@ static uint32_t uac_packet(uint32_t *d)
             n++;
         }
     }
+#if FELUCCA_UAC_CH > 2
+    if (uac_multi)                                      /* (the producer keeps to the 44.1 pattern: uac_tap_m) */
+        return uac_packet_m(n);
+#endif
     if (!uac.go || uac.ring48 != uac.r48) {             /* not primed (at this rate) yet */
         for (i = 0; i < n; i++)
             d[i] = 0;
-#if FELUCCA_UAC_CH > 2
-        if (uac_multi)
-            uac_spread(d, 0, 0, n);
-#endif
         return n;
     }
     if (uac.fill_min > hi) {
@@ -1505,10 +1676,6 @@ static uint32_t uac_packet(uint32_t *d)
             d[i] = last;
     }
     uac.last = d[n - 1u];
-#if FELUCCA_UAC_CH > 2
-    if (uac_multi)
-        uac_spread(d, r, k, n);                         /* (the tracks' frames read before the ring's index moves) */
-#endif
     RING_PUBLISH();
     ua_r = r + k;
     uac.pkts++;
@@ -1596,7 +1763,21 @@ static __attribute__((noinline)) void uac_play(int32_t *out, uint32_t n, uint32_
 }
 #endif
 
+#if FELUCCA_UAC_CH > 2
+static void uac_service_(void);
 static void uac_service(void)
+{
+    const uint32_t t0 = UAC_T();
+    uac_service_();
+    if (uac_multi) {
+        uac_svc_us += UAC_T() - t0;                     /* (ticks: the log turns them into us) */
+        uac_svc_n++;
+    }
+}
+static void uac_service_(void)
+#else
+static void uac_service(void)
+#endif
 {
     uint32_t csr, n;
 #if FELUCCA_UAC_OUT
@@ -1770,7 +1951,7 @@ static void usb_detach(void)
 }
 
 #if FELUCCA_UAC_CH > 2
-/* Present the USB audio input as MULTI (FELUCCA_UAC_CH channels: the master, then the app's tracks; no audio output)
+/* Present the USB audio input as MULTI (FELUCCA_UAC_CH channels: the master, then the app's tracks; the output as ever)
  * or stereo (main loop: at boot before usb_start, or later from a setting). A change while attached drops off the
  * bus; usb_retry attaches again within a second with the other descriptors, and the host enumerates afresh. */
 static void usb_uac_switch(uint32_t on)

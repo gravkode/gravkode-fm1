@@ -50,6 +50,7 @@ final class Rec {
     var cap = 0, frames = 0
     var scratch: UnsafeMutablePointer<Float32>
     var lastTime = -1.0, gaps = 0, gapFrames = 0.0, callbacks = 0, renderErr: OSStatus = 0
+    var t0 = -1.0, h0: UInt64 = 0, t1 = 0.0, h1: UInt64 = 0   /* first and last callback: sample time, host time */
     init(ch: Int, cap: Int) {
         self.ch = ch; self.cap = cap
         buf = .allocate(capacity: cap * ch)
@@ -96,6 +97,8 @@ let callback: AURenderCallback = { refCon, flags, ts, bus, n, _ in
     let t = ts.pointee.mSampleTime
     if r.lastTime >= 0 && t != r.lastTime { r.gaps += 1; r.gapFrames += t - r.lastTime }
     r.lastTime = t + Double(n)
+    if r.t0 < 0 { r.t0 = t; r.h0 = ts.pointee.mHostTime }
+    r.t1 = t; r.h1 = ts.pointee.mHostTime
     let k = min(Int(n), r.cap - r.frames)
     if k > 0 { (r.buf + r.frames * r.ch).update(from: r.scratch, count: k * r.ch); r.frames += k }
     return noErr
@@ -110,6 +113,10 @@ if st != noErr { fail("start: \(st)") }
 Thread.sleep(forTimeInterval: seconds)
 AudioOutputUnitStop(unit)
 AudioUnitUninitialize(unit)
+var tb = mach_timebase_info_data_t()
+mach_timebase_info(&tb)
+let secs = Double(rec.h1 &- rec.h0) * Double(tb.numer) / Double(tb.denom) / 1e9
+if secs > 1 { print(String(format: "rate     %.2f Hz by the Mac's clock (nominal %.0f)", (rec.t1 - rec.t0) / secs, rate)) }
 print("recorded \(rec.frames) frames in \(rec.callbacks) callbacks; HAL gaps \(rec.gaps) (\(Int(rec.gapFrames)) frames)" +
       (rec.renderErr != noErr ? "; render error \(rec.renderErr)" : ""))
 

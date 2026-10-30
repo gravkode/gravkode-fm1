@@ -1764,7 +1764,7 @@ static void glo_turn(uint32_t index, int32_t e)
 }
 
 /* (0.42) GLO's USB: K1 AUDIO, STEREO (the mix to the computer on 1-2, and its sound through the FM-1) or MULTI (the mix
- * on 1-2 and each track on 3..10, dry; nothing played through). USB reconnects (about a second) */
+ * on 1-2 and each track on 3..10, dry; its sound through the FM-1 as ever). USB reconnects (about a second) */
 static void usb_turn(uint32_t index, int32_t e)
 {
     if (index)

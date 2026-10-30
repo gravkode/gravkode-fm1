@@ -21,7 +21,7 @@
  *   FM1B_UAC_RING_POOL 0    1: the USB audio input's 2 KB ring in the pool, its RAM left to the app
  *   FM1B_UAC_OUT 1          USB audio output: the computer plays through the FM-1, mixed after the app, at MASTER
  *   FM1B_UAC_CH 2           more (fm1.toml usb_audio_tracks = N: N + 2, up to 10): MULTI, a USB audio input with the
- *                           master and the app's N tracks, a channel each, and no output (plat_usb_audio_multi);
+ *                           master and the app's N tracks, a channel each; the output stays (plat_usb_audio_multi);
  *                           FM1B_UAC_SAW 1 (a bench build): sawtooths on the tracks' channels (tools/uac_check.py)
  *   FM1B_TRS 1              MIDI in on the TRS jack
  *   APP_TOUCH               velocity and pressure from the keys (lib/touch.h)

@@ -1,7 +1,7 @@
 # GLO's USB page (0.42): GLO three times (GLO, MIDI, USB). K1 AUDIO: STEREO (as before: the mix to the computer on its
 # inputs 1-2, and the computer's sound through the FM-1) or MULTI (the mix on 1-2 and each track on 3..10, dry, after
-# its fader; nothing played through). The simulator records all along in MULTI: usb_trk<t> is track t's loudest sample
-# in the last render (-1: STEREO). Saved with the settings; older settings: STEREO.
+# its fader; 0.42.1: the computer's sound through the FM-1 as in STEREO). The simulator records all along in MULTI:
+# usb_trk<t> is track t's loudest sample in the last render (-1: STEREO). Saved with the settings; older: STEREO.
 #   terykons/build/host/terykons_host terykons/tests/usb.txt terykons/build/host
 wait 600
 expect usb_audio 0
