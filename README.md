@@ -15,8 +15,8 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.41.0**: chains: HOME held, several patterns one after another (1, 1, 2, 3): played in that
-order, round. 0.40.0: patterns copied, pasted and cleared, as on Elektron's machines: HOME held with OCT-
+Current version: **0.41.1**: a chain takes each pattern once, and stopping ends it. 0.41.0: chains: HOME held, several
+patterns one after another (1, 2, 3): played in that order, round. 0.40.0: patterns copied, pasted and cleared, as on Elektron's machines: HOME held with OCT-
 (copy), OCT+ (paste) or REC (clear). 0.39.0: a MIDI page on GLO (GLO again): each track's MIDI channel (1 to 16, or OFF), IN
 (the selected track from any channel, or each track from its own) and CLOCK (OFF, IN, OUT, IN+OUT). 0.38.0: tap tempo: on the TEMPO page (HOME from HOME's terricons) every key taps it, the last
 four beats averaged. 0.37.0: each synth track has its own envelope (ENV) and LFO (MOD), part of its sound: a user
@@ -160,7 +160,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.41.0.fwsc 0.41.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.41.1.fwsc 0.41.1 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -175,7 +175,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.41.0      # terykons/build/terykons-0.41.0.fwsc
+python3 tools/build.py terykons --release 0.41.1      # terykons/build/terykons-0.41.1.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)

@@ -15,8 +15,8 @@
 
 ---
 
-Поточна версія: **0.41.0**: ланцюжки: HOME затиснутий і кілька патернів по черзі (1, 1, 2, 3) грають у
-цьому порядку по колу. 0.40.0: патерни копіюються, вставляються й очищаються, як на Elektron: HOME затиснутий і
+Поточна версія: **0.41.1**: у ланцюжку кожен патерн лише раз, а стоп його скидає. 0.41.0: ланцюжки: HOME затиснутий і
+кілька патернів по черзі (1, 2, 3) грають у цьому порядку по колу. 0.40.0: патерни копіюються, вставляються й очищаються, як на Elektron: HOME затиснутий і
 OCT- (копія), OCT+ (вставка) або REC (очищення). 0.39.0: сторінка MIDI на GLO (GLO ще раз): MIDI-канал кожної доріжки (1–16 або OFF), IN
 (вибрана доріжка з будь-якого каналу або кожна доріжка зі свого) і CLOCK (OFF, IN, OUT, IN+OUT). 0.38.0: tap tempo: на сторінці TEMPO (HOME на сторінці териконів) кожна клавіша
 відстукує темп, береться середнє останніх чотирьох долей. 0.37.0: у кожної синтової доріжки своя обвідна (ENV) і свій LFO (MOD), вони частина її звуку:
@@ -165,7 +165,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.41.0.fwsc 0.41.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.41.1.fwsc 0.41.1 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -180,7 +180,7 @@ Terykons збирається інструментом fm1-base `tools/build.py`
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.41.0      # terykons/build/terykons-0.41.0.fwsc
+python3 tools/build.py terykons --release 0.41.1      # terykons/build/terykons-0.41.1.fwsc
 python3 tools/build.py terykons --host                # симулятор для тестів:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)

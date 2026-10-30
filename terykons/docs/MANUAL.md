@@ -274,7 +274,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004100, version 0.41.0](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004101, version 0.41.1](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -562,10 +562,12 @@ engines, knobs and voices) and the TEMPO are the song's: the same whichever patt
 - **K4** picks the pattern after the one playing (or the one queued), or before it, and shows the sixteen for a
   moment.
 - **A MIDI program change** 0 to 15 (any channel, USB or TRS) picks pattern 1 to 16.
-- **A chain (0.41):** HOME held, white keys one after another (the same one again too, up to 16): those patterns in
-  that order, round, each coming in at the end of the one before. Stopped, it starts from its first at once; playing,
-  its first is queued. The grid's bottom line shows CHAIN and its patterns, the one playing lit. Stopping takes it
-  back to its first. One pattern picked by hand (HOME and one key, K4, a program change) ends it. A chain is not saved.
+- **A chain (0.41):** HOME held, white keys one after another: those patterns in that order, round, each coming in
+  at the end of the one before. Each pattern once (0.41.1): a key pressed again is not added, so a pattern picked
+  twice is still just that pattern. Stopped, it starts from its first at once; playing, its first is queued. The
+  grid's bottom line shows CHAIN and its patterns, the one playing lit. **Stopping ends it** (CHAIN OFF; 0.41.1): the
+  pattern it was on stays. One pattern picked by hand (HOME and one key, K4, a program change) ends it too; to end it
+  and keep playing as you are, HOME and the key of the pattern playing. A chain is not saved.
 - **Copy, paste, clear (0.40)**, as on Elektron's machines, with HOME held: **OCT-** copies the pattern playing (COPY
   and its number at the grid's top), **OCT+** pastes the copy into the pattern playing, **REC** clears it (every
   step, lock, LENGTH and SWING as an empty pattern's). To copy one pattern into another: copy it, pick the other, paste.

@@ -129,9 +129,9 @@ static uint8_t set_dirty;                /* changed since the last save: SAVE is
 static bank_t bank;                      /* the patterns in the flash (seq/bank.h) */
 static int8_t copy_from = -1, clip_from = -1;   /* (0.40) the pattern copied (being, and done); -1: none, or not
                                                 * known (since a restart, the copy kept but not its number) */
-/* (0.41) a chain: HOME held, white keys one after another (repeats too): the patterns in that order, round. pos: the
- * one playing (-1: the first, still queued); turns: the sequencer's pattern ends seen; build: the keys while HOME is
- * held (two or more make the chain when it is let go) */
+/* (0.41) a chain: HOME held, white keys one after another: the patterns in that order, round (0.41.1: each once, a
+ * key again not added; stopping ends it). pos: the one playing (-1: the first, still queued); turns: the sequencer's
+ * pattern ends seen; build: the keys while HOME is held (two or more make the chain when it is let go) */
 #define CHAIN_MAX 16u
 static struct {
     uint8_t n, at[CHAIN_MAX];
@@ -2446,8 +2446,8 @@ static void chain_start(void)
     ui.redraw = 1;
 }
 
-/* each frame: at each pattern's end the chain's next one has come in (or, the same again, loops on); the one after it
- * queued while playing; stopped, back to its first */
+/* each frame: at each pattern's end the chain's next one has come in; the one after it queued while playing;
+ * stopped, the chain over (0.41.1; before, back to its first): the pattern it was on stays, nothing queued */
 static void chain_update(void)
 {
     uint32_t f = plat_lock();
@@ -2458,10 +2458,13 @@ static void chain_update(void)
         chain.playing = (uint8_t)playing;
         return;
     }
-    if (chain.playing && !playing) {         /* stopped: the chain from its start again */
-        chain.pos = 0;
-        pattern_queue(chain.at[0]);
+    if (chain.playing && !playing) {         /* stopped: the chain over */
+        chain.n = 0;
+        chain.playing = 0;
+        pattern_queue(seq.pattern);          /* (its next one no longer queued) */
+        app_say("CHAIN", "OFF");
         ui.redraw = 1;
+        return;
     }
     chain.playing = (uint8_t)playing;
     if (turns != chain.turns) {              /* an end: the next one in (unless it could not come in yet) */
@@ -2548,7 +2551,8 @@ static void patterns(void)
             ui.save_req = 0;
             app_say("SAVED", "");
         }
-        if (seq.next != SEQ_NO_PATTERN && !seq.playing) {   /* stopped: the next one in now */
+        if (seq.next != SEQ_NO_PATTERN && !seq.playing && !(chain.n && chain.playing)) {   /* stopped: the next one in
+                                                       * now (a chain's: not before it has seen the stop, 0.41.1) */
             uint32_t f = plat_lock();
             seq_load(&seq, bank_pattern(&bank, seq.next));
             seq.pattern = seq.next;
@@ -3133,8 +3137,9 @@ static void tempo_tap(void)
     }
     if (ui.tap_n && now - ui.tap_at[ui.tap_n - 1u] > TAP_GAP_MS)
         ui.tap_n = 0;
-    if (ui.tap_n == TAP_TAPS) {
-        memmove(ui.tap_at, ui.tap_at + 1, sizeof ui.tap_at - sizeof ui.tap_at[0]);
+    if (ui.tap_n == TAP_TAPS) {              /* (the oldest out; a loop: the device's C library declares no memmove) */
+        for (uint32_t i = 1; i < TAP_TAPS; i++)
+            ui.tap_at[i - 1u] = ui.tap_at[i];
         ui.tap_n--;
     }
     ui.tap_at[ui.tap_n++] = now;
@@ -3168,7 +3173,11 @@ static void key_down(uint32_t k)
         ui.home_used = 1;
         if (w >= 0 && !chain.bn)             /* the first: that pattern, as before */
             pattern_pick(w);
-        if (w >= 0 && chain.bn < CHAIN_MAX) {   /* (0.41) and the next ones after it: a chain, once HOME is let go */
+        int have = 0;                        /* (0.41.1: each pattern once) */
+        for (uint32_t i = 0; i < chain.bn; i++)
+            have |= chain.build[i] == w;
+        if (w >= 0 && chain.bn < CHAIN_MAX && !have) {   /* (0.41) and the next ones after it: a chain, once HOME is
+                                                          * let go */
             chain.build[chain.bn++] = (uint8_t)w;
             ui.redraw = 1;
         }
