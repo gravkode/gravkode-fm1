@@ -4801,8 +4801,8 @@ static void draw_terricons(int32_t dy, uint32_t now)
 #define LOGO_MS 2200u                        /* (0.36.1) the logo held until then, ms since power-on */
 #endif
 
-/* (0.36) the splash at power-on (plat.h APP_SPLASH): the logo, five terricons in ink before a teal sun on paper,
- * TERYKONS under them, the version under those (0.36.1), kept until LOGO_MS (app_frame). It is drawn before the settings and the theme are read: its own colours. Two bands of the
+/* (0.36) the splash at power-on (plat.h APP_SPLASH): the logo, five terricons in ink on paper (0.43.1: the teal
+ * sun behind them gone), TERYKONS under them, the version under those (0.36.1), kept until LOGO_MS (app_frame). It is drawn before the settings and the theme are read: its own colours. Two bands of the
  * canvas (144 rows at most each) */
 static void splash_heap(int16_t *px, int16_t *py, int32_t x, int32_t base, float h, int32_t half)
 {                                            /* a terricon's outline, still: draw_ridge's shape */
@@ -4822,15 +4822,11 @@ static void splash_band(int32_t dy)          /* (dy: the band's top row less the
 {
     static const int8_t X[5] = {-60, -32, 0, 30, 58};
     static const uint8_t H[5] = {40, 60, 82, 56, 36}, ORDER[5] = {2, 1, 3, 0, 4};   /* (the tallest first) */
-    const uint16_t paper = RGB(250, 244, 232), ink = RGB(36, 32, 40), sun = RGB(60, 210, 185);
+    const uint16_t paper = RGB(250, 244, 232), ink = RGB(36, 32, 40);
     const int32_t base = 134 + dy;
     int16_t px[2 * TC_N + 1], py[2 * TC_N + 1];
     const uint32_t n = 2u * TC_N + 1u;
     cv_rect(0, 0, 240, 240, paper);
-    for (int32_t y = -40; y <= 40; y++) {   /* the sun */
-        const int32_t w = (int32_t)fm_sqrtf((float)(1600 - y * y));
-        cv_rect(120 - w, 84 + dy + y, 2 * w + 1, 1, sun);
-    }
     for (uint32_t o = 0; o < 5u; o++) {      /* the heaps, their gullies a paler ink */
         const uint32_t i = ORDER[o];
         const int32_t half = 26 + H[i] / 6;

@@ -1,6 +1,6 @@
 # Terykons
 
-<p align="center"><img src="terykons/docs/img/screen-logo.png" width="240" alt="Terykons' logo: five terricons in ink before a teal sun, the name under them"></p>
+<p align="center"><img src="terykons/docs/img/screen-logo.png" width="240" alt="Terykons' logo: five terricons in ink, the name under them"></p>
 
 **A polyphonic synthesizer firmware for the M-VAVE FM-1, on all 24 sound engines of Mutable Instruments' Plaits,
 with an echo and the reverb of Mutable Instruments' Beads.**
@@ -15,7 +15,7 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.43.0**: panning: SEL again from the mixer opens PAN, and K1 places the selected track from
+Current version: **0.43.1**: the logo at power-on without the teal sun behind the terricons. 0.43.0: panning: SEL again from the mixer opens PAN, and K1 places the selected track from
 full left to full right (L50, C, R50), a pan pot and a left and right meter for each track; the centre sounds as
 before. 0.42.2: MULTI's work for the computer runs on the second core, after each block's sound (0.42.1
 took 16 % of the first and a heavy patch broke up); its ten inputs at a fixed level with 6 dB of headroom (a hot drum
@@ -172,7 +172,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.43.0.fwsc 0.43.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.43.1.fwsc 0.43.1 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -187,7 +187,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.43.0      # terykons/build/terykons-0.43.0.fwsc
+python3 tools/build.py terykons --release 0.43.1      # terykons/build/terykons-0.43.1.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)

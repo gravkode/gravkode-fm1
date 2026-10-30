@@ -1,6 +1,6 @@
 # Terykons
 
-<p align="center"><img src="terykons/docs/img/screen-logo.png" width="240" alt="Логотип Terykons: п'ять териконів перед бірюзовим сонцем, під ними назва"></p>
+<p align="center"><img src="terykons/docs/img/screen-logo.png" width="240" alt="Логотип Terykons: п'ять териконів чорнилом, під ними назва"></p>
 
 **Поліфонічна прошивка-синтезатор для M-VAVE FM-1 на всіх 24 звукових рушіях Mutable Instruments Plaits,
 з луною й ревербом Mutable Instruments Beads.**
@@ -15,7 +15,7 @@
 
 ---
 
-Поточна версія: **0.43.0**: панорама: SEL ще раз із мікшера відкриває PAN, і K1 ставить вибрану доріжку від
+Поточна версія: **0.43.1**: логотип при ввімкненні без бірюзового сонця за териконами. 0.43.0: панорама: SEL ще раз із мікшера відкриває PAN, і K1 ставить вибрану доріжку від
 крайнього ліва до крайнього права (L50, C, R50), у кожної доріжки пан-регулятор і індикатори зліва й справа; у центрі
 звук як раніше. 0.42.2: робота MULTI для комп'ютера йде на другому ядрі після звуку кожного блоку (0.42.1 брала
 16 % першого, і важкий патч заїкався); десять входів на фіксованому рівні з запасом 6 дБ (гучний барабан лишається
@@ -177,7 +177,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.43.0.fwsc 0.43.0 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.43.1.fwsc 0.43.1 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -192,7 +192,7 @@ Terykons збирається інструментом fm1-base `tools/build.py`
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.43.0      # terykons/build/terykons-0.43.0.fwsc
+python3 tools/build.py terykons --release 0.43.1      # terykons/build/terykons-0.43.1.fwsc
 python3 tools/build.py terykons --host                # симулятор для тестів:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)
