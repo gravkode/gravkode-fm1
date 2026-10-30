@@ -39,6 +39,10 @@ APP_DIR holds the app (app.h, app.c, its sources) and its fm1.toml:
   ble_central = true         and the FM-1 connects to Bluetooth MIDI devices too (FM1B_BLE_CENTRAL), beside a computer
   usb_audio_in = true        the FM-1 recordable over USB (FM1B_UAC; the default: true)
   usb_audio_out = true       a computer plays through the FM-1 over USB (FM1B_UAC_OUT; the default: true)
+  usb_audio_tracks = 8       and MULTI, which the app switches on (plat_usb_audio_multi): the USB audio input with the
+                             master and these tracks, a channel each (1..8; FM1B_UAC_CH = N + 2), no output then.
+                             FM1B_UAC_SAW=1 in the environment: a bench build, sawtooths on the tracks' channels
+                             (tools/uac_record.swift records them, tools/uac_check.py checks every frame)
   mirror = true              the screen and panel mirrored over USB (FM1B_MIRROR: device/mirror.c; web/mirror/,
                              tools/fm1_mirror.py), the panel played from the host; FM1B_MIRROR=1 in the environment
                              builds it in whatever fm1.toml says (an app's demo build), FM1B_POOL_SPARE=N the
@@ -162,6 +166,14 @@ def read_conf(path):
     if pending:
         raise SystemExit(f"{path}:{start}: a list without its ]")
     return conf
+
+
+def uac_flags():
+    """MULTI USB audio (fm1.toml usb_audio_tracks): the device's and the host's flags"""
+    n = int(CONF.get("usb_audio_tracks", 0))
+    if not 0 <= n <= 8:
+        raise SystemExit("usb_audio_tracks: 1..8")
+    return [f"-DFM1B_UAC_CH={n + 2}", *["-DFM1B_UAC_SAW=1"] * (os.environ.get("FM1B_UAC_SAW") == "1")] if n else []
 
 
 def toolchain():
@@ -460,6 +472,7 @@ def build_app():
         v = os.environ.get(flag)    # unset: fm1.toml's, the app's (app.h) or the platform's default (device/unity.c)
         if v in ("0", "1"):
             flags.append(f"-D{flag}={v}")
+    flags += uac_flags()
     flags.append(f'-DFELUCCA_ID="{PRODUCT}"')
     for key, macro in (("usb_manufacturer", "FELUCCA_USB_MANUFACTURER"), ("usb_product", "FELUCCA_USB_PRODUCT")):
         if CONF.get(key):
@@ -782,7 +795,7 @@ def build_host():
     o2_objs = o2_objects(os.environ.get("CC", "cc"), os.environ.get("CXX", "c++"),
                          ["-O2", "-ffp-contract=off", "-std=c99", "-w", "-DPLAT_HOST", *inc_dirs], out / "o2")
     cmd = [os.environ.get("CC", "cc"), "-O2", "-ffp-contract=off", "-std=c99", "-Wall", "-Wextra",
-           "-Wno-unused-function", "-Wno-unused-parameter", "-DPLAT_HOST", *opt_flags(),
+           "-Wno-unused-function", "-Wno-unused-parameter", "-DPLAT_HOST", *opt_flags(), *uac_flags(),
            *(f'-DAPP_VERSION="{VERSION}"', f'-DFELUCCA_ID="{PRODUCT}"') * bool(VERSION),   # (--release: as the FM-1's) *["-DFM1B_BLE=1"] * BLE, *["-DFM1B_BLE_CENTRAL=1"] * (BLE and bool(CONF.get("ble_central"))), *["-DFM1B_WIFI=1"] * WIFI,
            *(f"-I{d}" for d in (SRC / "device", SRC / "include", SRC / "lib", APP, GEN, *(APP / d for d in CONF.get("include", [])))),
            "-o", str(exe), str(SRC / "host" / "plat_host.c"), *o2_objs, "-lm", *host_cxx_runtime()]
@@ -904,7 +917,9 @@ def main():
         v = os.environ.get(env)
         return v == "1" if v in ("0", "1") else bool(CONF.get(key, default))
     parts = [("Bluetooth MIDI", BLE), ("Bluetooth MIDI devices", BLE and bool(CONF.get("ble_central"))), ("WiFi", WIFI),
-             ("USB audio in", on("usb_audio_in", "FM1B_UAC", True)),
+             ("USB audio in" + (f" (MULTI: the master and {CONF['usb_audio_tracks']} tracks"
+                                + (", bench sawtooths" if os.environ.get("FM1B_UAC_SAW") == "1" else "") + ")"
+                                if CONF.get("usb_audio_tracks") else ""), on("usb_audio_in", "FM1B_UAC", True)),
              ("USB audio out", on("usb_audio_out", "FM1B_UAC_OUT", True) and on("usb_audio_in", "FM1B_UAC", True)),
              ("screen mirroring", bool(CONF.get("mirror")) or os.environ.get("FM1B_MIRROR") == "1"), ("backup and restore", bool(CONF.get("backup")) and os.environ.get("FM1B_BACKUP") != "0"),
              ("the second core", CPU2),

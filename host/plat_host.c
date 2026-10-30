@@ -500,6 +500,14 @@ int plat_host_read(uint32_t addr, uint8_t *dst, uint32_t n) { (void)addr, (void)
 void plat_host_patience(uint32_t try_ms, uint32_t total_ms) { (void)try_ms, (void)total_ms; }
 static int uac_full;                            /* plat_usb_audio_full: the render at full level, MASTER after it */
 void plat_usb_audio_full(int on) { uac_full = on != 0; }
+#ifdef PLAT_USB_TRACKS
+/* MULTI: as if a computer recorded all along; the tracks of the last render stay in host_trk (an app's test reads
+ * them back through plat_usb_tracks) */
+static int uac_multi;
+static int16_t host_trk[APP_BLOCK * PLAT_USB_TRACKS];
+void plat_usb_audio_multi(int on) { uac_multi = on != 0; }
+int16_t *plat_usb_tracks(void) { return uac_multi ? host_trk : 0; }
+#endif
 
 /* flash: one buffer per object, kept across a simulated reboot */
 static uint8_t store[OBJ_NOBJ][PLAT_STORE_MAX];

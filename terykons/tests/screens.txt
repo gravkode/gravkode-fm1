@@ -84,6 +84,13 @@ turn K1 -5
 turn SELECT -4
 wait 30
 turn K2 -1
+# USB (GLO again, 0.42): AUDIO MULTI, each track's input on the computer above it; then STEREO again
+tap GLO
+wait 30
+turn K1 1
+wait 1400
+shot screen-usb.png
+turn K1 -1
 # SCREEN (GLO again, 0.25.1): THEME, every palette's swatch under it, the one shown framed
 tap GLO
 wait 1400

@@ -15,6 +15,9 @@
 #include "seq/bank.h"
 #include "presets/presets.h"
 #include "presets/store.h"
+#if defined PLAT_USB_TRACKS
+_Static_assert(PLAT_USB_TRACKS == SYNTH_TRACKS, "USB audio MULTI: a channel for each track (fm1.toml usb_audio_tracks)");
+#endif
 
 _Static_assert(APP_BLOCK <= 256u, "dual-core voice buffers fit APP_BLOCK");
 
@@ -89,7 +92,8 @@ typedef struct {
     uint8_t midi_ch[SYNTH_TRACKS];
     uint8_t midi_in;
     uint8_t midi_clock;
-    uint8_t midi_reserved[2];
+    uint8_t usb_audio;                   /* (0.42, a byte reserved in 0.39..0.41: 0) GLO's USB: AUDIO, 0 STEREO, 1 MULTI */
+    uint8_t midi_reserved;
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to sky (a byte reserved then) */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
@@ -163,7 +167,8 @@ enum {
     PAGE_ARP_2,                          /* ARP again: GATE, HOLD */
     PAGE_TEMPO,                          /* (0.36.2) HOME again (from HOME's terricons): TEMPO, SWING, LENGTH; again
                                           * the sound's pages */
-    PAGE_MIDI,                           /* (0.39) GLO again: the selected track's CHANNEL, IN, CLOCK; again SCREEN */
+    PAGE_MIDI,                           /* (0.39) GLO again: the selected track's CHANNEL, IN, CLOCK; again USB */
+    PAGE_USB,                            /* (0.42) GLO again: USB AUDIO, STEREO or MULTI; again SCREEN */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_HALL && (p) <= PAGE_FX_ECHO)
@@ -177,7 +182,7 @@ static uint8_t glo_page = PAGE_GLO;
 static uint8_t arp_page = PAGE_ARP;      /* (0.34) the ARP page shown last */
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "HALL", "TAPE", "ECHO", "DEBUG",
                                               "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER", "ARP",
-                                              "ARP 2", "TEMPO", "MIDI"};
+                                              "ARP 2", "TEMPO", "MIDI", "USB"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -285,7 +290,8 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     [PAGE_ARP] = {"MODE", "RATE", "OCTAVES"},
     [PAGE_ARP_2] = {"GATE", "HOLD", ""},
     [PAGE_TEMPO] = {"TEMPO", "SWING", "LENGTH"},
-    [PAGE_MIDI] = {"CHANNEL", "IN", "CLOCK"}
+    [PAGE_MIDI] = {"CHANNEL", "IN", "CLOCK"},
+    [PAGE_USB] = {"AUDIO", "", ""}
 };
 static const char *const MIDI_IN_NAME[2] = {"SELECTED", "CHANNELS"};
 static const char *const CLOCK_NAME[4] = {"OFF", "IN", "OUT", "IN+OUT"};
@@ -641,13 +647,20 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     seq_event_t ev[SEQ_EVENTS];
     const uint32_t ne = seq_block(&seq, n, ev, SEQ_EVENTS);
     uint32_t pos = 0, k = 0;
+#ifdef PLAT_USB_TRACKS
+    int16_t *const trk = plat_usb_tracks();  /* (0.42) USB audio MULTI, recording: each track on its own too */
+#else
+    int16_t *const trk = 0;
+#endif
     while (pos < n) {
         while (k < ne && ev[k].at <= pos)
             seq_apply(&ev[k++]);
         const uint32_t end = k < ne && ev[k].at < n ? ev[k].at : n;
+        grav_track_out = trk ? trk + SYNTH_TRACKS * pos : 0;
         render_span(lr + 2u * pos, end - pos, master_q12, &fx);
         pos = end;
     }
+    grav_track_out = 0;
     while (k < ne)
         seq_apply(&ev[k++]);
     {                                        /* the metronome: a click sounding goes on; a beat begins another */
@@ -664,6 +677,8 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     if (synth_audio_mute || synth_ota_mute) {
         for (uint32_t i = 0; i < 2u * n; ++i)
             lr[i] = 0;
+        if (trk)
+            memset(trk, 0, SYNTH_TRACKS * n * sizeof *trk);
     }
 }
 
@@ -789,7 +804,7 @@ static void midi_defaults(settings_t *s)    /* (0.39) as before: S1..S4 on 1..4,
         s->midi_ch[t] = (uint8_t)(t + 1u);
     s->midi_in = MIDI_IN_SELECTED;
     s->midi_clock = CLOCK_BOTH;
-    s->midi_reserved[0] = s->midi_reserved[1] = 0;
+    s->usb_audio = s->midi_reserved = 0;
 }
 
 static void settings_defaults(void)
@@ -904,6 +919,8 @@ static void settings_upgrade(settings_t *s, int loaded)
         }
     if (loaded <= SET_SIZE_037)              /* (before 0.39: MIDI as it was, the tracks on 1..8) */
         midi_defaults(s);
+    if (s->usb_audio > 1u)                   /* (0.42) */
+        s->usb_audio = 0;
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
     if (s->sky == 0 || s->sky > SKY_DAY)     /* (a byte reserved before 0.29; 0.29..0.30.1 kept DAY, their default, as
@@ -1007,6 +1024,9 @@ void app_init(void)
         fx_params[i] = set.fx[i];
     fx_quality = set.fx_quality;
     synth_set_tracks(&synth, set.trk_voices);   /* (before the audio starts: no queue needed) */
+#ifdef PLAT_USB_TRACKS
+    plat_usb_audio_multi(set.usb_audio);     /* (0.42; before USB starts: presented so from the first) */
+#endif
 
     seq_init(&seq);
     seq.bpm = set.bpm;
@@ -1741,6 +1761,23 @@ static void glo_turn(uint32_t index, int32_t e)
         }
         app_say("METRONOME", METRO_NAME[set.metro]);
     }
+}
+
+/* (0.42) GLO's USB: K1 AUDIO, STEREO (the mix to the computer on 1-2, and its sound through the FM-1) or MULTI (the mix
+ * on 1-2 and each track on 3..10, dry; nothing played through). USB reconnects (about a second) */
+static void usb_turn(uint32_t index, int32_t e)
+{
+    if (index)
+        return;
+#ifdef PLAT_USB_TRACKS
+    const uint8_t multi = e > 0;
+    if (multi != set.usb_audio) {
+        set.usb_audio = multi;
+        set_dirty = 1;
+        plat_usb_audio_multi(multi);
+    }
+#endif
+    app_say("USB AUDIO", set.usb_audio ? "MULTI" : "STEREO");
 }
 
 static void channel_text(uint32_t c, char *t)   /* (0.39) a track's MIDI channel: 1..16, or OFF */
@@ -2833,7 +2870,7 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 {
     return page == PAGE_SEQ || page == PAGE_TEMPO || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
-           page == PAGE_GLO || page == PAGE_MIDI || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO :
+           page == PAGE_GLO || page == PAGE_MIDI || page == PAGE_USB || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO :
            page == PAGE_MIXER ? B_SEL :
            IS_ARP_PAGE(page) ? B_ARP : B_FX;
 }
@@ -2841,7 +2878,8 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
 /* its blink's period: the first of a button's pages slow, the next faster (FX: HALL, TAPE, ECHO) */
 static uint32_t page_period(uint32_t page)
 {
-    return page == PAGE_DEBUG ? 125u :       /* (GLO's fourth, 0.39) */
+    return page == PAGE_DEBUG ? 125u :       /* (GLO's fifth, 0.42) */
+           page == PAGE_USB ? 375u :         /* (GLO's third, 0.42) */
            page == PAGE_TEMPO || page == PAGE_MIDI || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
            page == PAGE_OSC || page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_SCREEN ? 250u : 1000u;
 }
@@ -3106,8 +3144,9 @@ static void page_open(uint32_t k)            /* a page's button: its page (HOME,
         return;
     }
     if (k == B_GLO)                          /* GLO: GLO, again DEBUG, and back */
-        glo_page = active_page == PAGE_GLO ? PAGE_MIDI : active_page == PAGE_MIDI ? PAGE_SCREEN :   /* (0.39) */
-                   active_page == PAGE_SCREEN ? PAGE_DEBUG : active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
+        glo_page = active_page == PAGE_GLO ? PAGE_MIDI : active_page == PAGE_MIDI ? PAGE_USB :   /* (0.39, 0.42) */
+                   active_page == PAGE_USB ? PAGE_SCREEN : active_page == PAGE_SCREEN ? PAGE_DEBUG :
+                   active_page == PAGE_DEBUG ? PAGE_GLO : glo_page;
     if (k == B_ARP && IS_ARP_PAGE(active_page))   /* (0.34) ARP again: its other page */
         arp_page = active_page == PAGE_ARP ? PAGE_ARP_2 : PAGE_ARP;
     active_page = k == B_LFO  ? PAGE_MOD :
@@ -3643,6 +3682,8 @@ static void encoder_turn(uint32_t k, int32_t e)
         glo_turn(index, e);
     else if (knob && active_page == PAGE_MIDI)
         midi_turn(index, e);
+    else if (knob && active_page == PAGE_USB)
+        usb_turn(index, e);
     else if (k == EN_K1 && active_page == PAGE_FX_TAPE)
         quality_turn(e);
     else if (knob && IS_ARP_PAGE(active_page))   /* (0.34) */
@@ -3921,6 +3962,16 @@ static void knob_own(uint32_t i, knob_t *k)
         k->frac = (int32_t)theme_at() * 25600 / (int32_t)(THEMES - 1u);
         return;
     }
+    if (active_page == PAGE_USB) {           /* (0.42) K1 AUDIO; K2, K3 none */
+        k->name = PARAM_NAME[PAGE_USB][i];
+        if (i) {
+            k->frac = KNOB_NONE;
+            return;
+        }
+        text_cat(k->value, set.usb_audio ? "MULTI" : "STEREO");
+        k->frac = set.usb_audio ? 25600 : 0;
+        return;
+    }
     if (active_page == PAGE_MIDI) {          /* (0.39) */
         k->name = PARAM_NAME[PAGE_MIDI][i];
         if (i == 0u) {
@@ -4007,7 +4058,8 @@ static void dials_sync(void)
  * radius. (SEQ's are small, in the bottom band: draw_chips) */
 static int32_t knob_row(int32_t *h, int32_t *r)
 {
-    *h = active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_SCREEN ? 84 : 96;
+    *h = active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_USB || active_page == PAGE_SCREEN ?
+         84 : 96;
     *r = 17;
     return 46;
 }
@@ -4157,7 +4209,8 @@ static int animate_dials(uint32_t now)
 {
     if (!(IS_SOUND_PAGE(active_page) || active_page == PAGE_MOD || active_page == PAGE_ENV || IS_FX_PAGE(active_page) ||
           IS_ARP_PAGE(active_page) || active_page == PAGE_TEMPO ||
-          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_SCREEN ||
+          active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_USB ||
+          active_page == PAGE_SCREEN ||
           active_page == PAGE_MIXER) ||
         ui.splash_until || list_open()) return 0;
     const uint32_t dt = now - ui.dial_at;
@@ -4179,6 +4232,8 @@ static int animate_dials(uint32_t now)
     ui.dial_at = now;
     if (active_page == PAGE_SCREEN)          /* (THEME and SKY: K3 none) */
         ui.dial_dirty &= 3u;
+    if (active_page == PAGE_USB)             /* (AUDIO alone) */
+        ui.dial_dirty &= 1u;
     if (!ui.dial_dirty) return 0;
     /* One 80-wide tile of the row per frame (~2.5 ms SPI), even when a preset changes all three values at once. */
     uint32_t dial = ui.dial_next;
@@ -5595,6 +5650,26 @@ static void draw_midi_page(void)
     }
 }
 
+/* (0.42) GLO's USB: K1 AUDIO; above it the computer's input each track comes in on (MULTI: 3..10; STEREO: none, a red
+ * dash), under it what 1-2 carry */
+static void draw_usb_page(void)
+{
+    int32_t h, r;
+    char t[8];
+    draw_dials(knob_row(&h, &r), 1u, 0);
+    for (uint32_t k = 0; k < SYNTH_TRACKS; k++) {
+        const int32_t x = 6 + (int32_t)k * 29;
+        cv_text(x, 26, &FONT_T, TRACK_NAME[k], k == track_sel ? C_HI : C_GRAY);
+        t[0] = '-', t[1] = 0;
+        if (set.usb_audio)
+            int_text((int32_t)k + 3, t);
+        cv_text(x + text_w(&FONT_T, TRACK_NAME[k]) + 2, 26, &FONT_T, t, set.usb_audio ? C_WHITE : C_RED);
+    }
+    cv_text(8, 130, &FONT_XS, "1-2", C_GRAY);
+    cv_text(30, 130, &FONT_XS, set.usb_audio ? "THE MIX; EACH TRACK DRY ON ITS OWN" : "THE MIX; THE COMPUTER PLAYS HERE TOO",
+            C_WHITE);
+}
+
 /* GLO's SCREEN: THEME as a knob; beside it every palette in the knob's order, five a row: a swatch of its two
  * colours and its name, the one shown framed */
 /* GLO's SCREEN: K1 THEME, K2 SKY (0.28); under the knobs every palette's swatch in THEME's order, the one shown
@@ -5959,6 +6034,8 @@ static void draw_page(void)
         draw_glo();
     else if (active_page == PAGE_MIDI)
         draw_midi_page();
+    else if (active_page == PAGE_USB)
+        draw_usb_page();
     else if (active_page == PAGE_SCREEN)
         draw_screen_page();
     else if (active_page == PAGE_DEBUG)
@@ -6518,6 +6595,24 @@ int app_expect(const char *what, int *got)
     }
     else if (!strcmp(what, "midi_clock"))
         *got = set.midi_clock;
+    else if (!strcmp(what, "usb_audio"))     /* (0.42) GLO's USB: AUDIO; a track's loudest sample in the last render's
+                                              * USB audio (usb_trk<track>; -1: not MULTI) */
+        *got = set.usb_audio;
+#ifdef PLAT_USB_TRACKS
+    else if (!strncmp(what, "usb_trk", 7)) {
+        const int16_t *b = plat_usb_tracks();
+        int peak = -1;
+        if (b) {
+            peak = 0;
+            for (uint32_t i = 0; i < APP_BLOCK; i++) {
+                const int v = b[i * SYNTH_TRACKS + (uint32_t)atoi(what + 7) % SYNTH_TRACKS];
+                if ((v < 0 ? -v : v) > peak)
+                    peak = v < 0 ? -v : v;
+            }
+        }
+        *got = peak;
+    }
+#endif
     else if (!strcmp(what, "lock_mode"))     /* (0.35) LOCK mode; the pattern's locks; the steps held; a step's lock
                                               * (lk<step>_<param>, -1 none); a knob heard locked (lkon<param>, -1) */
         *got = ui.lock_mode;

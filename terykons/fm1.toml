@@ -4,6 +4,8 @@ id_prefix = "FM-1_73"          # package identity (each firmware its own; the te
 usb_manufacturer = "Terykons"
 usb_product = "Terykons FM-1"
 include = ["vendor"]
+# (0.42) USB audio MULTI (GLO's USB page): the master on the computer's inputs 1-2 and each track on 3..10
+usb_audio_tracks = 8
 cpu2 = true
 # A failure of the second core (some FM-1s' CPU1 misreads shared RAM now and then) gives it up: that block is
 # silent (dsp/grav_engine.c: the dropped job is never replayed), the render goes on on one core until power-off.

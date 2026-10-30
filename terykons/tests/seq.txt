@@ -143,6 +143,9 @@ wait 30
 expect page 17
 tap GLO
 wait 30
+expect page 18
+tap GLO
+wait 30
 expect page 12
 turn K2 -1
 wait 30

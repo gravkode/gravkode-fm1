@@ -181,6 +181,18 @@ void plat_host_patience(uint32_t try_ms, uint32_t total_ms);   /* each try's wai
  * speaker and headphones only; 0, both at MASTER (the default) */
 void plat_usb_audio_full(int on);
 
+/* USB audio MULTI (fm1.toml usb_audio_tracks = N, 1..8: FM1B_UAC_CH = N + 2): the USB audio input with N + 2 channels,
+ * the master on 1 and 2 and the app's N tracks on the rest (16-bit, 44.1 kHz), and no USB audio output; or stereo,
+ * as without it (the default). A change while plugged in reconnects USB (about a second). Main loop, or app_init
+ * (before USB starts: no reconnection) */
+#if defined FM1B_UAC_CH && FM1B_UAC_CH > 2
+#define PLAT_USB_TRACKS (FM1B_UAC_CH - 2)
+void plat_usb_audio_multi(int on);
+/* during app_render: where its tracks go, PLAT_USB_TRACKS samples a frame (track 0 first), its frames in order from
+ * the render's first; NULL when not wanted (stereo, or nobody recording). What the app does not write is silence */
+int16_t *plat_usb_tracks(void);
+#endif
+
 /* the keys' velocity and pressure (an app with APP_KEY_SENSE): on, the scan reads the keys on the analog rows and
  * hands each reading to the app (app_key_sample, app_key_probe); off by default */
 void plat_sense(int on);

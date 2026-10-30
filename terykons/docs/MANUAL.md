@@ -98,7 +98,7 @@ From the top:
 | HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (several one after another: a chain, 0.41); with OCT-, OCT+, REC: copy, paste, clear it (0.40, section 5) |
 | LFO | The MOD page: the selected synth track's LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: the selected synth track's ATTACK, DECAY, RELEASE |
-| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again MIDI (0.39: the tracks' channels, IN, CLOCK); again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
+| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again MIDI (0.39: the tracks' channels, IN, CLOCK); again USB (0.42: USB AUDIO, STEREO or MULTI, each track on its own channel); again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
 | ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
 | EDIT | LOCK mode (0.35): tap, on or off; held with a white key, that step's locks cleared (section 5). Lit while on (0.32..0.34 free; FREEZE before) |
@@ -110,7 +110,7 @@ From the top:
 | SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: HALL, TAPE,
-ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, MIDI, SCREEN, DEBUG).
+ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, MIDI, USB, SCREEN, DEBUG).
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when Terykons starts but its USB can't be reached.
@@ -274,7 +274,7 @@ page and its row red in step mode; a soloed one shows SOLO. The keys still play 
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004101, version 0.41.1](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004200, version 0.42.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -305,6 +305,21 @@ now. A note out keeps its channel: the note-off goes where its note-on went, the
 note in held goes to the tracks it started on, IN or the selected track changed meanwhile or not. CLOCK OUT turned
 off while the song plays by its own tempo sends a Stop; CLOCK IN turned off while it follows a clock stops it. All
 three are saved with the settings (SAVE); settings from before 0.39 keep MIDI as it was.
+
+### USB (GLO again, 0.42)
+
+![GLO's USB page: AUDIO MULTI; above it each track with the computer's input it comes in on, S1 on 3 to D4 on 10; under it what 1-2 carry](img/screen-usb.png "The USB page")
+
+GLO again opens USB, what the computer gets over the cable (section 10):
+
+| Knob | Setting | Values |
+| --- | --- | --- |
+| K1 | AUDIO | STEREO (left, as it comes, as before 0.42): the mix to the computer on its inputs 1-2, and the computer's sound through the FM-1. MULTI (right): the mix on 1-2 and each track on an input of its own, S1 to S4 on 3 to 6, D1 to D4 on 7 to 10; the computer plays nothing through the FM-1 |
+
+A turn reconnects the FM-1 to the computer (about a second): the computer finds it again with its new inputs (an
+app recording from it may need its audio device chosen again). Above the knob every track with its input (the
+selected one lit; STEREO: a red dash, none of its own); under it what 1-2 carry. Saved with the settings (SAVE);
+settings from before 0.42 are STEREO.
 
 GLO again opens **SCREEN**: K1 THEME picks the screen's colours, at once, from ten palettes: TEAL (as it comes),
 AMBER (Terykons' until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO, each shown under the knobs as
@@ -848,8 +863,20 @@ clock (24 a quarter note) and Stop (CLOCK OUT). No MIDI thru, no CC out.
 
 **MIDI clock in** (USB or TRS, CLOCK IN) leads the sequencer: section 5.
 
-**USB audio:** the FM-1 is also a USB sound card: a computer can record Terykons, and play its own sound through
-the FM-1's speaker and headphones, at MASTER.
+**USB audio:** the FM-1 is also a USB sound card, 16-bit at 44.1 kHz, no driver needed. GLO's USB page (0.42) has
+two ways:
+
+- **STEREO** (as it comes): a computer records the mix (inputs 1-2, at MASTER), and plays its own sound through the
+  FM-1's speaker and headphones, at MASTER.
+- **MULTI**: a computer records the mix on inputs 1-2 and each of the eight tracks on an input of its own: S1 on 3,
+  S2 on 4, S3 on 5, S4 on 6, D1 on 7, D2 on 8, D3 on 9, D4 on 10 (a multitrack in a DAW). A track's input is its
+  voices after its fader (VOL), as it plays in the mix, mono, without the effect (that is on 1-2 alone), and at the same
+  level whatever MASTER says. The computer plays nothing through the FM-1 in MULTI: the cable has no room left.
+
+In Ableton Live, say: Preferences, Audio, the input device Terykons FM-1; in Input Config the inputs 1/2 as a stereo
+pair and 3 to 10 as mono; then an audio track for each, its input the track's (3 for S1 and so on), armed. Ten
+channels at 44.1 kHz fill most of the full-speed USB the FM-1 has: they come in whole (checked on an FM-1 and macOS,
+every frame of 20 s); computers other than a Mac are not tested yet.
 
 Terykons has no Bluetooth or WiFi.
 
@@ -861,7 +888,7 @@ CPU (bottom right) is the smoothed share of each audio block's time used by rend
 the FM-1's cores. With the effect off, the sounding Plaits voices are split between them. With the effect on,
 it runs on the second core, a 24-sample chunk behind the voices, while the first renders them (0.32: its reverb and
 echo alone, about a quarter of what all of Beads took); the voices go to whichever core has room. Nothing is added to the latency,
-and the sound is the same on one core or two. GLO three times opens DEBUG (after GLO and SCREEN), where K1 selects one/two-core processing and K2
+and the sound is the same on one core or two. GLO five times opens DEBUG (after GLO, MIDI, USB and SCREEN), where K1 selects one/two-core processing and K2
 resets peaks and counters. These debug choices are temporary.
 
 Off (both AMOUNTs at 0, its tails died away), the effect is bypassed and costs nothing. If a block takes over 90% of its

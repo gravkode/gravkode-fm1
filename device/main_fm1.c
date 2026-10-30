@@ -167,6 +167,13 @@ void fm1_timer5_irq(void)
             uac_service();
 #endif
     }
+#if FELUCCA_UAC_CH > 2
+    /* MULTI: a packet takes most of a 1 ms frame on the wire (10 channels: 920 bytes, ~0.65 ms), so the next one is
+     * queued at 10 kHz, not 2, or some miss the next frame's IN token (and the host's stream breaks); usb_poll, when
+     * it runs this tick, calls it itself */
+    else if (uac_multi && (!usb_due || fm1b_dbg.in_audio))
+        uac_service();
+#endif
     if (usb_due && !fm1b_dbg.in_audio) {
         usb_due = 0;
         usb_poll();

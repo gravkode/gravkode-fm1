@@ -21,13 +21,13 @@ arpeggiator's, 0.34; LOCK mode on EDIT, the parameter locks, 0.35), the presets'
 | `vendor/` | Plaits, Beads' reverb engine and tape, stmlib, libc++ and newlib headers: [vendor/README.md](vendor/README.md) |
 | `fm1.toml` | Build and site settings: name, identity, the DSP units, their flags, the site's tagline and credits |
 | `words.tsv` | The screen reader's words |
-| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `arp.txt`, `locks.txt`, `envlfo.txt`, `tap.txt`, `midi.txt`, `copy.txt`, `chain.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
+| `tests/` | The simulator's scripts: `basic.txt`, `engines.txt`, `voices.txt`, `fx.txt`, `arp.txt`, `locks.txt`, `envlfo.txt`, `tap.txt`, `midi.txt`, `usb.txt`, `copy.txt`, `chain.txt`, `dual_core.txt`, `six_op_controls.txt`, `seq.txt`, `rec.txt`, `theme.txt`, `mixer.txt`, `browser.txt`, `playback.txt`, `tracks.txt`, `drums.txt`, `patterns.txt`, `icons.txt`, `presets.txt`, `sound_pages.txt`, and `screens.txt` and `icon_sheet.txt` (the manual's and the README's pictures); `seq_test.c` (the sequencer's timing) and `bank_test.c` (the patterns' bank on a flash of its own: a save cut short, damage, wear), `run_seq_test.py`; `presets_test.c` (`run_presets_test.py`); `dual_core_test.cpp` (`run_dual_core_test.py`) |
 | `docs/` | The manual and its pictures (`docs/img/compose.py` makes the README's from them) |
 | `site/landing.md` | The site's front page |
 
 ## Build, test, install
 
-Version 0.14 renders on both cores, with the DEBUG page (GLO three times since 0.25.1); since 0.14.1 the effect runs on the second core,
+Version 0.14 renders on both cores, with the DEBUG page (GLO five times since 0.42: GLO, MIDI, USB, SCREEN, DEBUG); since 0.14.1 the effect runs on the second core,
 a chunk behind the voices.
 K1 switches one/two-core processing; K2 clears peaks and counters. See
 [the debug guide](docs/DUAL_CORE_DEBUG.md) for measurements, automated tests and the device checklist.
@@ -64,15 +64,27 @@ Python with Pillow (the fonts).
 
 ## Release and site
 
-    python3 tools/build.py terykons --release 0.41.1    # terykons/build/terykons-0.41.1.fwsc, identity FM-1_73004101
+    python3 tools/build.py terykons --release 0.42.0    # terykons/build/terykons-0.42.0.fwsc, identity FM-1_73004200
     python3 tools/build.py terykons --web
-    python3 tools/make_site.py terykons terykons/build/terykons-0.41.1.fwsc 0.41.1 terykons/build/site
+    python3 tools/make_site.py terykons terykons/build/terykons-0.42.0.fwsc 0.42.0 terykons/build/site
 
 ## The pictures
 
-    python3 tools/build.py terykons --host --release 0.41.1   # (so GLO shows the version and identity)
+    python3 tools/build.py terykons --host --release 0.42.0   # (so GLO shows the version and identity)
     terykons/build/host/terykons_host terykons/tests/screens.txt terykons/docs/img
     python3 terykons/docs/img/compose.py
+
+## USB audio MULTI on the bench
+
+A bench build sends sawtooths on the tracks' inputs (3 to 10) instead of the tracks, each frame a value of its own;
+recorded on a Mac, every frame is checked (lost, repeated or changed on the way):
+
+    FM1B_UAC_SAW=1 python3 tools/build.py terykons --release 0.42.0-saw
+    python3 tools/fm1_install.py terykons/build/terykons-0.42.0-saw.fwsc
+    (GLO three times: USB; K1 to MULTI)
+    python3 tools/uac_check.py --record 20
+
+`tools/uac_record.swift` records any input as the macOS driver hands it over (`uac_check.py` builds and runs it).
 
 ## Notes
 

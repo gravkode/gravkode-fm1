@@ -14,6 +14,9 @@ extern volatile uint32_t grav_dual_core; /* UI request, sampled once at a block 
 extern volatile uint32_t grav_debug_reset;
 extern volatile float grav_track_peak[SYNTH_TRACKS];   /* (0.26) each track's loudest sample in the last block
                                                         * (its voices', before the effect and MASTER): the meters */
+extern int16_t *grav_track_out;          /* (0.42) set: the next render's tracks there too, SYNTH_TRACKS samples a frame,
+                                          * 16-bit (its voices' after its fader, before the effect, MASTER aside, the
+                                          * limiter as the master's): USB audio MULTI */
 
 typedef struct {
     float gain;                          /* MASTER, glided */

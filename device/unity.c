@@ -20,6 +20,9 @@
  *                           their time (its 4 KB ring in the app's pool; 5.8 ms more latency)
  *   FM1B_UAC_RING_POOL 0    1: the USB audio input's 2 KB ring in the pool, its RAM left to the app
  *   FM1B_UAC_OUT 1          USB audio output: the computer plays through the FM-1, mixed after the app, at MASTER
+ *   FM1B_UAC_CH 2           more (fm1.toml usb_audio_tracks = N: N + 2, up to 10): MULTI, a USB audio input with the
+ *                           master and the app's N tracks, a channel each, and no output (plat_usb_audio_multi);
+ *                           FM1B_UAC_SAW 1 (a bench build): sawtooths on the tracks' channels (tools/uac_check.py)
  *   FM1B_TRS 1              MIDI in on the TRS jack
  *   APP_TOUCH               velocity and pressure from the keys (lib/touch.h)
  *   FM1B_BLE 0              Bluetooth MIDI (fm1.toml ble = true; tools/build.py --no-ble leaves it out)
@@ -83,6 +86,13 @@ static volatile uint32_t fm1_ms;  /* milliseconds since boot (TIMER4-based, TIME
 #define FM1B_UAC_OUT 1            /* the computer plays through the FM-1 (USB audio output) */
 #endif
 #define FELUCCA_UAC_OUT FM1B_UAC_OUT
+#ifndef FM1B_UAC_CH
+#define FM1B_UAC_CH 2             /* the USB audio input's channels in MULTI (2: no MULTI) */
+#endif
+#define FELUCCA_UAC_CH FM1B_UAC_CH
+#ifdef FM1B_UAC_SAW
+#define FELUCCA_UAC_SAW FM1B_UAC_SAW
+#endif
 #ifndef FM1B_UAC_DEEP
 #define FM1B_UAC_DEEP 0           /* 1: the USB audio input holds a half more (renders past ~40 % of their time
                                    * otherwise run its ring dry: holds in the recording); its 4 KB ring in the pool */

@@ -1,0 +1,106 @@
+# GLO's USB page (0.42): GLO three times (GLO, MIDI, USB). K1 AUDIO: STEREO (as before: the mix to the computer on its
+# inputs 1-2, and the computer's sound through the FM-1) or MULTI (the mix on 1-2 and each track on 3..10, dry, after
+# its fader; nothing played through). The simulator records all along in MULTI: usb_trk<t> is track t's loudest sample
+# in the last render (-1: STEREO). Saved with the settings; older settings: STEREO.
+#   terykons/build/host/terykons_host terykons/tests/usb.txt terykons/build/host
+wait 600
+expect usb_audio 0
+expect usb_trk0 -1
+# GLO's round: GLO, MIDI, USB, SCREEN, DEBUG, GLO
+tap GLO
+wait 30
+expect page 3
+tap GLO
+wait 30
+expect page 17
+tap GLO
+wait 30
+expect page 18
+tap GLO
+wait 30
+expect page 12
+tap GLO
+wait 30
+expect page 7
+tap GLO
+wait 30
+expect page 3
+tap GLO
+wait 30
+tap GLO
+wait 30
+expect page 18
+listen
+# K2, K3: none
+turn K2 1
+turn K3 1
+wait 30
+expect usb_audio 0
+expect dirty 0
+# MULTI: silence on every track
+turn K1 1
+wait 30
+expect usb_audio 1
+said USB AUDIO MULTI
+expect dirty 1
+wait 30
+expect usb_trk0 0
+expect usb_trk4 0
+# S1's key: on S1's channel, on no other
+key 0 down 100 0
+wait 200
+expect usb_trk0 >100
+expect usb_trk1 0
+expect usb_trk4 0
+key 0 up
+wait 3000
+expect usb_trk0 0
+# D1 (SELECT on it): its hit on its own channel
+turn SELECT 4
+wait 30
+expect track 4
+key 0 down 100 0
+wait 40
+expect usb_trk4 >100
+expect usb_trk0 0
+expect usb_trk5 0
+key 0 up
+wait 600
+turn SELECT -4
+wait 30
+# its fader: S1 at VOL 0 is silent on its channel (the tracks after their faders)
+tap SEL
+wait 30
+turn K1 -100
+wait 30
+key 0 down 100 0
+wait 200
+expect usb_trk0 0
+key 0 up
+wait 300
+turn K1 100
+wait 30
+tap GLO
+wait 30
+expect page 18
+# STEREO again: no tracks
+turn K1 -1
+wait 30
+expect usb_audio 0
+said USB AUDIO STEREO
+expect usb_trk0 -1
+turn K1 1
+wait 30
+# saved: a restart keeps it
+tap SAVE
+wait 300
+reboot
+wait 600
+expect usb_audio 1
+expect usb_trk0 0
+# settings as 0.37..0.38 saved them: STEREO
+save038
+reboot
+wait 600
+expect usb_audio 0
+expect usb_trk0 -1

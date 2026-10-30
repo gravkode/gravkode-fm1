@@ -169,7 +169,7 @@ expect prs >40
 shot touch.png
 key 7 up
 wait 50
-# no radio: GLO three times opens DEBUG (its second, SCREEN, between), Bluetooth stays off, and the keys go out over
+# no radio: GLO five times opens DEBUG (MIDI, USB and SCREEN between), Bluetooth stays off, and the keys go out over
 # USB alone
 listen
 tap GLO
@@ -178,6 +178,10 @@ tap GLO
 wait 30
 said PAGE MIDI
 expect page 17
+tap GLO
+wait 30
+said PAGE USB
+expect page 18
 tap GLO
 wait 30
 said PAGE SCREEN

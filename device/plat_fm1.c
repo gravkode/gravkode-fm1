@@ -200,6 +200,16 @@ void plat_host_patience(uint32_t try_ms, uint32_t total_ms)
 /* USB audio full: the render at full level for the USB audio input, MASTER after it (main_fm1.c render_block) */
 static volatile uint8_t uac_full;
 void plat_usb_audio_full(int on) { uac_full = (uint8_t)(on != 0); }
+#ifdef PLAT_USB_TRACKS
+#if FELUCCA_UAC_CH > 2
+_Static_assert(PLAT_USB_TRACKS == UA_TRK, "the app's tracks: a USB audio channel each");
+void plat_usb_audio_multi(int on) { usb_uac_switch((uint32_t)(on != 0)); }
+int16_t *plat_usb_tracks(void) { return uac_multi && uac.feed ? ua_tblk : 0; }   /* (feed: sampled as the render began) */
+#else
+void plat_usb_audio_multi(int on) { (void)on; }
+int16_t *plat_usb_tracks(void) { return 0; }
+#endif
+#endif
 void plat_yield(void)
 {
     ble_poll();                                   /* Bluetooth: its notifications go out while the screen draws */

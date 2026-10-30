@@ -15,7 +15,9 @@
 
 ---
 
-Поточна версія: **0.41.1**: у ланцюжку кожен патерн лише раз, а стоп його скидає. 0.41.0: ланцюжки: HOME затиснутий і
+Поточна версія: **0.42.0**: мультитрек по USB: сторінка USB на GLO (GLO тричі), K1 AUDIO на MULTI, і комп'ютер
+записує мікс на своїх входах 1-2, а кожну з восьми доріжок на окремому вході, 3–10 (наприклад, мультитрек в
+Ableton); STEREO як раніше. 0.41.1: у ланцюжку кожен патерн лише раз, а стоп його скидає. 0.41.0: ланцюжки: HOME затиснутий і
 кілька патернів по черзі (1, 2, 3) грають у цьому порядку по колу. 0.40.0: патерни копіюються, вставляються й очищаються, як на Elektron: HOME затиснутий і
 OCT- (копія), OCT+ (вставка) або REC (очищення). 0.39.0: сторінка MIDI на GLO (GLO ще раз): MIDI-канал кожної доріжки (1–16 або OFF), IN
 (вибрана доріжка з будь-якого каналу або кожна доріжка зі свого) і CLOCK (OFF, IN, OUT, IN+OUT). 0.38.0: tap tempo: на сторінці TEMPO (HOME на сторінці териконів) кожна клавіша
@@ -74,7 +76,7 @@ SELECT перемикає їх швидко.
   зберігаються з її звуком, локаються на кроках.
 - **Налаштування зберігаються** після вимкнення й оновлення прошивки.
 - **MIDI:** вхід по USB і TRS, вихід по USB, у кожної доріжки свій канал на вибір (сторінка MIDI на GLO); FM-1 працює
-  і як **USB-звукова карта**.
+  і як **USB-звукова карта**: мікс у стерео або (MULTI, сторінка USB на GLO) мікс і кожна доріжка на окремому вході.
 - **Розрахунок голосів на двох ядрах** і **сторінка DEBUG**: середнє й пікове навантаження, час обробки, пропуски
   аудіо та вимкнення голосів.
 - **Встановлення з браузера** (Chrome або Edge), з тієї ж сторінки можна повернути заводську прошивку.
@@ -94,6 +96,7 @@ SELECT перемикає їх швидко.
 | ENV | ENV (синтової доріжки) | ATTACK (0–2 с) | DECAY (0–2 с, до 70 %) | RELEASE (0–4 с) |
 | GLO | GLO | VOICES доріжки (OFF, MONO, 2, 3, 4; усього чотири) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
 | GLO ще раз | MIDI | CHANNEL: канал доріжки (OFF, 1–16) | IN (SELECTED, CHANNELS) | CLOCK (OFF, IN, OUT, IN+OUT) |
+| GLO ще раз | USB | AUDIO: STEREO (мікс на 1-2, звук комп'ютера через FM-1) або MULTI (мікс на 1-2, кожна доріжка на своєму вході, 3–10) | — | — |
 | GLO ще раз | SCREEN | THEME: кольори екрана (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: небо HOME (OFF, DAY, NIGHT) | — |
 | FX | HALL | AMOUNT (скільки йде в реверб) | TIME (довжина хвоста) | TONE (від темного до яскравого) |
 | FX ще раз | TAPE | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) | DIFFUSE | MOD (рух хвоста) |
@@ -165,7 +168,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.41.1.fwsc 0.41.1 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.42.0.fwsc 0.42.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -180,14 +183,14 @@ Terykons збирається інструментом fm1-base `tools/build.py`
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.41.1      # terykons/build/terykons-0.41.1.fwsc
+python3 tools/build.py terykons --release 0.42.0      # terykons/build/terykons-0.42.0.fwsc
 python3 tools/build.py terykons --host                # симулятор для тестів:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)
 ```
 
 Тести (`terykons/tests/`): `basic.txt` (клавіші, октава, збереження, MIDI), `engines.txt` (усі рушії звучать),
-`voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор), `locks.txt` (параметр-локи), `envlfo.txt` (ENV і LFO кожної синтової доріжки), `tap.txt` (tap tempo), `midi.txt` (сторінка MIDI на GLO: канали, IN, CLOCK), `copy.txt` (копіювання, вставка й очищення патернів), `chain.txt` (ланцюжки),
+`voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор), `locks.txt` (параметр-локи), `envlfo.txt` (ENV і LFO кожної синтової доріжки), `tap.txt` (tap tempo), `midi.txt` (сторінка MIDI на GLO: канали, IN, CLOCK), `usb.txt` (сторінка USB на GLO: STEREO, MULTI, кожна доріжка на своєму вході), `copy.txt` (копіювання, вставка й очищення патернів), `chain.txt` (ланцюжки),
 `seq.txt` (секвенсор), `rec.txt` (живий запис, метроном), `theme.txt` (кольори екрана й небо), `mixer.txt`
 (мікшер), `browser.txt` (терикони HOME, браузер пресетів), `playback.txt` (усі вісім доріжок грають, розподіл
 голосів VOICES), `tracks.txt` (синтові доріжки), `drums.txt` (барабанні доріжки), `patterns.txt` (патерни),

@@ -24,6 +24,7 @@ grav_debug_t grav_debug;
 volatile uint32_t grav_dual_core = 1;
 volatile uint32_t grav_debug_reset;
 volatile float grav_track_peak[SYNTH_TRACKS];
+int16_t *grav_track_out;
 
 /* The render, on one core or two (CPU0: the audio interrupt; CPU1: the worker, one job at a time).
  *   The effect off: CPU1 renders its share of the voices for the whole block in one job while CPU0 renders the
@@ -349,6 +350,8 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
     }
     if (failed) {                        /* CPU1 given up mid-job (cpu2_fallback): this block is lost, one core on */
         memset(lr, 0, 2u * n * sizeof *lr);
+        if (grav_track_out)
+            memset(grav_track_out, 0, SYNTH_TRACKS * n * sizeof *grav_track_out);
         return;
     }
 
@@ -378,6 +381,22 @@ void grav_engine_render_tracks(grav_engine_t *e, int32_t *lr, uint32_t n, synth_
         e->gain += (gain - e->gain) * 0.004f;   /* MASTER glides: no step in the sound */
         lr[2 * i] = (int32_t)(soft_limit(work.fx_l[i] * e->gain / GRAV_FULL_SCALE) * GRAV_FULL_SCALE);
         lr[2 * i + 1] = (int32_t)(soft_limit(work.fx_r[i] * e->gain / GRAV_FULL_SCALE) * GRAV_FULL_SCALE);
+    }
+
+    /* (0.42) each track alone, for USB audio MULTI: its voices summed (after its fader, the whole of them: the effect's
+     * share too, none of the effect), at the level a full MASTER gives them in the mix, the same limiter, 16 bits */
+    if (grav_track_out) {
+        int16_t *o = grav_track_out;
+        for (uint32_t i = 0; i < n; i++, o += SYNTH_TRACKS) {
+            float sum[SYNTH_TRACKS] = {0};
+            for (uint32_t v = 0; v < SYNTH_VOICES_MAX; v++) {
+                const uint32_t track = synth->voice_track[v];
+                if ((work.live & (1u << v)) && track < SYNTH_TRACKS)
+                    sum[track] += work.out[v][i];
+            }
+            for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+                o[t] = (int16_t)(soft_limit(sum[t] * (GRAV_OUT_FULL / GRAV_FULL_SCALE)) * 32767.0f);
+        }
     }
 
     /* the timings the next block splits by, smoothed: a voice's block (on average), the effect's */
