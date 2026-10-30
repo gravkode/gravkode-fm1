@@ -15,7 +15,9 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.43.1**: the logo at power-on without the teal sun behind the terricons. 0.43.0: panning: SEL again from the mixer opens PAN, and K1 places the selected track from
+Current version: **0.44.0**: the show: left playing untouched (30 s, GLO's SCREEN K3 SHOW), the whole screen
+becomes a picture of the music, a row of terricons a step going back to the horizon, the peaks where notes begin;
+a button or a knob ends it. 0.43.1: the logo at power-on without the teal sun behind the terricons. 0.43.0: panning: SEL again from the mixer opens PAN, and K1 places the selected track from
 full left to full right (L50, C, R50), a pan pot and a left and right meter for each track; the centre sounds as
 before. 0.42.2: MULTI's work for the computer runs on the second core, after each block's sound (0.42.1
 took 16 % of the first and a heavy patch broke up); its ten inputs at a fixed level with 6 dB of headroom (a hot drum
@@ -68,6 +70,8 @@ hold HOME and turn SELECT to jump.
 - **An effect:** HALL, Beads' reverb (AMOUNT, TIME, TONE, DIFFUSE, MOD); ECHO, a delay in time with the tempo
   (AMOUNT, a note value from 1/32 to 1/2, FEEDBACK); both coloured by Beads' four media (digital to dirty tape). Its
   pages show it as rings on a lake under the terricons.
+- **A show** for the screen: left playing untouched, the whole screen becomes a picture of the music, a row of
+  terricons a step going back to the horizon under HOME's sky.
 - **A sequencer of eight tracks:** four synth tracks (S1–S4), each its own engine and sound, voices (the four shared
   out: MONO, POLY or none), and four drum tracks (D1–D4), each a kick, snare or hi-hat of Plaits' (two models each)
   with six knobs (TUNE, DECAY, TONE; the kick's PUNCH, SWEEP, DRIVE), in a voice of its own. Each its steps: 64 in four pages of 16, played on the white keys like a TR, a length of 1 to 64 each
@@ -104,7 +108,7 @@ hold HOME and turn SELECT to jump.
 | GLO | GLO | VOICES, the track's (OFF, MONO, 2, 3, 4; four in all) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
 | GLO again | MIDI | CHANNEL: the track's (OFF, 1 to 16) | IN (SELECTED, CHANNELS) | CLOCK (OFF, IN, OUT, IN+OUT) |
 | GLO again | USB | AUDIO: STEREO (the mix on 1-2, the computer's sound through the FM-1) or MULTI (the mix on 1-2, each track on its own input, 3 to 10) | — | — |
-| GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: HOME's sky (OFF, DAY, NIGHT) | — |
+| GLO again | SCREEN | THEME: the screen's colours (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: HOME's sky (OFF, DAY, NIGHT) | SHOW: the show after so long playing untouched (OFF, 10 S, 30 S, 1 MIN, 2 MIN) |
 | FX | HALL | AMOUNT (into the reverb) | TIME (the tail) | TONE (dark to bright) |
 | FX again | TAPE | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) | DIFFUSE | MOD (the tail's movement) |
 | FX again | ECHO | AMOUNT (into the echo) | TIME (1/32 to 1/2, triplets and dotted, at the tempo) | FEEDBACK |
@@ -172,7 +176,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.43.1.fwsc 0.43.1 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.44.0.fwsc 0.44.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -187,7 +191,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.43.1      # terykons/build/terykons-0.43.1.fwsc
+python3 tools/build.py terykons --release 0.44.0      # terykons/build/terykons-0.44.0.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)
@@ -195,7 +199,7 @@ python3 tools/build.py terykons --web                 # the browser emulator (Em
 
 The tests (`terykons/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO), `tap.txt` (tap tempo), `midi.txt` (GLO's MIDI page: channels, IN, CLOCK), `usb.txt` (GLO's USB page: STEREO, MULTI, each track on its input), `copy.txt` (patterns copied, pasted, cleared), `chain.txt` (chains),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `pan.txt` (PAN: each side, saving, older settings), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `pan.txt` (PAN: each side, saving, older settings), `show.txt` (the show: when it starts and ends, SHOW, older settings), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [terykons/README.md](terykons/README.md).
 

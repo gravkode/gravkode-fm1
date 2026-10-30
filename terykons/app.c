@@ -39,6 +39,10 @@ enum { CLOCK_OFF, CLOCK_IN, CLOCK_OUT, CLOCK_BOTH };   /* and CLOCK (with Start,
  * at the tempo; NIGHT a moon, stars twinkling at each hi-hat; OFF black, as before */
 enum { SKY_NIGHT = 1, SKY_OFF = 2, SKY_DAY = 3 };   /* (0.30.2: NIGHT as it comes; 0, as saved before, is NIGHT) */
 static const char *const SKY_NAME[4] = {"NIGHT", "NIGHT", "OFF", "DAY"};
+/* (0.44) GLO's SCREEN, K3 SHOW: how long playing with nothing touched before the show (OFF: never) */
+enum { SHOW_OFF, SHOW_10, SHOW_30, SHOW_60, SHOW_120, SHOW_N };
+static const char *const SHOW_NAME[SHOW_N] = {"OFF", "10 S", "30 S", "1 MIN", "2 MIN"};
+static const uint32_t SHOW_MS[SHOW_N] = {0u, 10000u, 30000u, 60000u, 120000u};
 #define PREV_SET_MAGIC 0x54504C32u
 #define OLD_SET_MAGIC 0x54504C31u            /* "TPL1": the settings record; another magic loads defaults */
 typedef struct {
@@ -95,6 +99,9 @@ typedef struct {
     uint8_t usb_audio;                   /* (0.42, a byte reserved in 0.39..0.41: 0) GLO's USB: AUDIO, 0 STEREO, 1 MULTI */
     uint8_t midi_reserved;
     uint8_t pan[SYNTH_TRACKS];           /* (0.43) the mixer's PAN (SEL again): 0 left .. 50 centre .. 100 right */
+    uint8_t show;                        /* (0.44) GLO's SCREEN, K3 SHOW (SHOW_*): playing and nothing touched so long,
+                                          * the screen a show of the music; older settings: 30 S */
+    uint8_t show_reserved[3];
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to sky (a byte reserved then) */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
@@ -108,7 +115,9 @@ typedef struct {
 #define SET_SIZE_036 1428                /* as 0.27..0.36 saved it: up to the tracks' LFOs and envelopes (one for all) */
 #define SET_SIZE_037 1452                /* as 0.37..0.38 saved it: up to MIDI's (channels 1..8, any in, clock both) */
 #define SET_SIZE_042 1464                /* as 0.39..0.42 saved it: up to the pans (each in the centre) */
-_Static_assert(sizeof(settings_t) == 1472 && SET_SIZE_042 == __builtin_offsetof(settings_t, pan) &&
+#define SET_SIZE_043 1472                /* as 0.43 saved it: up to SHOW (30 S) */
+_Static_assert(sizeof(settings_t) == 1476 && SET_SIZE_043 == __builtin_offsetof(settings_t, show) &&
+               SET_SIZE_042 == __builtin_offsetof(settings_t, pan) &&
                SET_SIZE_037 == __builtin_offsetof(settings_t, midi_ch) &&
                SET_SIZE_036 == __builtin_offsetof(settings_t, trk_mod) &&
                SET_SIZE_026 == __builtin_offsetof(settings_t, vol) &&
@@ -290,7 +299,7 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     {"", "", ""},
     {"TEMPO", "SWING", "LENGTH"},
     {"PUNCH", "SWEEP", "DRIVE"},
-    [PAGE_SCREEN] = {"THEME", "SKY", ""},
+    [PAGE_SCREEN] = {"THEME", "SKY", "SHOW"},
     [PAGE_MIXER] = {"VOL", "SEND", "RETURN"},
     [PAGE_ARP] = {"MODE", "RATE", "OCTAVES"},
     [PAGE_ARP_2] = {"GATE", "HOLD", ""},
@@ -828,6 +837,8 @@ static void settings_defaults(void)
         set.vol[t] = 100;
         set.pan[t] = 50;                     /* (0.43) */
     }
+    set.show = SHOW_30;                      /* (0.44) */
+    memset(set.show_reserved, 0, sizeof set.show_reserved);
     set.mute = 0;
     set.octave = 0;
     set.engine_id = 0;
@@ -887,7 +898,7 @@ static int set_size_known(int n)
 {
     return n == SET_SIZE_012 || n == SET_SIZE_013 || n == SET_SIZE_016 || n == SET_SIZE_017 || n == SET_SIZE_018 ||
            n == SET_SIZE_021 || n == SET_SIZE_025 || n == SET_SIZE_026 || n == SET_SIZE_036 ||
-           n == SET_SIZE_037 || n == SET_SIZE_042 || n == (int)sizeof(settings_t);
+           n == SET_SIZE_037 || n == SET_SIZE_042 || n == SET_SIZE_043 || n == (int)sizeof(settings_t);
 }
 
 /* a record an older version saved (loaded: its size): what it lacks at its defaults */
@@ -936,6 +947,8 @@ static void settings_upgrade(settings_t *s, int loaded)
     if (loaded <= SET_SIZE_042)              /* (before 0.43: no pans; each in the centre) */
         for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
             s->pan[t] = 50;
+    if (loaded <= SET_SIZE_043 || s->show >= SHOW_N)   /* (before 0.44: no show; 30 S) */
+        s->show = SHOW_30;
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
     if (s->sky == 0 || s->sky > SKY_DAY)     /* (a byte reserved before 0.29; 0.29..0.30.1 kept DAY, their default, as
@@ -1157,6 +1170,8 @@ static struct {
     uint32_t key_pat;                    /* the keys pressed as patterns (let go as such) */
     uint32_t key_midi;                   /* (0.34) the keys whose notes went out over MIDI (not to an arp: its notes go) */
     uint8_t logo;                        /* (0.36.1) the logo at power-on still shown (until LOGO_MS, or a touch) */
+    uint8_t show, show_clear;            /* (0.44) the show on; it ended (the screen cleared, the page drawn again) */
+    uint32_t idle_at;                    /* (0.44) the last button pressed, knob turned or key played */
     uint32_t arp_sig, arp_at;            /* (0.34) the ARP page: what its ladder showed, when it last changed; */
     uint8_t arp_band;                    /* its band's (held, HOLD) */
     uint8_t lock_mode;                   /* (0.35) EDIT: LOCK mode: the white keys the steps on every page, the knobs
@@ -1741,6 +1756,25 @@ static void sky_turn(int32_t e)              /* (0.28) SCREEN's K2: OFF, DAY, NI
         set_dirty = 1;
     }
     app_say("SKY", SKY_NAME[set.sky]);
+}
+
+/* (0.44) SCREEN's K3: SHOW, OFF to 2 MIN, a step a turn */
+static void show_turn(int32_t e)
+{
+    const uint8_t v = (uint8_t)clamp((int32_t)set.show + (e > 0 ? 1 : -1), SHOW_OFF, SHOW_N - 1);
+    if (v != set.show) {
+        set.show = v;
+        set_dirty = 1;
+    }
+    app_say("SHOW", SHOW_NAME[set.show]);
+}
+
+/* (0.44) the show ends (a button, a knob, or the sequencer stopped): the page again, the screen cleared first */
+static void show_end(void)
+{
+    ui.show = 0;
+    ui.show_clear = 1;
+    ui.redraw = 1;
 }
 
 static void theme_turn(int32_t e)
@@ -3721,10 +3755,12 @@ static void encoder_turn(uint32_t k, int32_t e)
     else if (knob && active_page == PAGE_PAN)
         pan_turn(index, e);
     else if (knob && active_page == PAGE_SCREEN) {
-        if (index == 0u)                     /* (K3: none) */
+        if (index == 0u)                     /* (K3: SHOW, 0.44) */
             theme_turn(e);
         else if (index == 1u)
             sky_turn(e);
+        else
+            show_turn(e);
     } else if (knob && active_page == PAGE_GLO)
         glo_turn(index, e);
     else if (knob && active_page == PAGE_MIDI)
@@ -3760,6 +3796,9 @@ static void input(void)
         ui.preset_used = ui.preset_shown = 0;
         ui.preset_at = plat_ms();
     }
+    int touched = (btn & ~ui.btn) != 0;      /* (0.44) a button or a knob: the show ends (a key: it plays on) */
+    if (touched || (keys & ~ui.keys))
+        ui.idle_at = plat_ms();
     keys_input(keys);
     for (uint32_t k = 0; k < NB; k++)
         if ((btn & 1u << k) && !(ui.btn & 1u << k))
@@ -3767,9 +3806,14 @@ static void input(void)
     buttons_let_go(btn);
     for (uint32_t k = 0; k < NE; k++) {
         const int32_t e = plat_enc((int)k);
-        if (e)
+        if (e) {
             encoder_turn(k, e);
+            touched = 1;
+            ui.idle_at = plat_ms();
+        }
     }
+    if (touched && ui.show)
+        show_end();
     if (btn != ui.btn || (keys != ui.keys && (ui.step_mode || ui.rec || ui.home_down || ui.preset_down)))
         ui.redraw = 1;                       /* (the keys are not drawn: a key redraws where it acts) */
     ui.keys = keys;
@@ -4012,8 +4056,9 @@ static void knob_own(uint32_t i, knob_t *k)
             k->frac = set.sky == SKY_OFF ? 0 : set.sky == SKY_DAY ? 12800 : 25600;
             return;
         }
-        if (i) {
-            k->frac = KNOB_NONE;
+        if (i) {                             /* (0.44) SHOW */
+            text_cat(k->value, SHOW_NAME[set.show < SHOW_N ? set.show : SHOW_30]);
+            k->frac = (int32_t)set.show * 25600 / (int32_t)(SHOW_N - 1u);
             return;
         }
         text_cat(k->value, PALETTES[theme_palette()].name);
@@ -4793,6 +4838,216 @@ static void draw_terricons(int32_t dy, uint32_t now)
     cv_rect(0, base + 1, 240, 144, set.sky == SKY_DAY ? RGB(26, 24, 28) : C_BLACK);   /* the ground (the feet's glow
                                                                                      * cut) */
     cv_rect(0, base, 240, 1, C_LINE);
+}
+
+/* (0.44) the show: playing, and no button, knob or key touched for SHOW's time (GLO's SCREEN, K3), the whole screen
+ * a picture of the music, no words. Each step leaves a row of terricons, a track each in its colour, as high as the
+ * track sounded in that step; the rows go back towards the horizon as the steps go on (one row a step: the rhythm a
+ * range of hills going away), smaller and dimmer, the newest at the front growing as it plays. Over them HOME's sky
+ * (SKY: the stars and the moon, the sun and the clouds, or none); the horizon glowing in the pattern's colour, a kick
+ * flaring it; the pattern's number a moment as it comes (a chain: its patterns under it). A button or a knob ends it
+ * and does what it does; the keys play on under it; stopping ends it */
+#define SHOW_ROWS 24u                        /* the rows kept (the live one aside) */
+#define SHOW_HZ 98                           /* the horizon's row */
+#define SHOW_BN 6                            /* points up each slope of a row's terricon */
+static struct {
+    uint32_t at[SHOW_ROWS];                  /* when each row's step began */
+    uint8_t lv[SHOW_ROWS][SEQ_TRACKS];       /* each track's height in it (200: a full level) */
+    uint8_t head, n;                         /* the newest row, how many */
+    uint32_t live_at, count, rows, frames;   /* the live row's step began; the sequencer's steps seen; rows and frames
+                                              * (the tests) */
+    uint32_t frame_at;                       /* the last frame (its own: the pages' strips keep theirs) */
+    float acc[SEQ_TRACKS];                   /* the live row's: each track's loudest in its step so far, */
+    float prev[SEQ_TRACKS];                  /* its level at the last frame, */
+    uint8_t hit;                             /* and the tracks a note began on in it (a bit each) */
+    uint8_t pattern;
+    uint32_t pat_at;                         /* the pattern seen last, and when it came */
+} sh;
+
+static float show_step_ms(void)
+{
+    const uint32_t bpm = seq_bpm(&seq);
+    return 15000.0f / (float)(bpm ? bpm : 120u);
+}
+
+/* a track's height in a row: a note begun in its step, its peak (its level, a quiet hi-hat's still a hill); else its
+ * sound going on from before, low (the rhythm in the peaks, a pad a ridge under them) */
+static float show_height(float level, int hit)
+{
+    return hit ? fm_maxf(level, 0.75f) : level * 0.45f;
+}
+
+static void show_begin(uint32_t now)         /* the plain at first: flat rows to the horizon */
+{
+    const float step = show_step_ms();
+    memset(&sh, 0, sizeof sh);
+    sh.n = SHOW_ROWS;
+    sh.head = SHOW_ROWS - 1u;
+    for (uint32_t j = 0; j < SHOW_ROWS; j++)
+        sh.at[(sh.head + SHOW_ROWS - j) % SHOW_ROWS] = now - (uint32_t)((float)(j + 1u) * step);
+    sh.live_at = now;
+    sh.count = seq.count;
+    sh.pattern = seq.pattern;
+    sh.pat_at = now;
+    ui.show = 1;
+}
+
+/* every frame of the show: the levels; a new step: the live row kept (a frame late for a few steps: each kept, their
+ * times between), a new one begun */
+static void show_track(uint32_t now)
+{
+    float a[SEQ_TRACKS];
+    levels_update(now);
+    if (seq.pattern != sh.pattern) {
+        sh.pattern = seq.pattern;
+        sh.pat_at = now;
+    }
+    for (uint32_t t = 0; t < SEQ_TRACKS; t++) {   /* (a note begun: the sequencer's, or a level jumping: a key's) */
+        a[t] = seq.mute >> t & 1u ? 0.0f : fm_minf(ui.level[t], 1.2f);
+        if (a[t] > 0.0f && ((int32_t)(ui.hit_at[t] - sh.live_at) >= 0 ||
+                            (a[t] > sh.prev[t] + 0.12f && now - ui.hit_at[t] > 200u)))   /* (a step's note rising late:
+                                                                                         * its own step's) */
+            sh.hit |= (uint8_t)(1u << t);
+        sh.prev[t] = a[t];
+        sh.acc[t] = fm_maxf(sh.acc[t], a[t]);
+    }
+    const uint32_t c = seq.count;
+    if (c == sh.count)
+        return;
+    const uint32_t k = c - sh.count > 4u ? 4u : c - sh.count;
+    for (uint32_t j = 0; j < k; j++) {
+        const uint32_t i = (sh.head + 1u) % SHOW_ROWS;
+        sh.head = (uint8_t)i;
+        sh.at[i] = sh.live_at + (now - sh.live_at) * j / k;
+        for (uint32_t t = 0; t < SEQ_TRACKS; t++)
+            sh.lv[i][t] = (uint8_t)(show_height(sh.acc[t], j == 0u && (sh.hit >> t & 1u)) * 200.0f + 0.5f);
+        if (sh.n < SHOW_ROWS)
+            sh.n++;
+        sh.rows++;
+    }
+    sh.count = c;
+    sh.live_at = now;
+    sh.hit = 0;
+    for (uint32_t t = 0; t < SEQ_TRACKS; t++)
+        sh.acc[t] = a[t];
+}
+
+/* a row, age steps old (0: the front): its terricons on a line across, closer together, lower and dimmer the further
+ * back; under each, the ground (what is behind it hidden) */
+static void show_row(int32_t dy, float age, const float *lv, uint16_t ground, int day)
+{
+    if (age < 0.0f)
+        age = 0.0f;
+    if (age > (float)(SHOW_ROWS - 2u))
+        return;
+    const float z = 1.0f + 0.42f * age, s = 1.0f / (1.0f + 0.07f * (z - 1.0f)), fade = 1.0f - age / (float)(SHOW_ROWS - 2u);
+    const int32_t by = SHOW_HZ + (int32_t)(138.0f / z + 0.5f) + dy, f = (int32_t)(256.0f * fade * fade);
+    const int front = age < 2.5f;
+    const uint16_t plain = mix565(ground, day ? RGB(150, 146, 140) : RGB(70, 84, 112), f * 3 / 4);
+    int16_t px[2 * SHOW_BN + 1], py[2 * SHOW_BN + 1];
+    int32_t from = 0;
+    for (uint32_t t = 0; t < SEQ_TRACKS; t++) {
+        const float cx = 120.0f + ((float)t - 3.5f) * 29.0f * s, hw = 13.0f * s, h = lv[t] * 70.0f / z;
+        if (h < 1.0f)                        /* (silent: the plain goes on) */
+            continue;
+        for (int32_t i = 0; i <= 2 * SHOW_BN; i++) {   /* (draw_ridge's shape: a flat top, a terrace each side) */
+            const float u = (float)i / (float)SHOW_BN - 1.0f, au = u < 0.0f ? -u : u;
+            float y = h * (1.0f - au) * (1.0f - 0.06f * u * u);
+            if (y > h * 0.88f)
+                y = h * 0.88f;
+            if (au > 0.55f && au < 0.7f && y < h * 0.45f - 1.0f)
+                y = h * 0.45f - 1.0f;
+            px[i] = (int16_t)(cx + hw * u + (u < 0.0f ? -0.5f : 0.5f));
+            py[i] = (int16_t)((float)by - y + 0.5f);
+        }
+        cv_rect(from, by, px[0] - from, 1, plain);
+        ground_under(px, py, 2u * SHOW_BN + 1u, by, ground);
+        {
+            const float l = fm_minf(lv[t], 1.0f);
+            const int32_t lit = f * (int32_t)(100.0f + 156.0f * l) / 256;
+            if (front)                       /* (the front's: a glow under it) */
+                thick_line(px, py, 2u * SHOW_BN + 1u, mix565(ground, TRACK_HUE[t], lit / 3), 4);
+            thick_line(px, py, 2u * SHOW_BN + 1u, mix565(ground, TRACK_HUE[t], lit), front ? 2 : 1);
+        }
+        from = px[2 * SHOW_BN] + 1;
+    }
+    cv_rect(from, by, 240 - from, 1, plain);
+}
+
+static void draw_show(int32_t dy, uint32_t now)
+{
+    const int day = set.sky == SKY_DAY;
+    const uint16_t ground = day ? RGB(26, 24, 28) : C_BLACK, tint = TRACK_HUE[(sh.pattern * 3u) % SEQ_TRACKS];
+    const int32_t hz = SHOW_HZ + dy;
+    const float kick = sky_flare(LOOK_KICK, now, 160.0f), step = show_step_ms();
+    if (hz > 0) {                            /* the sky, its glow down to the horizon */
+        if (set.sky != SKY_OFF)
+            draw_sky(hz, dy, now);
+        for (int32_t k = 1; k <= 18; k++) {
+            const float g = 1.0f - (float)k / 19.0f;
+            const uint16_t sky = set.sky == SKY_OFF ? C_BLACK : sky_at(hz - k, hz);
+            cv_rect(0, hz - k, 240, 1, mix565(sky, tint, (int32_t)(g * g * (50.0f + 130.0f * kick))));
+        }
+    }
+    cv_rect(0, hz, 240, 240, ground);
+    cv_rect(0, hz, 240, 1, mix565(ground, tint, 120 + (int32_t)(110.0f * kick)));
+    for (uint32_t j = sh.n; j-- > 0;) {      /* the rows, the furthest first; the live one last, at the front */
+        const uint32_t i = (sh.head + SHOW_ROWS - j) % SHOW_ROWS;
+        float lv[SEQ_TRACKS];
+        for (uint32_t t = 0; t < SEQ_TRACKS; t++)
+            lv[t] = (float)sh.lv[i][t] * (1.0f / 200.0f);
+        show_row(dy, (float)(now - sh.at[i]) / step, lv, ground, day);
+    }
+    {
+        float lv[SEQ_TRACKS];
+        for (uint32_t t = 0; t < SEQ_TRACKS; t++)
+            lv[t] = show_height(sh.acc[t], sh.hit >> t & 1u);
+        show_row(dy, (float)(now - sh.live_at) / step, lv, ground, day);
+    }
+    if (hz > 0 && now - sh.pat_at < 2400u) { /* the pattern's number as it comes, fading; a chain's patterns under it */
+        const uint32_t since = now - sh.pat_at;
+        const float a = fm_minf(1.0f, (float)since / 200.0f) * (since < 1400u ? 1.0f : (float)(2400u - since) / 1000.0f);
+        const uint16_t sky = set.sky == SKY_OFF ? C_BLACK : sky_at(40 + dy, hz);
+        char t[8];
+        t[0] = 'P';
+        t[1] = (char)('0' + (sh.pattern + 1u) / 10u);
+        t[2] = (char)('0' + (sh.pattern + 1u) % 10u);
+        t[3] = 0;
+        cv_text(120 - text_w(&FONT_L, t) / 2, 28 + dy, &FONT_L, t, mix565(sky, C_WHITE, (int32_t)(230.0f * a)));
+        if (chain.playing && chain.n > 1u) {
+            int32_t w = 0, x;
+            for (uint32_t k = 0; k < chain.n; k++) {
+                int_text((int32_t)chain.at[k] + 1, t);
+                w += text_w(&FONT_XS, t) + (k ? 8 : 0);
+            }
+            x = 120 - w / 2;
+            for (uint32_t k = 0; k < chain.n; k++) {
+                int_text((int32_t)chain.at[k] + 1, t);
+                cv_text(x, 64 + dy, &FONT_XS, t, mix565(sky, (int32_t)k == chain.pos ? tint : C_GRAY, (int32_t)(230.0f * a)));
+                x += text_w(&FONT_XS, t) + 8;
+            }
+        }
+    }
+}
+
+static void draw_show_frame(uint32_t now)    /* the whole screen, two canvases */
+{
+    cv_begin(240, 144, C_BLACK);
+    draw_show(0, now);
+    cv_blit(0, 0);
+    cv_begin(240, 96, C_BLACK);
+    draw_show(-144, now);
+    cv_blit(0, 144);
+    sh.frames++;
+}
+
+/* playing, nothing touched for SHOW's time, and nothing else on the screen to see: no step mode, no LOCK, no
+ * recording, no list or splash, no step or button held, not DEBUG */
+static int show_due(uint32_t now)
+{
+    return set.show != SHOW_OFF && set.show < SHOW_N && seq.playing && !ui.logo && now - ui.idle_at >= SHOW_MS[set.show] &&
+           !ui.step_mode && !ui.lock_mode && !ui.rec && !list_open() && !ui.splash_until && ui.step_held < 0 && !ui.btn &&
+           active_page != PAGE_DEBUG;
 }
 
 #ifdef PLAT_HOST
@@ -5781,7 +6036,7 @@ static void draw_screen_page(void)
 {
     int32_t h, r;
     const int32_t y = knob_row(&h, &r) + h + 3;
-    draw_dials(knob_row(&h, &r), 3u, 0);
+    draw_dials(knob_row(&h, &r), 7u, 0);     /* (K3 SHOW since 0.44) */
     for (uint32_t i = 0; i < THEMES; i++) {
         const palette_t *pl = &PALETTES[THEME_ORDER[i]];
         const int32_t x = 9 + (int32_t)i * 23;
@@ -6452,6 +6707,24 @@ void app_frame(void)
         lcd_fill(0, 0, 240, 240, C_BLACK);
         ui.redraw = 1;
     }
+    if (ui.show && !seq.playing)             /* (0.44) the show: over once stopped */
+        show_end();
+    if (ui.show_clear) {
+        ui.show_clear = 0;
+        lcd_fill(0, 0, 240, 240, C_BLACK);
+        ui.redraw = 1;
+    }
+    if (!ui.show && show_due(now))
+        show_begin(now);
+    if (ui.show) {                           /* (the page's own drawing waits) */
+        show_track(now);
+        ui.redraw = ui.redraw_grid = 0;
+        if (now - sh.frame_at >= frame_ms()) {
+            sh.frame_at = now;
+            draw_show_frame(now);
+        }
+        return;
+    }
     if (ui.redraw) {
         ui.redraw = 0;
         ui.redraw_grid = 0;
@@ -6572,6 +6845,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
         settings_capture();
         plat_store_save(OBJ_SETTINGS, &set, !strcmp(cmd, "save012") ? SET_SIZE_012 :
                                             !strcmp(cmd, "save016") ? SET_SIZE_016 : !strcmp(cmd, "save018") ? SET_SIZE_018 : SET_SIZE_021);
+        return 1;
+    }
+    if (!strcmp(cmd, "save043")) {           /* (0.44) the settings as 0.43 saved them: no SHOW */
+        settings_capture();
+        plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_043);
         return 1;
     }
     if (!strcmp(cmd, "save042")) {           /* (0.43) the settings as 0.39..0.42 saved them: no pans */
@@ -6835,6 +7113,14 @@ int app_expect(const char *what, int *got)
         *got = set.vol[track_sel];
     else if (!strcmp(what, "pan"))           /* (0.43) the selected track's PAN, 0 left .. 50 .. 100 right */
         *got = set.pan[track_sel];
+    else if (!strcmp(what, "show"))          /* (0.44) the show on; SHOW (SHOW_*); its rows kept and frames drawn */
+        *got = ui.show;
+    else if (!strcmp(what, "show_set"))
+        *got = set.show;
+    else if (!strcmp(what, "show_rows"))
+        *got = (int)sh.rows;
+    else if (!strcmp(what, "show_frames"))
+        *got = (int)sh.frames;
     else if (!strcmp(what, "fx_return"))
         *got = fx_params[FX_HALL];
     else if (!strcmp(what, "meter"))         /* the selected track's meter, 0..256 */

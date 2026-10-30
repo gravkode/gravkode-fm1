@@ -333,8 +333,14 @@ turn SELECT -7
 wait 1600
 wait 600
 shot screen-pan.png
+# (0.44) the show: still playing, nothing touched for 30 s (SHOW 30 S, as it comes): the rows of terricons going back
+# to the horizon; SEL ends it (and goes back from PAN)
+wait 34000
+expect show 1
+shot screen-show.png
 tap SEL
 wait 30
+expect show 0
 # (0.33) the effect's pages, still playing: the lake under the terricons, the pattern dropping into it, the echoes
 # following, the tail rippling. FX: ECHO (the page shown last), again HALL, again TAPE; then HOME
 tap FX

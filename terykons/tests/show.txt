@@ -1,0 +1,128 @@
+# The show (0.44): playing, and no button, knob or key touched for SHOW's time (GLO's SCREEN, K3: OFF, 10 S, 30 S as
+# it comes, 1 MIN, 2 MIN), the whole screen a picture of the music: a row of terricons a step, going back to the
+# horizon. A button or a knob ends it and does what it does; a key plays under it; stopping ends it. Not in step mode,
+# LOCK mode or recording. Saved with the settings; older: 30 S.
+#   terykons/build/host/terykons_host terykons/tests/show.txt terykons/build/host
+wait 600
+expect show_set 2
+expect show 0
+# GLO four times: SCREEN; K3 SHOW to 10 S
+tap GLO
+wait 30
+tap GLO
+wait 30
+tap GLO
+wait 30
+tap GLO
+wait 30
+expect page 12
+listen
+wait 400
+turn K3 -1
+wait 30
+expect show_set 1
+said SHOW 10 S
+expect dirty 1
+tap HOME
+wait 30
+# a kick on steps 1 and 9 of D1 (step mode, black key 5), out of step mode; then PLAY
+tap SEQ
+wait 30
+key 8 down 100 0
+wait 30
+key 8 up
+wait 30
+key 0 down 100 0
+wait 30
+key 0 up
+wait 30
+key 14 down 100 0
+wait 30
+key 14 up
+wait 30
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap PLAY
+wait 30
+expect seq_playing 1
+# 10 s with nothing touched: the show; its rows going by, its frames drawn
+wait 9500
+expect show 0
+wait 700
+expect show 1
+wait 2000
+expect show_rows >10
+expect show_frames >30
+# a key plays under it, the show on
+key 12 down 100 0
+wait 100
+key 12 up
+wait 300
+expect show 1
+# a knob ends it (and turns: K1 on HOME's terricons is TEMPO); nothing touched again: the show again
+turn K1 1
+wait 30
+expect show 0
+wait 10500
+expect show 1
+# PLAY: stops, the show over
+tap PLAY
+wait 60
+expect seq_playing 0
+expect show 0
+# stopped: none
+wait 11000
+expect show 0
+# OFF: never (GLO again: SCREEN, the GLO page shown last)
+tap PLAY
+wait 30
+tap GLO
+wait 30
+expect page 12
+turn K3 -1
+wait 30
+expect show_set 0
+said SHOW OFF
+turn K3 -5
+wait 30
+expect show_set 0
+tap HOME
+wait 30
+wait 12000
+expect show 0
+# step mode: none (SEQ), 2 MIN at most
+tap GLO
+wait 30
+turn K3 1
+wait 30
+expect show_set 1
+turn K3 10
+wait 30
+expect show_set 4
+said SHOW 2 MIN
+turn K3 -3
+wait 30
+expect show_set 1
+tap SEQ
+wait 30
+wait 11000
+expect show 0
+tap SEQ
+wait 30
+tap SEQ
+wait 30
+tap PLAY
+wait 30
+# saved: a restart keeps it
+tap SAVE
+wait 300
+reboot
+wait 600
+expect show_set 1
+# the settings as 0.43 saved them: 30 S
+save043
+reboot
+wait 600
+expect show_set 2

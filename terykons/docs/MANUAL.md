@@ -98,7 +98,7 @@ From the top:
 | HOME | HOME's terricons (every track, 0.28) → TEMPO (0.36.2: TEMPO, SWING, LENGTH) → OSC → extra sound pages → OUTPUT → the terricons. A drum track: DRUM → SHAPE → OUTPUT. From step mode: the terricons. Hold HOME and turn SELECT to jump sound pages; with a white key, choose a pattern (several one after another: a chain, 0.41); with OCT-, OCT+, REC: copy, paste, clear it (0.40, section 5) |
 | LFO | The MOD page: the selected synth track's LFO RATE, LFO DEPTH, LFO DEST |
 | ENV | The ENV page: the selected synth track's ATTACK, DECAY, RELEASE |
-| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again MIDI (0.39: the tracks' channels, IN, CLOCK); again USB (0.42: USB AUDIO, STEREO or MULTI, each track on its own channel); again SCREEN (THEME, the screen's colours); again DEBUG (section 11) |
+| GLO | The GLO page: VOICES, VELOCITY, METRONOME; again MIDI (0.39: the tracks' channels, IN, CLOCK); again USB (0.42: USB AUDIO, STEREO or MULTI, each track on its own channel); again SCREEN (THEME, the screen's colours; SKY; SHOW, 0.44: the show, section 5); again DEBUG (section 11) |
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
 | ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
 | EDIT | LOCK mode (0.35): tap, on or off; held with a white key, that step's locks cleared (section 5). Lit while on (0.32..0.34 free; FREEZE before) |
@@ -301,7 +301,7 @@ in the centre. In USB audio MULTI (section 10) the mix on 1-2 has the pans; each
 
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004301, version 0.43.1](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004400, version 0.44.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -354,10 +354,12 @@ AMBER (Terykons' until 0.25), CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED and MONO
 a swatch of its two colours, the one shown framed. K2 SKY (0.29) picks HOME's sky: OFF (black, as before), DAY (a
 light blue sky, a sun flaring at each kick, soft clouds drifting slowly at the tempo's pace) or NIGHT (as it comes since
 0.30.2: a moon, stars twinkling at each hi-hat). Only the theme's two brightest colours change (values, the knob
-turned, the selected track, the steps and notes); the greys stay, REC stays red. It is saved with the settings (SAVE).
+turned, the selected track, the steps and notes); the greys stay, REC stays red. K3 SHOW (0.44) picks how long the
+FM-1 plays with nothing touched before the show fills the screen (section 5, The show): OFF (never), 10 S, 30 S (as it
+comes), 1 MIN, 2 MIN. All three are saved with the settings (SAVE); settings from before 0.44 have SHOW at 30 S.
 The splash at power-on (the logo) keeps its own colours: it is drawn before the settings are read.
 
-![GLO's SCREEN page: THEME at TEAL, SKY at DAY, the ten palettes' swatches under them, TEAL framed](img/screen-theme.png "The SCREEN page")
+![GLO's SCREEN page: THEME at TEAL, SKY at NIGHT, SHOW at 30 S, the ten palettes' swatches under them, TEAL framed](img/screen-theme.png "The SCREEN page")
 
 GLO once more opens DEBUG, the two cores' timings (section 11).
 
@@ -468,6 +470,30 @@ piano roll; step mode (SEQ) shows every track's steps.
 
 A list over the page (the tracks, the patterns, a preset's slots, the presets' browser) stops it until the list
 goes.
+
+### The show (0.44)
+
+![The show: rows of terricons in the tracks' colours going back to a horizon glowing rose, under the night sky](img/screen-show.png "The show")
+
+Left to play with nothing touched, the FM-1 puts on a show: after SHOW's time (GLO's SCREEN, K3: 30 s as it comes;
+10 s to 2 min, or OFF), from any page, the whole screen becomes a picture of the music, with no words on it. Made for a
+chain playing on its own, or a pattern left to run.
+
+- **Each step leaves a row of terricons**, a track each, S1 at the left to D4 at the right, in its colour. A track
+  that began a note in the step stands up as a peak, as high as it sounded (a quiet hi-hat still a hill); a sound
+  going on from before (a pad, a long kick) is a low ridge under the peaks; a silent track leaves the ground flat.
+- **The rows go back towards the horizon** as the steps go on, one row a step, smaller, closer together and dimmer
+  the further they go: the rhythm a range of hills going away. The newest row is at the front, growing as its step
+  plays. The rows in front hide the ones behind them.
+- **The sky** is HOME's (K2 SKY): the stars and the moon at NIGHT, the sun and the clouds by DAY, black with SKY
+  OFF. The horizon glows in the pattern's colour, and flares at each kick.
+- **A new pattern** (a chain moving on, a pattern picked by MIDI) shows its number for a moment, P03, and a chain's
+  patterns under it, the one playing lit.
+
+A button or a knob ends the show and does what it does (PLAY stops at once, a knob turns): the page is back. The keys
+play on under it, and the show follows them; on the mixer and PAN pages they mute and solo as ever. Stopping ends
+it. It does not start in step mode, in LOCK mode, while recording, over a list, or on DEBUG. Its frames come as
+HOME's do: about 30 a second, 10 while the sound takes 75 % or more of the time; the sound is never held up by it.
 
 ### Step mode (SEQ)
 

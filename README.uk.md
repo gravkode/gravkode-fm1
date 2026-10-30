@@ -15,7 +15,9 @@
 
 ---
 
-Поточна версія: **0.43.1**: логотип при ввімкненні без бірюзового сонця за териконами. 0.43.0: панорама: SEL ще раз із мікшера відкриває PAN, і K1 ставить вибрану доріжку від
+Поточна версія: **0.44.0**: шоу: коли FM-1 грає й нічого не чіпати (30 с, GLO → SCREEN, K3 SHOW), увесь
+екран стає картиною музики: за кожен крок ряд териконів, що відпливає до горизонту, піки там, де починаються ноти;
+кнопка чи ручка його завершує. 0.43.1: логотип при ввімкненні без бірюзового сонця за териконами. 0.43.0: панорама: SEL ще раз із мікшера відкриває PAN, і K1 ставить вибрану доріжку від
 крайнього ліва до крайнього права (L50, C, R50), у кожної доріжки пан-регулятор і індикатори зліва й справа; у центрі
 звук як раніше. 0.42.2: робота MULTI для комп'ютера йде на другому ядрі після звуку кожного блоку (0.42.1 брала
 16 % першого, і важкий патч заїкався); десять входів на фіксованому рівні з запасом 6 дБ (гучний барабан лишається
@@ -68,6 +70,8 @@ SELECT перемикає їх швидко.
 - **Ефект:** HALL — реверб Beads (AMOUNT, TIME, TONE, DIFFUSE, MOD); ECHO — затримка в темп (AMOUNT, тривалість
   ноти від 1/32 до 1/2, FEEDBACK); обидва забарвлює одне з чотирьох середовищ Beads (від цифрового до «брудної» стрічки).
   Його сторінки показують його колами на озері під териконами.
+- **Шоу** на екрані: коли FM-1 грає й нічого не чіпати, увесь екран стає картиною музики: за кожен крок ряд
+  териконів, що відпливає до горизонту під небом HOME.
 - **Секвенсор на вісім доріжок:** чотири синтові (S1–S4), у кожної свій рушій і звук, голоси (чотири на всіх:
   MONO, POLY або жодного), і чотири барабанні (D1–D4): кік, малий або хай-хет Plaits (по дві моделі) з шістьма
   ручками (TUNE, DECAY, TONE; у кіка PUNCH, SWEEP, DRIVE), у кожної свій голос. У кожної доріжки свої кроки — 64,
@@ -105,7 +109,7 @@ SELECT перемикає їх швидко.
 | GLO | GLO | VOICES доріжки (OFF, MONO, 2, 3, 4; усього чотири) | VELOCITY (ON, OFF) | METRONOME (OFF, REC, COUNT) |
 | GLO ще раз | MIDI | CHANNEL: канал доріжки (OFF, 1–16) | IN (SELECTED, CHANNELS) | CLOCK (OFF, IN, OUT, IN+OUT) |
 | GLO ще раз | USB | AUDIO: STEREO (мікс на 1-2, звук комп'ютера через FM-1) або MULTI (мікс на 1-2, кожна доріжка на своєму вході, 3–10) | — | — |
-| GLO ще раз | SCREEN | THEME: кольори екрана (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: небо HOME (OFF, DAY, NIGHT) | — |
+| GLO ще раз | SCREEN | THEME: кольори екрана (TEAL, AMBER, CYAN, ICE, GREEN, LIME, VIOLET, PINK, RED, MONO) | SKY: небо HOME (OFF, DAY, NIGHT) | SHOW: шоу, коли стільки грає без дотику (OFF, 10 S, 30 S, 1 MIN, 2 MIN) |
 | FX | HALL | AMOUNT (скільки йде в реверб) | TIME (довжина хвоста) | TONE (від темного до яскравого) |
 | FX ще раз | TAPE | QUALITY (DIGITAL, VINTAGE, CLEAN TAPE, DIRTY TAPE) | DIFFUSE | MOD (рух хвоста) |
 | FX ще раз | ECHO | AMOUNT (скільки йде в луну) | TIME (від 1/32 до 1/2, тріолі й з крапкою, у темп) | FEEDBACK (повтори) |
@@ -177,7 +181,7 @@ K1 — TIMBRE, K2 — MORPH, K3 — HARMONICS (на екрані — свої н
 2. Зберіть сайт і запустіть його (або використайте опублікований):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.43.1.fwsc 0.43.1 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.44.0.fwsc 0.44.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -192,7 +196,7 @@ Terykons збирається інструментом fm1-base `tools/build.py`
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.43.1      # terykons/build/terykons-0.43.1.fwsc
+python3 tools/build.py terykons --release 0.44.0      # terykons/build/terykons-0.44.0.fwsc
 python3 tools/build.py terykons --host                # симулятор для тестів:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # емулятор у браузері (Emscripten)
@@ -201,7 +205,7 @@ python3 tools/build.py terykons --web                 # емулятор у бр
 Тести (`terykons/tests/`): `basic.txt` (клавіші, октава, збереження, MIDI), `engines.txt` (усі рушії звучать),
 `voices.txt` (поліфонія, MONO, velocity), `fx.txt` (ефект: HALL, TAPE, ECHO, його озеро, збереження, старі налаштування), `arp.txt` (арпеджіатор), `locks.txt` (параметр-локи), `envlfo.txt` (ENV і LFO кожної синтової доріжки), `tap.txt` (tap tempo), `midi.txt` (сторінка MIDI на GLO: канали, IN, CLOCK), `usb.txt` (сторінка USB на GLO: STEREO, MULTI, кожна доріжка на своєму вході), `copy.txt` (копіювання, вставка й очищення патернів), `chain.txt` (ланцюжки),
 `seq.txt` (секвенсор), `rec.txt` (живий запис, метроном), `theme.txt` (кольори екрана й небо), `mixer.txt`
-(мікшер), `pan.txt` (PAN: обидва боки, збереження, старі налаштування), `browser.txt` (терикони HOME, браузер пресетів), `playback.txt` (усі вісім доріжок грають, розподіл
+(мікшер), `pan.txt` (PAN: обидва боки, збереження, старі налаштування), `show.txt` (шоу: коли вмикається й вимикається, SHOW, старі налаштування), `browser.txt` (терикони HOME, браузер пресетів), `playback.txt` (усі вісім доріжок грають, розподіл
 голосів VOICES), `tracks.txt` (синтові доріжки), `drums.txt` (барабанні доріжки), `patterns.txt` (патерни),
 `icons.txt` (іконки), `seq_test.c` (його таймінг до семпла) і `bank_test.c` (патерни у флеші): `run_seq_test.py`,
 `screens.txt` (знімки екрана). Докладніше — у [terykons/README.md](terykons/README.md).
