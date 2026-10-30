@@ -74,6 +74,8 @@ turn K2 -30
 wait 30
 tap SEL
 wait 30
+tap SEL
+wait 30
 expect vol 80
 expect send 70
 expect store_writes 0
@@ -89,6 +91,8 @@ wait 30
 key 0 up
 wait 30
 tap SEL
+wait 30
+tap SEL
 wait 600
 expect page 8
 expect terricons_sounding 0
@@ -97,6 +101,8 @@ wait 30
 key 0 down 100 0
 wait 30
 key 0 up
+wait 30
+tap SEL
 wait 30
 tap SEL
 wait 600

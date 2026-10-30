@@ -15,7 +15,9 @@ reverb, all on the FM-1's own panel and screen.
 
 ---
 
-Current version: **0.42.2**: MULTI's work for the computer runs on the second core, after each block's sound (0.42.1
+Current version: **0.43.0**: panning: SEL again from the mixer opens PAN, and K1 places the selected track from
+full left to full right (L50, C, R50), a pan pot and a left and right meter for each track; the centre sounds as
+before. 0.42.2: MULTI's work for the computer runs on the second core, after each block's sound (0.42.1
 took 16 % of the first and a heavy patch broke up); its ten inputs at a fixed level with 6 dB of headroom (a hot drum
 stays clean), the FM-1 alone on them (not the computer's playback through it). 0.42.1: MULTI for a DAW: the ten
 inputs come on the computer's clock (the FM-1's runs 0.045 % fast, and 0.42.0's recordings broke every few seconds),
@@ -110,6 +112,7 @@ hold HOME and turn SELECT to jump.
 | ARP again | ARP 2 | GATE (5 to 100 %) | HOLD (OFF, ON) | — |
 | GLO again | DEBUG | one/two cores | reset peaks/counters | — |
 | SEL | MIXER | VOL (the selected track's fader) | SEND (its share through the effect) | RETURN (HALL's AMOUNT); white keys 1–8 mute the tracks, black keys 1–8 solo them |
+| SEL again | PAN | PAN: the selected track's place (L50 to C to R50) | — | —; the keys mute and solo, as on the mixer |
 
 SELECT picks the track (S1–S4, D1–D4) the keys, ALGO, PRESET, OSC, VOICES and the steps are for; ALGO picks its
 engine (on a drum track: bass drum, snare, hi-hat), OCT- and OCT+ the octave (-2 to +2), MASTER the volume, SAVE
@@ -121,7 +124,7 @@ velocity, length; the black keys 1–8 the tracks; OCT- / OCT+ the pages; SEQ he
 the selected track alone, a synth track's notes as a piano roll, a drum's 64 steps; a third time: out), PLAY
 starts and stops, REC (stopped) records notes and chords step by step. HOME held and a white key, or K4, picks the
 pattern (playing: at the pattern's end). The open page's button blinks, faster on its next page; PLAY flashes green on the beat. SEL opens
-the mixer from every page. The effect takes nothing in with both AMOUNTs at 0; once its tails have died away it is
+the mixer from every page, again PAN (each track's place from left to right), again back. The effect takes nothing in with both AMOUNTs at 0; once its tails have died away it is
 off, and costs nothing then.
 
 DEBUG keeps two-core mode on by default. Its controls are temporary and are not saved. Heavy FX settings can
@@ -169,7 +172,7 @@ manual has the details: [terykons/docs/MANUAL.md](terykons/docs/MANUAL.md).
 2. Make the site and serve it (or use the published one):
 
    ```bash
-   python3 tools/make_site.py terykons terykons/build/terykons-0.42.2.fwsc 0.42.2 terykons/build/site
+   python3 tools/make_site.py terykons terykons/build/terykons-0.43.0.fwsc 0.43.0 terykons/build/site
    python3 -m http.server 8080 --directory terykons/build/site
    ```
 
@@ -184,7 +187,7 @@ JieLi's AC79 SDK.
 
 ```bash
 export JIELI_TOOLCHAIN="$HOME/.jieli/toolchain" AC79_SDK="$HOME/fw-AC79_AIoT_SDK"
-python3 tools/build.py terykons --release 0.42.2      # terykons/build/terykons-0.42.2.fwsc
+python3 tools/build.py terykons --release 0.43.0      # terykons/build/terykons-0.43.0.fwsc
 python3 tools/build.py terykons --host                # the simulator, for the tests:
 terykons/build/host/terykons_host terykons/tests/basic.txt terykons/build/host
 python3 tools/build.py terykons --web                 # the browser emulator (Emscripten)
@@ -192,7 +195,7 @@ python3 tools/build.py terykons --web                 # the browser emulator (Em
 
 The tests (`terykons/tests/`): `basic.txt` (keys, octave, saving, MIDI), `engines.txt` (every engine plays),
 `voices.txt` (polyphony, MONO, velocity), `fx.txt` (the effect: HALL, TAPE, ECHO, its lake, saving, older settings), `arp.txt` (the arpeggiator), `locks.txt` (parameter locks), `envlfo.txt` (each synth track's ENV and LFO), `tap.txt` (tap tempo), `midi.txt` (GLO's MIDI page: channels, IN, CLOCK), `usb.txt` (GLO's USB page: STEREO, MULTI, each track on its input), `copy.txt` (patterns copied, pasted, cleared), `chain.txt` (chains),
-`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
+`dual_core.txt` (DEBUG and worker scheduling), `seq.txt` (the sequencer), `rec.txt` (live recording, the metronome), `theme.txt` (the screen's colours), `mixer.txt` (the mixer), `pan.txt` (PAN: each side, saving, older settings), `browser.txt` (HOME's terricons, the presets' browser), `playback.txt` (all eight tracks playing, VOICES shared out), `tracks.txt` (the synth tracks), `drums.txt` (the drum tracks), `patterns.txt` (the patterns), `icons.txt` (the icons), `presets.txt` (browsing, saving, reboot and deferred/error writes), `sound_pages.txt` (advanced controls, all six FM operators, animation and migration), `seq_test.c` (its timing, to the sample, and
 `bank_test.c`, the patterns' flash: `run_seq_test.py`), `screens.txt` (the screenshots). More in
 [terykons/README.md](terykons/README.md).
 

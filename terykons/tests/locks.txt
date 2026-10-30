@@ -135,6 +135,8 @@ wait 30
 expect lk2_8 60
 tap SEL
 wait 30
+tap SEL
+wait 30
 # OCT+ in LOCK mode: the next 16 steps on the keys
 tap OCT+
 wait 30

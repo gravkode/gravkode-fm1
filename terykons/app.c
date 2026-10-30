@@ -94,6 +94,7 @@ typedef struct {
     uint8_t midi_clock;
     uint8_t usb_audio;                   /* (0.42, a byte reserved in 0.39..0.41: 0) GLO's USB: AUDIO, 0 STEREO, 1 MULTI */
     uint8_t midi_reserved;
+    uint8_t pan[SYNTH_TRACKS];           /* (0.43) the mixer's PAN (SEL again): 0 left .. 50 centre .. 100 right */
 } settings_t;
 #define SET_SIZE_012 20                  /* the record as 0.12 saved it: up to sky (a byte reserved then) */
 #define SET_SIZE_013 32                  /* as 0.13..0.15 saved it: up to fx_reserved[] (one sound) */
@@ -106,7 +107,9 @@ typedef struct {
 #define SET_SIZE_026 1420                /* as 0.26 saved it: up to the faders (each at 100) */
 #define SET_SIZE_036 1428                /* as 0.27..0.36 saved it: up to the tracks' LFOs and envelopes (one for all) */
 #define SET_SIZE_037 1452                /* as 0.37..0.38 saved it: up to MIDI's (channels 1..8, any in, clock both) */
-_Static_assert(sizeof(settings_t) == 1464 && SET_SIZE_037 == __builtin_offsetof(settings_t, midi_ch) &&
+#define SET_SIZE_042 1464                /* as 0.39..0.42 saved it: up to the pans (each in the centre) */
+_Static_assert(sizeof(settings_t) == 1472 && SET_SIZE_042 == __builtin_offsetof(settings_t, pan) &&
+               SET_SIZE_037 == __builtin_offsetof(settings_t, midi_ch) &&
                SET_SIZE_036 == __builtin_offsetof(settings_t, trk_mod) &&
                SET_SIZE_026 == __builtin_offsetof(settings_t, vol) &&
                SET_SIZE_025 == __builtin_offsetof(settings_t, send) &&
@@ -169,10 +172,12 @@ enum {
                                           * the sound's pages */
     PAGE_MIDI,                           /* (0.39) GLO again: the selected track's CHANNEL, IN, CLOCK; again USB */
     PAGE_USB,                            /* (0.42) GLO again: USB AUDIO, STEREO or MULTI; again SCREEN */
+    PAGE_PAN,                            /* (0.43) SEL again: each track's PAN; again back */
     PAGE_N
 };
 #define IS_FX_PAGE(p) ((p) >= PAGE_FX_HALL && (p) <= PAGE_FX_ECHO)
 #define IS_ARP_PAGE(p) ((p) == PAGE_ARP || (p) == PAGE_ARP_2)
+#define IS_MIXER_PAGE(p) ((p) == PAGE_MIXER || (p) == PAGE_PAN)   /* (0.43) SEL's: the keys mute and solo on both */
 #define IS_SOUND_PAGE(p) ((p) == PAGE_OSC || (p) == PAGE_SHAPE || (p) == PAGE_SOUND || (p) == PAGE_OUTPUT)
 
 static uint8_t active_page = PAGE_SEQ;
@@ -182,7 +187,7 @@ static uint8_t glo_page = PAGE_GLO;
 static uint8_t arp_page = PAGE_ARP;      /* (0.34) the ARP page shown last */
 static const char *const PAGE_NAME[PAGE_N] = {"OSC", "MOD", "ENV", "GLO", "HALL", "TAPE", "ECHO", "DEBUG",
                                               "SEQ", "SHAPE", "DETAIL", "OUTPUT", "SCREEN", "MIXER", "ARP",
-                                              "ARP 2", "TEMPO", "MIDI", "USB"};
+                                              "ARP 2", "TEMPO", "MIDI", "USB", "PAN"};
 static const char *page_name(uint32_t page);
 
 /* the controls by their names in plat.h, in its order */
@@ -291,7 +296,8 @@ static const char *const PARAM_NAME[PAGE_N][3] = {
     [PAGE_ARP_2] = {"GATE", "HOLD", ""},
     [PAGE_TEMPO] = {"TEMPO", "SWING", "LENGTH"},
     [PAGE_MIDI] = {"CHANNEL", "IN", "CLOCK"},
-    [PAGE_USB] = {"AUDIO", "", ""}
+    [PAGE_USB] = {"AUDIO", "", ""},
+    [PAGE_PAN] = {"PAN", "", ""}
 };
 static const char *const MIDI_IN_NAME[2] = {"SELECTED", "CHANNELS"};
 static const char *const CLOCK_NAME[4] = {"OFF", "IN", "OUT", "IN+OUT"};
@@ -727,6 +733,7 @@ static void render_span(int32_t *lr, uint32_t n, uint32_t master_q12, const grav
         sound[t].morph = morph;              /* (a drum: DECAY) */
         sound[t].harmonics = (float)locked(t, SEQ_LK_OSC2, osc_params[t][2]) / 100.0f;
         sound[t].send = (float)locked(t, SEQ_LK_SEND, set.send[t]) * 0.01f;   /* (0.26) the mixer's SEND */
+        sound[t].pan = (float)((int32_t)set.pan[t] - 50) * 0.02f;   /* (0.43) its PAN, -1 .. 1 */
         {
             const int32_t vol = locked(t, SEQ_LK_VOL, set.vol[t]);
             sound[t].gain = (float)(vol * vol) * 0.0001f;   /* (0.27) its fader, squared (100: 1, exactly) */
@@ -819,6 +826,7 @@ static void settings_defaults(void)
                                               * level, none muted */
         set.send[t] = 100;
         set.vol[t] = 100;
+        set.pan[t] = 50;                     /* (0.43) */
     }
     set.mute = 0;
     set.octave = 0;
@@ -879,7 +887,7 @@ static int set_size_known(int n)
 {
     return n == SET_SIZE_012 || n == SET_SIZE_013 || n == SET_SIZE_016 || n == SET_SIZE_017 || n == SET_SIZE_018 ||
            n == SET_SIZE_021 || n == SET_SIZE_025 || n == SET_SIZE_026 || n == SET_SIZE_036 ||
-           n == SET_SIZE_037 || n == (int)sizeof(settings_t);
+           n == SET_SIZE_037 || n == SET_SIZE_042 || n == (int)sizeof(settings_t);
 }
 
 /* a record an older version saved (loaded: its size): what it lacks at its defaults */
@@ -925,6 +933,9 @@ static void settings_upgrade(settings_t *s, int loaded)
         midi_defaults(s);
     if (s->usb_audio > 1u)                   /* (0.42) */
         s->usb_audio = 0;
+    if (loaded <= SET_SIZE_042)              /* (before 0.43: no pans; each in the centre) */
+        for (uint32_t t = 0; t < SYNTH_TRACKS; t++)
+            s->pan[t] = 50;
     if (s->theme > NPALETTES)                /* (a byte reserved before 0.25.1) */
         s->theme = 0;
     if (s->sky == 0 || s->sky > SKY_DAY)     /* (a byte reserved before 0.29; 0.29..0.30.1 kept DAY, their default, as
@@ -965,7 +976,7 @@ static int settings_valid(const settings_t *s, int loaded)
             return 0;
     }
     for (uint32_t t = 0; t < SYNTH_TRACKS; t++)   /* (0.39) */
-        if (s->midi_ch[t] > 16u)
+        if (s->midi_ch[t] > 16u || s->pan[t] > 100u)
             return 0;
     if (s->midi_in > MIDI_IN_CHANNELS || s->midi_clock > CLOCK_BOTH)
         return 0;
@@ -2856,6 +2867,33 @@ static void mixer_turn(uint32_t index, int32_t e)
     app_say(a, t);
 }
 
+/* (0.43) a PAN as the screen says it: L50 .. L1, C, R1 .. R50 */
+static void pan_text(uint32_t v, char *t)
+{
+    t[0] = 0;
+    if (v == 50u) {
+        text_cat(t, "C");
+        return;
+    }
+    text_cat(t, v < 50u ? "L" : "R");
+    int_text(v < 50u ? 50 - (int32_t)v : (int32_t)v - 50, t + 1);
+}
+
+/* (0.43) SEL again, PAN: K1 the selected track's PAN (its dry sound's place; the effect's send stays mono) */
+static void pan_turn(uint32_t index, int32_t e)
+{
+    char a[16], t[8];
+    if (index)
+        return;
+    set.pan[track_sel] = (uint8_t)clamp((int32_t)set.pan[track_sel] + e, 0, 100);
+    set_dirty = 1;
+    pan_text(set.pan[track_sel], t);
+    a[0] = 0;
+    text_cat(a, "PAN ");
+    text_cat(a, TRACK_NAME[track_sel]);
+    app_say(a, t);
+}
+
 /* SEQ held, REC: the selected track's steps all off (its length kept) */
 static void track_clear(void)
 {
@@ -2875,7 +2913,7 @@ static uint32_t page_button(uint32_t page)   /* the button that opens a page */
     return page == PAGE_SEQ || page == PAGE_TEMPO || IS_SOUND_PAGE(page) ? B_HOME : page == PAGE_MOD ? B_LFO :
            page == PAGE_ENV ? B_ENV :
            page == PAGE_GLO || page == PAGE_MIDI || page == PAGE_USB || page == PAGE_SCREEN || page == PAGE_DEBUG ? B_GLO :
-           page == PAGE_MIXER ? B_SEL :
+           IS_MIXER_PAGE(page) ? B_SEL :
            IS_ARP_PAGE(page) ? B_ARP : B_FX;
 }
 
@@ -2884,6 +2922,7 @@ static uint32_t page_period(uint32_t page)
 {
     return page == PAGE_DEBUG ? 125u :       /* (GLO's fifth, 0.42) */
            page == PAGE_USB ? 375u :         /* (GLO's third, 0.42) */
+           page == PAGE_PAN ? 500u :         /* (SEL's second, 0.43) */
            page == PAGE_TEMPO || page == PAGE_MIDI || page == PAGE_FX_TAPE || page == PAGE_ARP_2 ? 500u :
            page == PAGE_OSC || page == PAGE_FX_ECHO || page == PAGE_SHAPE || page == PAGE_SCREEN ? 250u : 1000u;
 }
@@ -3088,7 +3127,7 @@ static void lights(uint32_t btn, uint32_t keys)
     } else if (seq.playing && now - ui.beat_at < (ui.beat_bar ? 120u : 60u))
         lit |= LED_PLAY_GREEN;               /* PLAY green on each beat, longer on the bar's first */
     key_lights_t k = {keys, 0, 0};
-    if (ui.preset_down || ui.home_down || ui.lock_mode || ui.step_mode || active_page == PAGE_MIXER) {
+    if (ui.preset_down || ui.home_down || ui.lock_mode || ui.step_mode || IS_MIXER_PAGE(active_page)) {
         k.lit = k.mid = 0;
         if (ui.preset_down)
             slot_lights(&k);
@@ -3234,7 +3273,7 @@ static void key_down(uint32_t k)
             lock_key((uint32_t)w, 1);
         else if (b >= 0 && b < (int)SYNTH_TRACKS)
             track_select((uint32_t)b);
-    } else if (active_page == PAGE_MIXER) {   /* (the other keys silent) */
+    } else if (IS_MIXER_PAGE(active_page)) {   /* (the other keys silent) */
         ui.key_mix |= bit;
         if (w >= 0 && w < (int)SYNTH_TRACKS)
             mute_toggle((uint32_t)w);
@@ -3505,13 +3544,15 @@ static void seq_let_go(void)
     ui.redraw = 1;
 }
 
-/* SEL let go: the mixer (again: back to the page it was opened on). (Held on an FX page until 0.31: SEED, the grains
- * by hand) */
+/* SEL let go: the mixer, again PAN (0.43), again back to the page it was opened on. (Held on an FX page until 0.31:
+ * SEED, the grains by hand) */
 static void sel_follow(uint32_t btn)
 {
     if (ui.sel_down && !(btn & 1u << B_SEL)) {
         ui.sel_down = 0;
         if (active_page == PAGE_MIXER)
+            active_page = PAGE_PAN;
+        else if (active_page == PAGE_PAN)
             active_page = ui.mixer_from;
         else {
             ui.mixer_from = active_page;
@@ -3677,6 +3718,8 @@ static void encoder_turn(uint32_t k, int32_t e)
         select_turn(e);
     else if (knob && active_page == PAGE_MIXER)
         mixer_turn(index, e);
+    else if (knob && active_page == PAGE_PAN)
+        pan_turn(index, e);
     else if (knob && active_page == PAGE_SCREEN) {
         if (index == 0u)                     /* (K3: none) */
             theme_turn(e);
@@ -3951,6 +3994,17 @@ static void knob_own(uint32_t i, knob_t *k)
         k->frac = v * 256;
         return;
     }
+    if (active_page == PAGE_PAN) {           /* (0.43) the selected track's PAN; K2, K3 none */
+        k->name = PARAM_NAME[PAGE_PAN][i];
+        if (i) {
+            k->frac = KNOB_NONE;
+            return;
+        }
+        pan_text(set.pan[track_sel], k->value);
+        k->frac = (int32_t)set.pan[track_sel] * 256;
+        k->centred = 1;
+        return;
+    }
     if (active_page == PAGE_SCREEN) {        /* THEME, SKY (0.28) */
         k->name = PARAM_NAME[PAGE_SCREEN][i];
         if (i == 1u) {
@@ -4215,7 +4269,7 @@ static int animate_dials(uint32_t now)
           IS_ARP_PAGE(active_page) || active_page == PAGE_TEMPO ||
           active_page == PAGE_SEQ || active_page == PAGE_GLO || active_page == PAGE_MIDI || active_page == PAGE_USB ||
           active_page == PAGE_SCREEN ||
-          active_page == PAGE_MIXER) ||
+          IS_MIXER_PAGE(active_page)) ||
         ui.splash_until || list_open()) return 0;
     const uint32_t dt = now - ui.dial_at;
     if (dt < frame_ms()) return 0;
@@ -4246,7 +4300,7 @@ static int animate_dials(uint32_t now)
     ui.dial_next = (uint8_t)((dial + 1u) % 3u);
     if (active_page == PAGE_SEQ && !ui.step_mode)   /* (HOME's terricons: no knobs drawn) */
         return 0;
-    if (active_page == PAGE_SEQ || active_page == PAGE_MIXER || IS_FX_PAGE(active_page) || IS_ARP_PAGE(active_page)) {   /* (small: SEQ's at the
+    if (active_page == PAGE_SEQ || IS_MIXER_PAGE(active_page) || IS_FX_PAGE(active_page) || IS_ARP_PAGE(active_page)) {   /* (small: SEQ's at the
                                                                    * page's top, 0.28; the mixer's and, 0.33, the
                                                                    * effect's in the bottom band) */
         cv_begin(80, CHIP_H, C_BLACK);
@@ -5401,6 +5455,52 @@ static void draw_mixer_body(int32_t dy)
     }
 }
 
+/* (0.43) SEL again, PAN: the eight tracks a strip each, as on the mixer: its name, a pan pot (a ring, its top
+ * marked, the pointer where the track sits: full left, the top, full right), its PAN in words (L50 .. C .. R50),
+ * its sound as two meters, left and right (each full while the track is in the middle; the far side empty at a
+ * side), M and S as on the mixer. The keys mute and solo here too */
+static void draw_pan_body(int32_t dy)
+{
+    char t[8];
+    const int32_t H = 26;
+    for (uint32_t tr = 0; tr < SYNTH_TRACKS; tr++) {
+        const int32_t x = 8 + (int32_t)tr * 28, cx = x + 12, cy = 55 + dy, sel = tr == track_sel;
+        const int muted = seq.mute >> tr & 1u, mute = set.mute >> tr & 1u, solo = ui.solo >> tr & 1u;
+        const int32_t pan = set.pan[tr], m = (int32_t)ui.meter[tr] * H / 256;
+        const int32_t ml = m * (pan > 50 ? 100 - pan : 50) / 50, mr = m * (pan < 50 ? pan : 50) / 50;
+        const int8_t *d = DIAL_POINT[pan * 48 / 100];
+        const uint16_t c = muted ? C_DIM : sel ? C_HI : C_WHITE;
+        if (sel)
+            cv_rect(x, 22 + dy, 26, 15, C_HI);
+        cv_text(x + 13 - text_w(&FONT_XS, TRACK_NAME[tr]) / 2, 22 + dy, &FONT_XS, TRACK_NAME[tr],
+                sel ? C_BLACK : muted ? C_DIM : C_WHITE);
+        dial_ring(cx, cy, 10, sel ? C_GRAY : C_DIM);
+        cv_rect(cx, cy - 13, 1, 2, C_GRAY);  /* the centre */
+        cv_line(cx, cy, cx + d[0] * 9 / 127, cy + d[1] * 9 / 127, c);
+        cv_line(cx + 1, cy, cx + 1 + d[0] * 9 / 127, cy + d[1] * 9 / 127, c);
+        pan_text((uint32_t)pan, t);
+        cv_text(x + 13 - text_w(&FONT_XS, t) / 2, 70 + dy, &FONT_XS, t, muted ? C_DIM : pan == 50 ? C_GRAY : c);
+        for (uint32_t s = 0; s < 2u; s++) {  /* its meters, L and R, a segment every other row */
+            const int32_t mx = x + 6 + (int32_t)s * 8, h = s ? mr : ml, top = 88 + dy;
+            cv_rect(mx, top, 6, H, RGB(18, 18, 23));
+            for (int32_t r = 0; r < h; r += 2)
+                cv_rect(mx, top + H - 1 - r, 6, 1, muted ? C_DIM : r >= H * 7 / 8 ? C_WHITE : r >= H / 2 ? C_HI : C_AMB);
+        }
+        for (uint32_t b = 0; b < 2u; b++) {  /* M, S: as on the mixer */
+            const int on = b ? solo : mute;
+            const int32_t bx = x + 1 + (int32_t)b * 12;
+            const char *l = b ? "S" : "M";
+            if (on)
+                cv_rect(bx, 120 + dy, 11, 14, b ? C_HI : C_RED);
+            else {
+                cv_rect(bx, 120 + dy, 11, 14, C_LINE);
+                cv_rect(bx + 1, 121 + dy, 9, 12, C_BLACK);
+            }
+            cv_text(bx + 6 - text_w(&FONT_T, l) / 2, 121 + dy, &FONT_T, l, on ? C_BLACK : C_DIM);
+        }
+    }
+}
+
 static uint32_t meter_of(float peak)         /* a track's loudest sample (0..~1) as a meter's height, 0..256 */
 {
     return peak > 0.0f ? (uint32_t)(peak / (peak + 0.15f) * 256.0f) : 0u;
@@ -5583,9 +5683,12 @@ static void draw_seq_grid(void)
         cv_blit(LEVEL_X, HOME_BAND_Y + LEVEL_Y);
         return;
     }
-    if (active_page == PAGE_MIXER) {
+    if (IS_MIXER_PAGE(active_page)) {
         cv_begin(240, 144u - STRIP_Y, C_BLACK);
-        draw_mixer_body(-STRIP_Y);
+        if (active_page == PAGE_PAN)
+            draw_pan_body(-STRIP_Y);
+        else
+            draw_mixer_body(-STRIP_Y);
         cv_blit(0, 36 + STRIP_Y);
     } else if (IS_FX_PAGE(active_page)) {    /* (0.33) the lake, under the page's name */
         cv_begin(240, 144u - LAKE_Y, C_BLACK);
@@ -5901,7 +6004,7 @@ static void draw_mixer_band(void)
 {
     char t[48];
     const int32_t y = 43;
-    draw_chips(CHIP_Y, 7u, 0);
+    draw_chips(CHIP_Y, active_page == PAGE_PAN ? 1u : 7u, 0);   /* (PAN, 0.43: K1 alone) */
     if (band_message(t, 160))
         cv_text(8, y + 2, &FONT_T, t, preset_import_failed ? C_HI : C_GRAY);
     else if (ui.lock_mode)                   /* (0.35) LOCK: the steps for the keys */
@@ -6048,6 +6151,8 @@ static void draw_page(void)
         draw_seq();
     else if (active_page == PAGE_MIXER)
         draw_mixer_body(0);
+    else if (active_page == PAGE_PAN)
+        draw_pan_body(0);
     else if (IS_FX_PAGE(active_page))        /* (0.33) the lake; its knobs small, in the bottom band */
         draw_fx_page();
     else if (IS_ARP_PAGE(active_page))       /* (0.34) the arp's ladder; its knobs small, in the bottom band */
@@ -6107,7 +6212,7 @@ static void draw_bottom(void)
         draw_home_band();
     else if (active_page == PAGE_SEQ)
         draw_seq_band();
-    else if (active_page == PAGE_MIXER)
+    else if (IS_MIXER_PAGE(active_page))
         draw_mixer_band();
     else if (IS_FX_PAGE(active_page))
         draw_fx_band();
@@ -6330,7 +6435,7 @@ void app_frame(void)
     lake_listen(now);                        /* (0.33: the effect's levels, every frame) */
     if (active_page == PAGE_SEQ)
         seq_frame(now);
-    else if (active_page == PAGE_MIXER)
+    else if (IS_MIXER_PAGE(active_page))
         mixer_frame(now);
     else if (IS_FX_PAGE(active_page))
         fx_frame(now);
@@ -6473,6 +6578,11 @@ int app_host_cmd(const char *cmd, const char *a, const char *b, const char *c, c
                                             !strcmp(cmd, "save016") ? SET_SIZE_016 : !strcmp(cmd, "save018") ? SET_SIZE_018 : SET_SIZE_021);
         return 1;
     }
+    if (!strcmp(cmd, "save042")) {           /* (0.43) the settings as 0.39..0.42 saved them: no pans */
+        settings_capture();
+        plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_042);
+        return 1;
+    }
     if (!strcmp(cmd, "save038")) {           /* (0.39) the settings as 0.37..0.38 saved them: no MIDI page's */
         settings_capture();
         plat_store_save(OBJ_SETTINGS, &set, SET_SIZE_037);
@@ -6600,12 +6710,23 @@ int app_expect(const char *what, int *got)
     else if (!strcmp(what, "midi_clock"))
         *got = set.midi_clock;
     else if (!strcmp(what, "usb_audio"))     /* (0.42) GLO's USB: AUDIO; the loudest sample in the last render's USB
-                                              * audio of a track (usb_trk<track>) or the mix (usb_mix; -1: not MULTI) */
+                                              * audio of a track (usb_trk<track>) or the mix (usb_mix its left,
+                                              * usb_mixr its right, 0.43; -1: not MULTI) */
         *got = set.usb_audio;
 #ifdef PLAT_USB_TRACKS
-    else if (!strncmp(what, "usb_trk", 7) || !strcmp(what, "usb_mix")) {
+    else if (!strcmp(what, "usb_side")) {   /* (0.43) the mix's loudest left sample less its loudest right one */
         const int16_t *b = plat_usb_tracks();
-        const uint32_t c = what[4] == 'm' ? 0u : 2u + (uint32_t)atoi(what + 7) % SYNTH_TRACKS;
+        int l = 0, r = 0;
+        for (uint32_t i = 0; b && i < APP_BLOCK; i++) {
+            const int x = b[i * GRAV_USB_CH], y = b[i * GRAV_USB_CH + 1];
+            l = (x < 0 ? -x : x) > l ? (x < 0 ? -x : x) : l;
+            r = (y < 0 ? -y : y) > r ? (y < 0 ? -y : y) : r;
+        }
+        *got = l - r;
+    }
+    else if (!strncmp(what, "usb_trk", 7) || !strcmp(what, "usb_mix") || !strcmp(what, "usb_mixr")) {
+        const int16_t *b = plat_usb_tracks();
+        const uint32_t c = what[4] == 'm' ? (what[7] == 'r' ? 1u : 0u) : 2u + (uint32_t)atoi(what + 7) % SYNTH_TRACKS;
         int peak = -1;
         if (b) {
             peak = 0;
@@ -6716,6 +6837,8 @@ int app_expect(const char *what, int *got)
         *got = set.controls[track_sel].level;
     else if (!strcmp(what, "vol"))           /* (0.27) the selected track's fader */
         *got = set.vol[track_sel];
+    else if (!strcmp(what, "pan"))           /* (0.43) the selected track's PAN, 0 left .. 50 .. 100 right */
+        *got = set.pan[track_sel];
     else if (!strcmp(what, "fx_return"))
         *got = fx_params[FX_HALL];
     else if (!strcmp(what, "meter"))         /* the selected track's meter, 0..256 */

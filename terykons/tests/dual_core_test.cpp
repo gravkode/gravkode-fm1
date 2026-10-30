@@ -97,6 +97,7 @@ static std::vector<int32_t> render(unsigned engine, unsigned voices, bool fx_on,
                 const bool drum = t >= SYNTH_S_TRACKS;
                 sound[t].send = send < 0.0f ? 0.5f * float(t % 3) : send;   // (0.26: < 0, each its own: 0, 0.5, 1)
                 sound[t].gain = send < 0.0f ? 0.25f * float(t % 4) + 0.25f : 1.0f;   // (0.27: the faders, with them)
+                sound[t].pan = send < 0.0f ? 0.25f * float(t) - 0.9f : 0.0f;   // (0.43: each its place, with them)
                 sound[t].engine = drum ? KIT[engine & 1u][t - SYNTH_S_TRACKS] : current_engine;
                 sound[t].timbre = drum ? 0.3f + 0.1f * float(t - SYNTH_S_TRACKS) : timbre;
                 sound[t].morph = drum ? 0.6f : 0.5f;

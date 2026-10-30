@@ -168,12 +168,16 @@ wait 1300
 peakreset
 wait 300
 expect peak_db_min -60
-# SEL from an FX page: the mixer, held or tapped (SEED went with the grains); again: back. EDIT does nothing
+# SEL from an FX page: the mixer, held or tapped (SEED went with the grains); again PAN (0.43); again: back. EDIT does
+# nothing
 press SEL
 wait 500
 release SEL
 wait 30
 expect page 13
+tap SEL
+wait 30
+expect page 19
 tap SEL
 wait 30
 expect page 4

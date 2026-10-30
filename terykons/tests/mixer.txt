@@ -1,7 +1,8 @@
 # The mixer (0.26, SEL): the eight tracks a strip each: VOL (K1, the selected track's fader; 0.27: its own, not its
 # sound's OUTPUT LEVEL),
 # SEND (K2: its share through the effect; the rest goes past it), the effect's RETURN (K3: HALL's AMOUNT, 0.32), the
-# mutes on white keys 1..8 (a muted track's steps start no notes), the tracks on black keys 1..8. SEL again: back.
+# mutes on white keys 1..8 (a muted track's steps start no notes), the tracks on black keys 1..8. SEL again: PAN
+# (0.43, pan.txt); again: back.
 # On the effect's pages too (SEED, held there, went with Beads' grains in 0.32). Saved with the settings.
 #   tools/build.py terykons --host, then
 #   terykons/build/host/terykons_host terykons/tests/mixer.txt terykons/build/host
@@ -113,7 +114,10 @@ expect send 100
 expect vol 100
 wait 900
 expect meter 0
-# SEL again: back to SEQ's page; from an FX page too (0.26.2), held there as well (0.32)
+# SEL again: PAN (0.43); again: back to SEQ's page; from an FX page too (0.26.2), held there as well (0.32)
+tap SEL
+wait 30
+expect page 19
 tap SEL
 wait 30
 expect page 8
@@ -125,12 +129,16 @@ wait 30
 expect page 13
 tap SEL
 wait 30
+tap SEL
+wait 30
 expect page 4
 press SEL
 wait 500
 release SEL
 wait 30
 expect page 13
+tap SEL
+wait 30
 tap SEL
 wait 30
 expect page 4

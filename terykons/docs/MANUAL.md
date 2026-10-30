@@ -70,14 +70,14 @@ From the top:
   the value, a pointer easing to it; the name above, the value under. A knob that starts from the middle (DENSITY,
   PITCH, TUNE) has a longer tick there. The knob being turned grows a little and takes the theme's colour, then
   settles back. In step mode (SEQ) its knobs are small, at the page's top, above the tracks' steps (section 5); on
-  the mixer's, the effect's (0.33) and the arp's (0.34) pages small too, in the bottom band.
+  the mixer's and PAN's (0.43), the effect's (0.33) and the arp's (0.34) pages small too, in the bottom band.
 - **The bottom band:** the page's state (a sound page: how to change pages);
   OCT (the octave), PRESET (the selected sound, or CUSTOM after editing), VOL (MASTER); a message, or the last MIDI
   message in and where from (USB or TRS); CPU, the share of its time the sound takes: it turns red once a block of
   sound came late (heard as a crackle), until the next power-on. In step mode (0.30.1) one line: PLAY or
   STOP, REC or STEP (the track alone: its name and NOTES, a drum's STEPS), the pattern, UNSAVED, and CPU
   (the engine is in the header). In LOCK mode (0.35) the page's state is the 16 steps on the white keys and LOCK. On
-  the mixer, the effect's (0.33) and the arp's (0.34) pages the page's three knobs,
+  the mixer, PAN (0.43), the effect's (0.33) and the arp's (0.34) pages the page's knobs,
   small, and under them what the mixer's keys do, ECHO's time and whether the effect is on, or the notes the arp
   holds; and CPU. The keys are not drawn: the
   FM-1's own are under the screen.
@@ -102,7 +102,7 @@ From the top:
 | FX | The effect's pages, again for the next (0.32): HALL, TAPE, ECHO (section 7). Lit while the effect runs |
 | ARP | The selected synth track's arpeggiator (0.34): ARP (MODE, RATE, OCTAVES), again ARP 2 (GATE, HOLD) (section 4). Lit while it is on |
 | EDIT | LOCK mode (0.35): tap, on or off; held with a white key, that step's locks cleared (section 5). Lit while on (0.32..0.34 free; FREEZE before) |
-| SEL | The MIXER (section 4), from every page; SEL again: back to the page it was opened on |
+| SEL | The MIXER (section 4), from every page; SEL again: PAN (0.43, each track's place from left to right); again: back to the page it was opened on |
 | SEQ | Step mode: every track on the screen, the white keys their steps (section 5). Lit while on. SEQ again (0.31): the selected track alone, a synth track's notes as a piano roll, a drum track's 64 steps; a third time: back to the page it was pressed on |
 | PLAY | The sequencer: start, stop. Green on each beat while it plays; red while recording |
 | REC | Stopped: step recording; playing: live recording (section 5). Held SEQ, then REC: the selected track cleared |
@@ -110,7 +110,7 @@ From the top:
 | SAVE | Tap: stores settings and pattern, the white keys lighting one after another, first to last (0.31). Hold: user preset slots; OCT-/+ changes page, a white key saves/replaces the slot. Lit while changes remain unsaved (section 9) |
 
 The page shown has its button blinking: slowly on a button's first page, faster on the next (FX: HALL, TAPE,
-ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, MIDI, USB, SCREEN, DEBUG).
+ECHO; ARP: ARP, ARP 2; HOME: SEQ, TEMPO, OSC; GLO: GLO, MIDI, USB, SCREEN, DEBUG; SEL: MIXER, PAN).
 
 **At power-on:** OCT- and OCT+ held is the panel's setup (the knobs' and keys' calibration); REC held starts the
 chip's update mode, a way to install when Terykons starts but its USB can't be reached.
@@ -248,8 +248,8 @@ decay while held still exists; extending RELEASE cannot restore a carrier that h
 
 ![The mixer playing: the eight tracks a strip each, S1 selected; each with its fader, its meter moving, its send bar, its M and S; LEVEL, SEND, RETURN below](img/screen-mixer.png "The mixer")
 
-SEL opens the mixer, from every page; SEL again goes back to the page it was
-opened on. Each track is a strip, S1 to S4 then D1 to D4:
+SEL opens the mixer, from every page; SEL again opens PAN (0.43, below), and again goes back to the page the mixer
+was opened on. Each track is a strip, S1 to S4 then D1 to D4:
 
 - **its name**, the selected track's in the theme's colour;
 - **its VOL** as a fader: the mixer's own (0.27), which a preset never changes (its sound's OUTPUT LEVEL is
@@ -272,9 +272,36 @@ The other keys do not play on the mixer. A silent track (muted, or another soloe
 page and its row red in step mode; a soloed one shows SOLO. The keys still play a silent track. Live recording goes on while muted. SEND and the mutes are saved with the settings
 (SAVE); settings saved before 0.26 have every track sent whole and none muted.
 
+### PAN (SEL again, 0.43)
+
+![PAN playing: the eight tracks a strip each, S1 selected at L35; each with its pan pot, its PAN, its sound on the left and on the right, its M and S; PAN L35 below](img/screen-pan.png "PAN")
+
+SEL on the mixer opens PAN: where each track sits between the left and the right. SEL again goes back to the page
+the mixer was opened on. Each track is a strip, as on the mixer:
+
+- **its name**, the selected track's in the theme's colour;
+- **a pan pot**: its pointer up in the centre, at its left end full left, at its right end full right;
+- **its PAN** in words: L50 (full left) to L1, C (the centre), R1 to R50 (full right);
+- **two meters**, its sound on the left and on the right: both full in the centre, the far one emptier as it moves
+  to a side, empty at the end;
+- **M** and **S**, as on the mixer.
+
+| Control | What it does |
+| --- | --- |
+| K1 PAN | the selected track's place, L50 to C to R50 (C: as before 0.43) |
+| White keys 1–8, black keys 1–8 | mute and solo, as on the mixer |
+| SELECT | pick the track K1 is for |
+
+PAN places a track's own sound; what it sends through the effect (SEND) goes in as before, in the middle, and the
+reverb's and the echo's tails spread over both sides as they always have. The pan is constant power: a track at a
+side is 3 dB louder on that side than on either in the centre, and silent on the other, so it sounds as loud moved
+as it did in the middle. Every track in the centre, the sound is as before 0.43, sample for sample. PAN is not
+locked on a step (LOCK NOT ON THIS PAGE). Saved with the settings (SAVE); settings from before 0.43 have every track
+in the centre. In USB audio MULTI (section 10) the mix on 1-2 has the pans; each track's own input stays mono.
+
 ### GLO (GLO)
 
-![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004202, version 0.42.2](img/screen-glo.png "The GLO page")
+![The GLO page: the voices of S1..S4 and those free, S1's VOICES MONO, VELOCITY ON, METRONOME REC; ID FM-1_73004300, version 0.43.0](img/screen-glo.png "The GLO page")
 
 The firmware and its global settings:
 
@@ -871,7 +898,8 @@ two ways:
   FM-1's speaker and headphones, at MASTER.
 - **MULTI**: a computer records the mix on inputs 1-2 and each of the eight tracks on an input of its own: S1 on 3,
   S2 on 4, S3 on 5, S4 on 6, D1 on 7, D2 on 8, D3 on 9, D4 on 10 (a multitrack in a DAW). A track's input is its
-  voices after its fader (VOL), as it plays in the mix, mono, without the effect (that is on 1-2 alone). All ten come
+  voices after its fader (VOL), as it plays in the mix, mono, without the effect (that is on 1-2 alone) and without
+  its PAN (0.43: the mix on 1-2 has it; in the DAW a track is placed again on its own). All ten come
   at a fixed level whatever MASTER says: 6 dB under what a full MASTER gives the speaker (0.42.2; a hot drum stays
   clean, where 0.42.0's tracks hit the limiter), on the computer's clock (0.42.1, below), about 7 ms later than in
   STEREO. They carry the FM-1 alone: the computer's own playback through the FM-1 and the metronome's click are heard

@@ -1,0 +1,145 @@
+# PAN (0.43): SEL again from the mixer. Each track a strip: its name, a pan pot, its PAN (L50 .. C .. R50), its sound
+# as two meters (left, right), M and S as on the mixer (the keys mute and solo here too). K1 the selected track's
+# PAN: its dry sound's place (constant power: the centre as before 0.43, sample for sample; +3 dB at a side), the
+# effect's send mono. SEL again: back to the page the mixer was opened on. Saved with the settings; older: centre.
+# Read through USB audio MULTI (the mix's left on 1, right on 2: usb_mix, usb_mixr; usb_side left less right).
+#   terykons/build/host/terykons_host terykons/tests/pan.txt terykons/build/host
+wait 600
+expect pan 50
+# MULTI (GLO three times: USB, K1)
+tap GLO
+wait 30
+tap GLO
+wait 30
+tap GLO
+wait 30
+expect page 18
+turn K1 1
+wait 30
+expect usb_audio 1
+tap HOME
+wait 30
+expect page 8
+# the mixer: S1's SEND 0 (its dry sound alone on 1-2); SEL again: PAN
+listen
+wait 400
+tap SEL
+wait 30
+expect page 13
+turn K2 -100
+wait 30
+expect send 0
+tap SEL
+wait 30
+expect page 19
+said PAGE PAN
+# in the centre: both sides alike, as before 0.43 (S1's notes over MIDI: the keys mute and solo here)
+midi 90 3C 64
+wait 200
+expect usb_mix >100
+expect usb_side 0
+midi 80 3C 00
+wait 3000
+# K2, K3: none
+turn K2 5
+turn K3 5
+wait 30
+expect pan 50
+# full left: nothing on the right; S1's own channel (3) as it was, mono
+turn K1 -50
+wait 30
+expect pan 0
+said PAN S1 L50
+expect dirty 1
+midi 90 3C 64
+wait 200
+expect usb_mix >100
+expect usb_mixr 0
+expect usb_trk0 >100
+midi 80 3C 00
+wait 3000
+# no further than the end
+turn K1 -10
+wait 30
+expect pan 0
+# full right: nothing on the left
+turn K1 100
+wait 30
+expect pan 100
+said PAN S1 R50
+midi 90 3C 64
+wait 200
+expect usb_mix 0
+expect usb_mixr >100
+midi 80 3C 00
+wait 3000
+# R25: both, the right louder
+turn K1 -25
+wait 30
+expect pan 75
+said PAN S1 R25
+midi 90 3C 64
+wait 200
+expect usb_mix >100
+expect usb_side <0
+midi 80 3C 00
+wait 3000
+# another track its own (in the centre)
+turn SELECT 1
+wait 1600
+expect track 1
+expect pan 50
+turn SELECT -1
+wait 1600
+expect pan 75
+# the keys as on the mixer: white key 2 mutes S2, black key 1 solos S1; again: off
+key 2 down 100 0
+wait 30
+key 2 up
+wait 30
+expect mute 514
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+expect solo 1
+key 2 down 100 0
+wait 30
+key 2 up
+key 1 down 100 0
+wait 30
+key 1 up
+wait 30
+expect mute 0
+expect solo 0
+# SEL again: back to SEQ's page; from an FX page: back there
+tap SEL
+wait 30
+expect page 8
+tap FX
+wait 30
+expect page 4
+tap SEL
+wait 30
+tap SEL
+wait 30
+expect page 19
+tap SEL
+wait 30
+expect page 4
+# saved: a restart keeps it
+tap SAVE
+wait 300
+reboot
+wait 600
+expect pan 75
+# the settings as 0.39..0.42 saved them: every track in the centre; as 0.37..0.38, too
+save042
+reboot
+wait 600
+expect pan 50
+expect usb_audio 1
+save038
+reboot
+wait 600
+expect pan 50

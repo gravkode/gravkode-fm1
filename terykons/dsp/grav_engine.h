@@ -41,6 +41,9 @@ typedef struct {
     float send;                          /* (0.26) its share through the effect, 0..1; the rest goes past it, dry. 1
                                           * (every track): the whole mix through it, as before */
     float gain;                          /* (0.27) the mixer's fader on it, 0..1 (1: as before, sample for sample) */
+    float pan;                           /* (0.43) its place in the stereo, -1 left .. 0 centre .. 1 right: its dry
+                                          * sound's (the effect's send stays mono). Every track at 0: as before,
+                                          * sample for sample */
 } grav_sound_t;
 
 void grav_engine_init(grav_engine_t *e);
